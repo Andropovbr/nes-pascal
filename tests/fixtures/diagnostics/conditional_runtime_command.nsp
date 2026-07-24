@@ -1,0 +1,12 @@
+program InvalidConditionalRuntime;
+
+var
+    Enabled: boolean;
+
+begin
+    Enabled := true;
+    if Enabled then
+        nes.run;
+    nes.set_background_color($21);
+    nes.run;
+end.

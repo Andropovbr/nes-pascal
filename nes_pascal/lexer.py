@@ -12,6 +12,9 @@ class TokenKind(Enum):
     VAR = auto()
     BEGIN = auto()
     END = auto()
+    IF = auto()
+    THEN = auto()
+    ELSE = auto()
     TRUE = auto()
     FALSE = auto()
     NOT = auto()
@@ -42,6 +45,9 @@ KEYWORDS = {
     "var": TokenKind.VAR,
     "begin": TokenKind.BEGIN,
     "end": TokenKind.END,
+    "if": TokenKind.IF,
+    "then": TokenKind.THEN,
+    "else": TokenKind.ELSE,
     "true": TokenKind.TRUE,
     "false": TokenKind.FALSE,
     "not": TokenKind.NOT,

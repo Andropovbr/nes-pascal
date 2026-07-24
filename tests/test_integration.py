@@ -44,6 +44,36 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_builds_valid_boolean_expressions_nrom_image(self) -> None:
         self._assert_valid_nrom_image("boolean_expressions")
 
+    def test_builds_valid_conditionals_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("conditionals")
+
+    def test_conditional_branch_larger_than_relative_branch_range(self) -> None:
+        assignments = "\n".join(
+            "        Counter := Counter + $01;" for _ in range(80)
+        )
+        source = f"""program LongBranch;
+var
+    Enabled: boolean;
+    Counter: byte;
+begin
+    Enabled := true;
+    Counter := $00;
+    if Enabled then
+    begin
+{assignments}
+    end;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source_path = Path(temporary_directory) / "long_branch.nsp"
+            rom_path = Path(temporary_directory) / "long_branch.nes"
+            source_path.write_text(source, encoding="utf-8")
+            compile_source(source_path, rom_path)
+            rom = rom_path.read_bytes()
+        self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
+
 
 if __name__ == "__main__":
     unittest.main()

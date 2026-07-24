@@ -96,6 +96,16 @@ class DiagnosticPrecedenceTests(unittest.TestCase):
             str(error),
         )
 
+    def test_runtime_command_inside_conditional_is_preserved(self) -> None:
+        self.assert_primary_diagnostic(
+            "conditional_runtime_command.nsp",
+            "E3009",
+            9,
+            9,
+            "nes.run cannot appear inside a conditional branch.",
+            "        ^^^^^^^",
+        )
+
     def test_assignment_error_precedes_missing_background_color(self) -> None:
         source = """program InvalidPrecedence;
 var

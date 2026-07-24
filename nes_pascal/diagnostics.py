@@ -26,6 +26,7 @@ class DiagnosticCode(StrEnum):
     ASSIGNMENT_TO_CONSTANT = "E3006"
     UNKNOWN_ASSIGNMENT_TARGET = "E3007"
     VARIABLE_READ_BEFORE_ASSIGNMENT = "E3008"
+    CONDITIONAL_RUNTIME_COMMAND = "E3009"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -77,6 +78,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Variable read before assignment"
+    ),
+    DiagnosticCode.CONDITIONAL_RUNTIME_COMMAND: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Runtime command inside conditional"
     ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"

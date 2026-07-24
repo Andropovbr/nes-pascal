@@ -60,6 +60,20 @@ class BackendGoldenTests(unittest.TestCase):
         self.assertIn("lda #$00              ; false", actual)
         self.assertIn("lda #$01              ; true", actual)
 
+    def test_conditional_program_matches_golden_assembly(self) -> None:
+        source_path = ROOT / "examples" / "conditionals.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        actual = generate(analyze(parse(source, filename), source, filename))
+        expected = (ROOT / "tests" / "golden" / "conditionals.asm").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(actual, expected)
+        self.assertIn("; long-branch-safe false path", actual)
+        self.assertIn("@if_then_", actual)
+        self.assertIn("@if_else_", actual)
+        self.assertIn("@if_end_", actual)
+
 
 if __name__ == "__main__":
     unittest.main()

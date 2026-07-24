@@ -14,6 +14,7 @@ from .ast import (
     ComparisonExpression,
     ComparisonOperator,
     HexLiteral,
+    IfStatement,
     Literal,
     Program,
     Run,
@@ -169,13 +170,16 @@ class Parser:
         )
         raise AssertionError("unreachable")
 
-    def _parse_statement(self) -> Statement:
+    def _parse_statement(self, consume_terminator: bool = True) -> Statement:
+        if self._check(TokenKind.IF):
+            return self._parse_if_statement(consume_terminator)
         if self._check(TokenKind.IDENTIFIER) and self._peek_kind() is TokenKind.ASSIGN:
-            return self._parse_assignment()
+            return self._parse_assignment(consume_terminator)
 
         namespace = self._expect(
             TokenKind.IDENTIFIER,
-            "Expected an assignment, nes.set_background_color, or nes.run.",
+            "Expected an assignment, if statement, "
+            "nes.set_background_color, or nes.run.",
         )
         self._expect(TokenKind.DOT, "Expected '.' after 'nes'.")
         command = self._expect(TokenKind.IDENTIFIER, "Expected a command name.")
@@ -186,19 +190,22 @@ class Parser:
             self._unknown_command(namespace, qualified_name)
         if normalized == "nes.set_background_color":
             return self._parse_background_color(
-                SourcePosition(namespace.line, namespace.column)
+                SourcePosition(namespace.line, namespace.column),
+                consume_terminator,
             )
         if normalized == "nes.run":
-            self._expect(TokenKind.SEMICOLON, "Expected ';' after 'nes.run'.")
+            if consume_terminator:
+                self._expect(TokenKind.SEMICOLON, "Expected ';' after 'nes.run'.")
             return Run(SourcePosition(namespace.line, namespace.column))
         self._unknown_command(command, qualified_name)
         raise AssertionError("unreachable")
 
-    def _parse_assignment(self) -> Assignment:
+    def _parse_assignment(self, consume_terminator: bool) -> Assignment:
         target = self._expect(TokenKind.IDENTIFIER, "Expected an assignment target.")
         self._expect(TokenKind.ASSIGN, "Expected ':=' after the assignment target.")
         value = self._parse_expression()
-        self._expect(TokenKind.SEMICOLON, "Expected ';' after the assignment.")
+        if consume_terminator:
+            self._expect(TokenKind.SEMICOLON, "Expected ';' after the assignment.")
         return Assignment(
             target.text,
             SourcePosition(target.line, target.column),
@@ -206,7 +213,9 @@ class Parser:
         )
 
     def _parse_background_color(
-        self, position: SourcePosition
+        self,
+        position: SourcePosition,
+        consume_terminator: bool,
     ) -> SetBackgroundColor:
         self._expect(
             TokenKind.LEFT_PAREN,
@@ -217,11 +226,49 @@ class Parser:
             TokenKind.RIGHT_PAREN,
             "Expected ')' after the background color.",
         )
-        self._expect(
-            TokenKind.SEMICOLON,
-            "Expected ';' after 'nes.set_background_color(...)'.",
-        )
+        if consume_terminator:
+            self._expect(
+                TokenKind.SEMICOLON,
+                "Expected ';' after 'nes.set_background_color(...)'.",
+            )
         return SetBackgroundColor(argument, position)
+
+    def _parse_if_statement(self, consume_terminator: bool) -> IfStatement:
+        if_token = self._expect(TokenKind.IF, "Expected 'if'.")
+        condition = self._parse_expression()
+        self._expect(TokenKind.THEN, "Expected 'then' after the if condition.")
+        then_branch = self._parse_conditional_branch()
+        else_branch = None
+        if self._match(TokenKind.ELSE):
+            else_branch = self._parse_conditional_branch()
+        if consume_terminator:
+            self._expect(
+                TokenKind.SEMICOLON,
+                "Expected ';' after the if statement.",
+            )
+        return IfStatement(
+            condition,
+            then_branch,
+            else_branch,
+            SourcePosition(if_token.line, if_token.column),
+        )
+
+    def _parse_conditional_branch(self) -> tuple[Statement, ...]:
+        if not self._match(TokenKind.BEGIN):
+            return (self._parse_statement(consume_terminator=False),)
+
+        statements: list[Statement] = []
+        while not self._check(TokenKind.END):
+            if self._check(TokenKind.EOF):
+                self._error(
+                    self._current(),
+                    DiagnosticCode.INVALID_SYNTAX,
+                    "Reached the end of the file before the branch block ended.",
+                    "Finish the branch block with 'end'.",
+                )
+            statements.append(self._parse_statement())
+        self._expect(TokenKind.END, "Expected 'end' after the branch block.")
+        return tuple(statements)
 
     def _parse_expression(self) -> ValueExpression:
         return self._parse_or_expression()
@@ -349,7 +396,8 @@ class Parser:
             token,
             DiagnosticCode.UNKNOWN_COMMAND,
             f"Unknown command: {name}.",
-            "Use an assignment, nes.set_background_color(value);, or nes.run;.",
+            "Use an assignment, if statement, "
+            "nes.set_background_color(value);, or nes.run;.",
         )
 
     def _match(self, kind: TokenKind) -> bool:

@@ -93,12 +93,12 @@ Goal: support the basic control-flow constructs required for game logic.
 
 ## Milestone 6 — Conditional Statements
 
-* [ ] `if` statements
-* [ ] `if / else` statements
-* [ ] Nested conditionals
-* [ ] Compound statements inside branches
-* [ ] Conditional branch code generation
-* [ ] Long-branch handling when branch targets exceed 6502 limits
+* [x] `if` statements
+* [x] `if / else` statements
+* [x] Nested conditionals
+* [x] Compound statements inside branches
+* [x] Conditional branch code generation
+* [x] Long-branch handling when branch targets exceed 6502 limits
 
 ## Milestone 7 — Basic Loops
 

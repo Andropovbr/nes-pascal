@@ -33,6 +33,7 @@ the range reserved for their category.
 | E3006 | Semantic Analysis | Assignment to constant |
 | E3007 | Semantic Analysis | Unknown assignment target |
 | E3008 | Semantic Analysis | Variable read before assignment |
+| E3009 | Semantic Analysis | Runtime command inside conditional |
 | E4001 | Type System | Unknown type |
 | E4002 | Type System | Invalid `nes_color` value |
 | E4003 | Type System | Invalid `byte` value |
@@ -264,6 +265,30 @@ the range reserved for their category.
   ```
 
 - **Suggested fix:** Assign the variable before reading it.
+
+### E3009 - Runtime command inside conditional
+
+- **Category:** Semantic Analysis
+- **Explanation:** NES initialization commands must execute exactly once in
+  the top-level program block. `nes.set_background_color` and `nes.run`
+  cannot be placed on a conditional execution path.
+- **Trigger:**
+
+  ```pascal
+  if Enabled then
+      nes.run;
+  ```
+
+- **Expected compiler output:**
+
+  ```text
+  E3009 demo.nsp:2:5
+
+  nes.run cannot appear inside a conditional branch.
+  ```
+
+- **Suggested fix:** Move the NES runtime command out of the conditional and
+  place it in the top-level program block.
 
 ## Type System (E4000-E4999)
 

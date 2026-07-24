@@ -5,7 +5,8 @@ Pascal and specialized for Nintendo Entertainment System games. The current
 milestone supports strongly typed constants, variables, and assignments using
 the one-byte `nes_color`, `byte`, and `boolean` types, plus byte arithmetic.
 It also supports comparisons and short-circuit Boolean expressions. It
-generates ca65 Assembly for an NROM-256 image.
+supports structured `if`/`else` statements and generates ca65 Assembly for an
+NROM-256 image.
 
 ## Prerequisites
 
@@ -74,6 +75,12 @@ short-circuit evaluation.
 See `examples/boolean_expressions.nsp` for all comparison and Boolean
 operators.
 
+Conditional statements accept a single statement or a compound `begin`/`end`
+branch. Conditions must be `boolean`, `else` is optional, and conditionals may
+be nested. Definite-assignment analysis follows both control-flow paths.
+
+See `examples/conditionals.nsp` for simple, compound, and nested branches.
+
 ## Compilation
 
 Compile the minimal example with:
@@ -92,6 +99,12 @@ Compile the Boolean-expression example with:
 
 ```text
 python -m nes_pascal.cli examples/boolean_expressions.nsp -o build/boolean_expressions.nes
+```
+
+Compile the conditional example with:
+
+```text
+python -m nes_pascal.cli examples/conditionals.nsp -o build/conditionals.nes
 ```
 
 Or use:
@@ -168,7 +181,7 @@ examples, and suggested fixes.
 
 ## Current limitations
 
-- only `program`, optional `const` and `var` sections, assignment,
+- only `program`, optional `const` and `var` sections, assignment, `if`/`else`,
   `nes.set_background_color`, and `nes.run` are supported;
 - `nes_color`, `byte`, and `boolean` are the only built-in types;
 - `nes_color` and `byte` initializers use hexadecimal literals, while
@@ -179,9 +192,10 @@ examples, and suggested fixes.
 - equality and inequality require matching types; ordered comparisons are
   limited to `byte`;
 - Boolean expressions support only `not`, `and`, and `or`;
+- conditional branches support assignments and nested conditionals; NES
+  runtime commands remain top-level only;
 - variables use regular RAM; zero-page allocation is not implemented;
-- there are no conditional statements, loops, multiplication, division,
-  procedures, sprites, controller input, audio, runtime strings, recursion,
-  or optimizations;
+- there are no loops, multiplication, division, procedures, sprites,
+  controller input, audio, runtime strings, recursion, or optimizations;
 - only NTSC NES, mapper 0, 32 KiB PRG-ROM, and 8 KiB CHR-ROM are supported;
 - CHR-ROM is empty, and the backend does not provide a game engine.

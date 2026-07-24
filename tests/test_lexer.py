@@ -100,6 +100,15 @@ class LexerTests(unittest.TestCase):
         self.assertIn(TokenKind.LESS_EQUAL, kinds)
         self.assertIn(TokenKind.GREATER_EQUAL, kinds)
 
+    def test_tokenizes_conditional_keywords(self) -> None:
+        tokens = tokenize(
+            "begin if Enabled then Counter := $01 else Counter := $02; end."
+        )
+        kinds = [token.kind for token in tokens]
+        self.assertIn(TokenKind.IF, kinds)
+        self.assertIn(TokenKind.THEN, kinds)
+        self.assertIn(TokenKind.ELSE, kinds)
+
 
 if __name__ == "__main__":
     unittest.main()

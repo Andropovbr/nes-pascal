@@ -14,6 +14,7 @@ from .ast import (
     ConstantDeclaration,
     ConstantReference,
     HexLiteral,
+    IfStatement,
     ImmediateValue,
     Program,
     ResolvedAssignment,
@@ -21,6 +22,7 @@ from .ast import (
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
     ResolvedComparisonExpression,
+    ResolvedIfStatement,
     ResolvedProgram,
     ResolvedSetBackgroundColor,
     ResolvedStatement,
@@ -83,19 +85,84 @@ class SemanticAnalyzer:
             resolved_variables.append(variable)
             declared_names.add(normalized_name)
 
-        assigned_variables: set[str] = set()
+        resolved_statements, _ = self._resolve_statements(
+            program.statements,
+            constants,
+            variables,
+            set(),
+            inside_conditional=False,
+        )
+
+        self._validate_program_structure(program)
+        return ResolvedProgram(
+            program.name,
+            tuple(resolved_variables),
+            resolved_statements,
+        )
+
+    def _resolve_statements(
+        self,
+        statements: tuple[
+            Assignment | SetBackgroundColor | Run | IfStatement,
+            ...,
+        ],
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+        inside_conditional: bool,
+    ) -> tuple[tuple[ResolvedStatement, ...], set[str]]:
+        current_assignments = set(assigned_variables)
         resolved_statements: list[ResolvedStatement] = []
-        for statement in program.statements:
+        for statement in statements:
             if isinstance(statement, Assignment):
                 resolved = self._resolve_assignment(
                     statement,
                     constants,
                     variables,
-                    assigned_variables,
+                    current_assignments,
                 )
                 resolved_statements.append(resolved)
-                assigned_variables.add(statement.target.lower())
+                current_assignments.add(statement.target.lower())
+            elif isinstance(statement, IfStatement):
+                condition = self._resolve_value(
+                    statement.condition,
+                    BuiltInType.BOOLEAN,
+                    constants,
+                    variables,
+                    current_assignments,
+                )
+                then_branch, then_assignments = self._resolve_statements(
+                    statement.then_branch,
+                    constants,
+                    variables,
+                    current_assignments,
+                    inside_conditional=True,
+                )
+                resolved_else = None
+                if statement.else_branch is not None:
+                    resolved_else, else_assignments = self._resolve_statements(
+                        statement.else_branch,
+                        constants,
+                        variables,
+                        current_assignments,
+                        inside_conditional=True,
+                    )
+                    current_assignments = (
+                        then_assignments & else_assignments
+                    )
+                resolved_statements.append(
+                    ResolvedIfStatement(
+                        condition,
+                        then_branch,
+                        resolved_else,
+                    )
+                )
             elif isinstance(statement, SetBackgroundColor):
+                if inside_conditional:
+                    self._conditional_runtime_command_error(
+                        statement.position,
+                        "nes.set_background_color",
+                    )
                 resolved_statements.append(
                     ResolvedSetBackgroundColor(
                         self._resolve_value(
@@ -103,19 +170,36 @@ class SemanticAnalyzer:
                             BuiltInType.NES_COLOR,
                             constants,
                             variables,
-                            assigned_variables,
+                            current_assignments,
                         )
                     )
                 )
             else:
                 assert isinstance(statement, Run)
+                if inside_conditional:
+                    self._conditional_runtime_command_error(
+                        statement.position,
+                        "nes.run",
+                    )
                 resolved_statements.append(Run())
 
-        self._validate_program_structure(program)
-        return ResolvedProgram(
-            program.name,
-            tuple(resolved_variables),
+        return (
             tuple(resolved_statements),
+            current_assignments,
+        )
+
+    def _conditional_runtime_command_error(
+        self,
+        position: SourcePosition | None,
+        command: str,
+    ) -> None:
+        assert position is not None
+        self._error(
+            position,
+            DiagnosticCode.CONDITIONAL_RUNTIME_COMMAND,
+            f"{command} cannot appear inside a conditional branch.",
+            "Move the NES runtime command to the top-level program block.",
+            len(command),
         )
 
     def _ensure_unique_name(
@@ -610,11 +694,13 @@ class SemanticAnalyzer:
 
     def _statement_position(
         self,
-        statement: Assignment | SetBackgroundColor | Run,
+        statement: Assignment | SetBackgroundColor | Run | IfStatement,
         program: Program,
     ) -> SourcePosition:
         if isinstance(statement, Assignment):
             return statement.target_position
+        if isinstance(statement, IfStatement):
+            return statement.position
         if statement.position is not None:
             return statement.position
         assert program.end_position is not None

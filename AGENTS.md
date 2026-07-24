@@ -80,6 +80,10 @@ begin
     RenderingEnabled := true;
     WithinLimit := RenderingEnabled and
         (NextFrameCounter <= MaximumFrameCounter);
+    if WithinLimit then
+        BackgroundColor := DefaultBackgroundColor
+    else
+        BackgroundColor := $0F;
     nes.set_background_color(BackgroundColor);
     nes.run;
 end.
@@ -92,6 +96,8 @@ matches. A direct hexadecimal literal remains valid as the argument to
 `+` and `-`, parentheses, and `byte` operands only. Arithmetic wraps modulo
 256. Comparisons produce `boolean` values. Boolean expressions support `not`,
 `and`, and `or`, with short-circuit evaluation for the binary operators.
+Conditional statements support `if`, optional `else`, nested conditionals,
+and compound `begin`/`end` branches.
 
 The compiler must generate ca65 Assembly, assemble it, and link a valid `.nes`
 ROM. When opened in an emulator, the NES must:
@@ -102,8 +108,8 @@ ROM. When opened in an emulator, the NES must:
 4. enable rendering;
 5. remain in a stable loop.
 
-Do not implement conditional statements, loops, multiplication, division,
-user-defined procedures, sprites, controller input, or audio yet.
+Do not implement loops, multiplication, division, user-defined procedures,
+sprites, controller input, or audio yet.
 
 ## Expected pipeline
 
@@ -184,10 +190,12 @@ Currently supported:
 - equality and inequality for operands of exactly matching types;
 - ordered comparisons for `byte`;
 - boolean operators `not`, `and`, and `or`;
+- `if` statements with optional `else`;
+- nested conditionals and compound branches;
 - parentheses in expressions.
 
 Do not implement type inference, implicit conversions, user-defined types,
-multiplication, division, conditional statements, or loops yet.
+multiplication, division, or loops yet.
 
 ## Diagnostics
 
@@ -222,9 +230,11 @@ Before completing a task:
 2. compile the minimal example;
 3. confirm a valid iNES header;
 4. confirm the NROM image size;
-5. report the commands run;
-6. describe known limitations;
-7. never alter golden tests merely to hide a failure.
+5. add and run a practical gameplay-oriented test when the implemented
+   features make one possible;
+6. report the commands run;
+7. describe known limitations;
+8. never alter golden tests merely to hide a failure.
 
 ## Tests
 
@@ -240,6 +250,11 @@ Use:
 
 Tests that require ca65 must be skipped with a clear message when the toolchain
 is not installed.
+
+Whenever practical, complement unit, golden, and structural ROM tests with a
+small behavior-oriented example based on a realistic NES use case. If the
+current language or runtime cannot express the scenario yet, document the
+missing capabilities instead of claiming that the behavior was validated.
 
 ## Documentation
 

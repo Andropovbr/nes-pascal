@@ -14,6 +14,7 @@ from nes_pascal.ast import (
     ComparisonExpression,
     ComparisonOperator,
     HexLiteral,
+    IfStatement,
     Run,
     SetBackgroundColor,
     SourcePosition,
@@ -279,6 +280,77 @@ class ParserTests(unittest.TestCase):
                 self.assertIsInstance(expression, ComparisonExpression)
                 assert isinstance(expression, ComparisonExpression)
                 self.assertEqual(expression.operator, expected_operator)
+
+    def test_parses_if_else_with_compound_branches(self) -> None:
+        program = parse(
+            program_with(
+                "if Enabled then\n"
+                "begin\n"
+                "    Counter := $01;\n"
+                "end\n"
+                "else\n"
+                "begin\n"
+                "    Counter := $02;\n"
+                "end;\n"
+                "nes.set_background_color($21);\n"
+                "nes.run;",
+                variables=(
+                    "    Counter: byte;\n"
+                    "    Enabled: boolean;"
+                ),
+            )
+        )
+        statement = program.statements[0]
+        self.assertIsInstance(statement, IfStatement)
+        assert isinstance(statement, IfStatement)
+        self.assertEqual(len(statement.then_branch), 1)
+        self.assertEqual(len(statement.else_branch or ()), 1)
+        self.assertIsInstance(statement.then_branch[0], Assignment)
+
+    def test_parses_nested_if_and_attaches_else_to_nearest_if(self) -> None:
+        program = parse(
+            program_with(
+                "if First then\n"
+                "    if Second then\n"
+                "        Counter := $01\n"
+                "    else\n"
+                "        Counter := $02;\n"
+                "nes.set_background_color($21);\n"
+                "nes.run;",
+                variables=(
+                    "    Counter: byte;\n"
+                    "    First: boolean;\n"
+                    "    Second: boolean;"
+                ),
+            )
+        )
+        outer = program.statements[0]
+        assert isinstance(outer, IfStatement)
+        self.assertIsNone(outer.else_branch)
+        inner = outer.then_branch[0]
+        self.assertIsInstance(inner, IfStatement)
+        assert isinstance(inner, IfStatement)
+        self.assertIsNotNone(inner.else_branch)
+
+    def test_rejects_if_without_then(self) -> None:
+        with self.assertRaises(CompilerError) as context:
+            parse(
+                program_with(
+                    "if Enabled Counter := $01;\n"
+                    "nes.set_background_color($21);\n"
+                    "nes.run;",
+                    variables=(
+                        "    Counter: byte;\n"
+                        "    Enabled: boolean;"
+                    ),
+                ),
+                "missing-then.nsp",
+            )
+        self.assertEqual(context.exception.code, "E2102")
+        self.assertIn(
+            "Expected 'then' after the if condition.",
+            str(context.exception),
+        )
 
 
 if __name__ == "__main__":

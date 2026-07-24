@@ -10,6 +10,7 @@ from nes_pascal.ast import (
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
     ResolvedComparisonExpression,
+    ResolvedIfStatement,
     ResolvedSetBackgroundColor,
     ResolvedUnaryExpression,
     Run,
@@ -493,6 +494,91 @@ end.
         self.assertEqual(context.exception.code, "E4004")
         self.assertIn(
             "Cannot assign a boolean expression of type boolean",
+            str(context.exception),
+        )
+
+    def test_resolves_if_else_and_definite_assignment(self) -> None:
+        source = """program Conditionals;
+var
+    Enabled: boolean;
+    Counter: byte;
+    Result: byte;
+begin
+    Enabled := true;
+    if Enabled then
+        Counter := $01
+    else
+        Counter := $02;
+    Result := Counter;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        conditional = resolved.statements[1]
+        self.assertIsInstance(conditional, ResolvedIfStatement)
+        assert isinstance(conditional, ResolvedIfStatement)
+        self.assertEqual(len(conditional.then_branch), 1)
+        self.assertEqual(len(conditional.else_branch or ()), 1)
+        self.assertIsInstance(resolved.statements[2], ResolvedAssignment)
+
+    def test_if_without_else_does_not_definitely_assign(self) -> None:
+        source = """program Conditionals;
+var
+    Enabled: boolean;
+    Counter: byte;
+    Result: byte;
+begin
+    Enabled := true;
+    if Enabled then
+        Counter := $01;
+    Result := Counter;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3008")
+        self.assertIn("Counter is read before it is assigned.", str(context.exception))
+
+    def test_rejects_non_boolean_if_condition(self) -> None:
+        source = """program Conditionals;
+var
+    Counter: byte;
+begin
+    Counter := $01;
+    if Counter then
+        Counter := $02;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E4004")
+        self.assertIn(
+            "Counter has type byte, but boolean is required.",
+            str(context.exception),
+        )
+
+    def test_rejects_runtime_command_inside_conditional(self) -> None:
+        source = """program Conditionals;
+var
+    Enabled: boolean;
+begin
+    Enabled := true;
+    if Enabled then
+        nes.run;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source, "conditional-runtime.nsp")
+        self.assertEqual(context.exception.code, "E3009")
+        self.assertIn(
+            "nes.run cannot appear inside a conditional branch.",
             str(context.exception),
         )
 

@@ -1,0 +1,27 @@
+program Conditionals;
+
+const
+    Limit: byte = $10;
+
+var
+    Counter: byte;
+    Enabled: boolean;
+    BackgroundColor: nes_color;
+
+begin
+    Counter := $10;
+    Enabled := Counter <= Limit;
+    if Enabled then
+    begin
+        BackgroundColor := $21;
+    end
+    else
+    begin
+        if Counter > Limit then
+            BackgroundColor := $16
+        else
+            BackgroundColor := $0F;
+    end;
+    nes.set_background_color(BackgroundColor);
+    nes.run;
+end.

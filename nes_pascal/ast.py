@@ -154,7 +154,15 @@ class Run:
     position: SourcePosition | None = field(default=None, compare=False)
 
 
-Statement = Assignment | SetBackgroundColor | Run
+@dataclass(frozen=True, slots=True)
+class IfStatement:
+    condition: ValueExpression
+    then_branch: tuple[Statement, ...]
+    else_branch: tuple[Statement, ...] | None
+    position: SourcePosition
+
+
+Statement = Assignment | SetBackgroundColor | Run | IfStatement
 
 
 @dataclass(frozen=True, slots=True)
@@ -238,7 +246,16 @@ class ResolvedSetBackgroundColor:
     argument: ResolvedValue
 
 
-ResolvedStatement = ResolvedAssignment | ResolvedSetBackgroundColor | Run
+@dataclass(frozen=True, slots=True)
+class ResolvedIfStatement:
+    condition: ResolvedValue
+    then_branch: tuple[ResolvedStatement, ...]
+    else_branch: tuple[ResolvedStatement, ...] | None
+
+
+ResolvedStatement = (
+    ResolvedAssignment | ResolvedSetBackgroundColor | Run | ResolvedIfStatement
+)
 
 
 @dataclass(frozen=True, slots=True)

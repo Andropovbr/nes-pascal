@@ -11,8 +11,10 @@ from .ast import (
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
     ResolvedComparisonExpression,
+    ResolvedIfStatement,
     ResolvedProgram,
     ResolvedSetBackgroundColor,
+    ResolvedStatement,
     ResolvedUnaryExpression,
     ResolvedValue,
     Run,
@@ -38,13 +40,7 @@ def generate(program: ResolvedProgram) -> str:
         for variable in program.variables
     ]
     temporary_count = max(
-        (
-            _expression_depth(statement.value)
-            if isinstance(statement, ResolvedAssignment)
-            else _expression_depth(statement.argument)
-            if isinstance(statement, ResolvedSetBackgroundColor)
-            else 0
-        )
+        _statement_expression_depth(statement)
         for statement in program.statements
     )
     variable_lines.extend(
@@ -54,47 +50,8 @@ def generate(program: ResolvedProgram) -> str:
     if not variable_lines:
         variable_lines.append("    ; no variables")
 
-    statement_lines: list[str] = []
     label_counter = [0]
-    for statement in program.statements:
-        if isinstance(statement, ResolvedAssignment):
-            statement_lines.extend(
-                [
-                    "",
-                    f"; Source: {statement.target.name} := value",
-                    *_load_value(statement.value, label_counter),
-                    f"    sta {statement.target.label}",
-                ]
-            )
-        elif isinstance(statement, ResolvedSetBackgroundColor):
-            statement_lines.extend(
-                [
-                    "",
-                    "; Source: nes.set_background_color(value)",
-                    "    lda #$3F",
-                    "    sta $2006               ; universal palette address, high byte",
-                    "    lda #$00",
-                    "    sta $2006               ; low byte",
-                    *_load_value(statement.argument, label_counter),
-                    "    sta $2007",
-                ]
-            )
-        else:
-            assert isinstance(statement, Run)
-            statement_lines.extend(
-                [
-                    "",
-                    "; Source: nes.run",
-                    "    lda #$00",
-                    "    sta $2005               ; scroll X",
-                    "    sta $2005               ; scroll Y",
-                    "    lda #$08",
-                    "    sta $2001               ; enable background rendering",
-                    "",
-                    "@main_loop:",
-                    "    jmp @main_loop",
-                ]
-            )
+    statement_lines = _generate_statements(program.statements, label_counter)
 
     variables = "\n".join(variable_lines)
     statements = "\n".join(statement_lines)
@@ -166,6 +123,86 @@ RESET:
 .segment "CHR"
     .res 8192, $00          ; empty CHR-ROM
 """
+
+
+def _generate_statements(
+    statements: tuple[ResolvedStatement, ...],
+    label_counter: list[int],
+) -> list[str]:
+    statement_lines: list[str] = []
+    for statement in statements:
+        if isinstance(statement, ResolvedAssignment):
+            statement_lines.extend(
+                [
+                    "",
+                    f"; Source: {statement.target.name} := value",
+                    *_load_value(statement.value, label_counter),
+                    f"    sta {statement.target.label}",
+                ]
+            )
+        elif isinstance(statement, ResolvedSetBackgroundColor):
+            statement_lines.extend(
+                [
+                    "",
+                    "; Source: nes.set_background_color(value)",
+                    "    lda #$3F",
+                    "    sta $2006               ; universal palette address, high byte",
+                    "    lda #$00",
+                    "    sta $2006               ; low byte",
+                    *_load_value(statement.argument, label_counter),
+                    "    sta $2007",
+                ]
+            )
+        elif isinstance(statement, Run):
+            statement_lines.extend(
+                [
+                    "",
+                    "; Source: nes.run",
+                    "    lda #$00",
+                    "    sta $2005               ; scroll X",
+                    "    sta $2005               ; scroll Y",
+                    "    lda #$08",
+                    "    sta $2001               ; enable background rendering",
+                    "",
+                    "@main_loop:",
+                    "    jmp @main_loop",
+                ]
+            )
+        else:
+            assert isinstance(statement, ResolvedIfStatement)
+            then_label = _new_label(label_counter, "if_then")
+            end_label = _new_label(label_counter, "if_end")
+            else_label = (
+                _new_label(label_counter, "if_else")
+                if statement.else_branch is not None
+                else end_label
+            )
+            statement_lines.extend(
+                [
+                    "",
+                    "; Source: if condition then",
+                    *_load_value(statement.condition, label_counter),
+                    "    cmp #$00",
+                    f"    bne {then_label}",
+                    f"    jmp {else_label}       ; long-branch-safe false path",
+                    f"{then_label}:",
+                    *_generate_statements(statement.then_branch, label_counter),
+                ]
+            )
+            if statement.else_branch is not None:
+                statement_lines.extend(
+                    [
+                        f"    jmp {end_label}",
+                        f"{else_label}:",
+                        *_generate_statements(
+                            statement.else_branch,
+                            label_counter,
+                        ),
+                    ]
+                )
+            statement_lines.append(f"{end_label}:")
+
+    return statement_lines
 
 
 def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
@@ -366,5 +403,26 @@ def _expression_depth(value: ResolvedValue) -> int:
         return max(
             _expression_depth(value.left),
             _expression_depth(value.right),
+        )
+    return 0
+
+
+def _statement_expression_depth(statement: ResolvedStatement) -> int:
+    if isinstance(statement, ResolvedAssignment):
+        return _expression_depth(statement.value)
+    if isinstance(statement, ResolvedSetBackgroundColor):
+        return _expression_depth(statement.argument)
+    if isinstance(statement, ResolvedIfStatement):
+        branch_depths = [
+            _statement_expression_depth(branch_statement)
+            for branch_statement in statement.then_branch
+        ]
+        if statement.else_branch is not None:
+            branch_depths.extend(
+                _statement_expression_depth(branch_statement)
+                for branch_statement in statement.else_branch
+            )
+        return max(
+            [_expression_depth(statement.condition), *branch_depths],
         )
     return 0

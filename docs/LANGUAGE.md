@@ -276,6 +276,57 @@ Use parentheses to negate a comparison:
 Different := not (Counter = Limit);
 ```
 
+## Conditional statements
+
+An `if` condition must have type `boolean`. A conditional may contain one
+statement:
+
+```pascal
+if Enabled then
+    Counter := $01;
+```
+
+The optional `else` branch follows Pascal semicolon placement. There is no
+semicolon between the final statement of the `then` branch and `else`; one
+semicolon terminates the complete conditional:
+
+```pascal
+if Enabled then
+    Counter := $01
+else
+    Counter := $02;
+```
+
+Use `begin` and `end` for a branch containing multiple statements:
+
+```pascal
+if Enabled then
+begin
+    Counter := Counter + $01;
+    Ready := true;
+end
+else
+begin
+    Counter := $00;
+    Ready := false;
+end;
+```
+
+Conditionals may be nested. An `else` without an enclosing branch block
+belongs to the nearest unmatched `if`.
+
+Definite-assignment analysis follows control flow. A variable assigned in both
+branches of an `if/else` is assigned afterward. An assignment made only in
+the `then` branch, or in an `if` without `else`, is not guaranteed afterward.
+
+`nes.set_background_color` and `nes.run` are initialization commands and must
+remain in the top-level program block. Placing either command inside a
+conditional produces E3009.
+
+The backend emits a nearby relative branch followed by an absolute `JMP`.
+This keeps conditional branches valid even when a branch body exceeds the
+6502 relative-branch range.
+
 ## Initial commands
 
 ### `nes.set_background_color`
@@ -325,10 +376,10 @@ The current milestone does not support:
 - functions;
 - user-defined parameters;
 - multiplication or division;
-- conditional statements and loops;
+- loops;
 - type inference;
 - implicit conversions;
-- `if`, `while`, `for`, or `case`;
+- `while`, `repeat`, `for`, or `case`;
 - arrays or records;
 - inline Assembly;
 - sprites, controller input, or audio.
