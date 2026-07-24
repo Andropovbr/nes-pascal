@@ -45,6 +45,21 @@ class BackendGoldenTests(unittest.TestCase):
         self.assertIn("sbc expression_temporary_0", actual)
         self.assertIn("eor #$FF", actual)
 
+    def test_boolean_expression_program_matches_golden_assembly(self) -> None:
+        source_path = ROOT / "examples" / "boolean_expressions.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        actual = generate(analyze(parse(source, filename), source, filename))
+        expected = (
+            ROOT / "tests" / "golden" / "boolean_expressions.asm"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(actual, expected)
+        self.assertIn("cmp expression_temporary_0", actual)
+        self.assertIn("; short-circuit false", actual)
+        self.assertIn("; short-circuit true", actual)
+        self.assertIn("lda #$00              ; false", actual)
+        self.assertIn("lda #$01              ; true", actual)
+
 
 if __name__ == "__main__":
     unittest.main()

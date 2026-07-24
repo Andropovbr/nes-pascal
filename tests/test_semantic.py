@@ -2,10 +2,14 @@ import unittest
 
 from nes_pascal.ast import (
     BinaryOperator,
+    BooleanOperator,
     BuiltInType,
     ImmediateValue,
     ResolvedAssignment,
     ResolvedBinaryExpression,
+    ResolvedBooleanBinaryExpression,
+    ResolvedBooleanNotExpression,
+    ResolvedComparisonExpression,
     ResolvedSetBackgroundColor,
     ResolvedUnaryExpression,
     Run,
@@ -358,6 +362,139 @@ end.
             analyze_source(source)
         self.assertEqual(context.exception.code, "E3008")
         self.assertIn("Counter is read before it is assigned.", str(context.exception))
+
+    def test_resolves_comparisons_and_boolean_operators(self) -> None:
+        source = """program BooleanExpressions;
+var
+    Left: byte;
+    Right: byte;
+    Equal: boolean;
+    Result: boolean;
+begin
+    Left := $0F;
+    Right := $10;
+    Equal := Left = Right;
+    Result := not Equal and (Left < Right or Left >= $20);
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        equality = resolved.statements[2]
+        result = resolved.statements[3]
+        assert isinstance(equality, ResolvedAssignment)
+        assert isinstance(result, ResolvedAssignment)
+        self.assertIsInstance(equality.value, ResolvedComparisonExpression)
+        self.assertIsInstance(result.value, ResolvedBooleanBinaryExpression)
+        assert isinstance(result.value, ResolvedBooleanBinaryExpression)
+        self.assertEqual(result.value.operator, BooleanOperator.AND)
+        self.assertIsInstance(result.value.left, ResolvedBooleanNotExpression)
+
+    def test_allows_equality_for_matching_boolean_and_nes_color_types(self) -> None:
+        source = """program Equality;
+var
+    FirstColor: nes_color;
+    SameColor: boolean;
+    Enabled: boolean;
+    SameState: boolean;
+begin
+    FirstColor := $21;
+    Enabled := true;
+    SameColor := FirstColor = $21;
+    SameState := Enabled <> false;
+    nes.set_background_color(FirstColor);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        self.assertIsInstance(
+            resolved.statements[2].value,
+            ResolvedComparisonExpression,
+        )
+        self.assertIsInstance(
+            resolved.statements[3].value,
+            ResolvedComparisonExpression,
+        )
+
+    def test_rejects_equality_between_different_types(self) -> None:
+        source = """program InvalidComparison;
+var
+    Counter: byte;
+    Enabled: boolean;
+    Result: boolean;
+begin
+    Counter := $01;
+    Enabled := true;
+    Result := Counter = Enabled;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E4004")
+        self.assertIn(
+            "Comparison operands must have exactly the same type",
+            str(context.exception),
+        )
+
+    def test_rejects_ordered_comparison_for_nes_color(self) -> None:
+        source = """program InvalidComparison;
+var
+    Color: nes_color;
+    Result: boolean;
+begin
+    Color := $21;
+    Result := Color < $30;
+    nes.set_background_color(Color);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E4004")
+        self.assertIn(
+            "Color has type nes_color, but byte is required.",
+            str(context.exception),
+        )
+
+    def test_rejects_non_boolean_operand_for_boolean_operator(self) -> None:
+        source = """program InvalidBoolean;
+var
+    Counter: byte;
+    Result: boolean;
+begin
+    Counter := $01;
+    Result := true and Counter;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E4004")
+        self.assertIn(
+            "Counter has type byte, but boolean is required.",
+            str(context.exception),
+        )
+
+    def test_rejects_boolean_expression_assigned_to_byte(self) -> None:
+        source = """program InvalidBoolean;
+var
+    Counter: byte;
+begin
+    Counter := true or false;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E4004")
+        self.assertIn(
+            "Cannot assign a boolean expression of type boolean",
+            str(context.exception),
+        )
 
 
 if __name__ == "__main__":

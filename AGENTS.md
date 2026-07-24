@@ -64,18 +64,22 @@ program Minimal;
 
 const
     DefaultBackgroundColor: nes_color = $21;
+    MaximumFrameCounter: byte = $10;
 
 var
     BackgroundColor: nes_color;
     FrameCounter: byte;
     NextFrameCounter: byte;
     RenderingEnabled: boolean;
+    WithinLimit: boolean;
 
 begin
     BackgroundColor := DefaultBackgroundColor;
     FrameCounter := $00;
     NextFrameCounter := FrameCounter + $01;
     RenderingEnabled := true;
+    WithinLimit := RenderingEnabled and
+        (NextFrameCounter <= MaximumFrameCounter);
     nes.set_background_color(BackgroundColor);
     nes.run;
 end.
@@ -86,7 +90,8 @@ Variables require explicit declarations and assignments require exact type
 matches. A direct hexadecimal literal remains valid as the argument to
 `nes.set_background_color`. Arithmetic expressions support unary and binary
 `+` and `-`, parentheses, and `byte` operands only. Arithmetic wraps modulo
-256.
+256. Comparisons produce `boolean` values. Boolean expressions support `not`,
+`and`, and `or`, with short-circuit evaluation for the binary operators.
 
 The compiler must generate ca65 Assembly, assemble it, and link a valid `.nes`
 ROM. When opened in an emulator, the NES must:
@@ -97,7 +102,7 @@ ROM. When opened in an emulator, the NES must:
 4. enable rendering;
 5. remain in a stable loop.
 
-Do not implement multiplication, division, comparisons, boolean expressions,
+Do not implement conditional statements, loops, multiplication, division,
 user-defined procedures, sprites, controller input, or audio yet.
 
 ## Expected pipeline
@@ -176,10 +181,13 @@ Currently supported:
 - assignment with `:=`;
 - constant and initialized-variable references;
 - `byte` arithmetic using unary and binary `+` and `-`;
-- parentheses in arithmetic expressions.
+- equality and inequality for operands of exactly matching types;
+- ordered comparisons for `byte`;
+- boolean operators `not`, `and`, and `or`;
+- parentheses in expressions.
 
 Do not implement type inference, implicit conversions, user-defined types,
-multiplication, division, comparisons, or boolean expressions yet.
+multiplication, division, conditional statements, or loops yet.
 
 ## Diagnostics
 

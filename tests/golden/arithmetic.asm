@@ -14,8 +14,8 @@
 variable_Counter: .res 1       ; Counter: byte
 variable_Result: .res 1       ; Result: byte
 variable_BackgroundColor: .res 1       ; BackgroundColor: nes_color
-expression_temporary_0: .res 1 ; arithmetic temporary
-expression_temporary_1: .res 1 ; arithmetic temporary
+expression_temporary_0: .res 1 ; expression temporary
+expression_temporary_1: .res 1 ; expression temporary
 
 .segment "CODE"
 

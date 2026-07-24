@@ -4,10 +4,15 @@ from nes_pascal.ast import (
     Assignment,
     BinaryExpression,
     BinaryOperator,
+    BooleanBinaryExpression,
+    BooleanNotExpression,
+    BooleanOperator,
     BooleanLiteral,
     BuiltInType,
     ConstantDeclaration,
     ConstantReference,
+    ComparisonExpression,
+    ComparisonOperator,
     HexLiteral,
     Run,
     SetBackgroundColor,
@@ -214,6 +219,66 @@ class ParserTests(unittest.TestCase):
         self.assertIsInstance(expression.operand.right, UnaryExpression)
         assert isinstance(expression.operand.right, UnaryExpression)
         self.assertEqual(expression.operand.right.operator, UnaryOperator.PLUS)
+
+    def test_parses_comparison_and_boolean_precedence(self) -> None:
+        program = parse(
+            program_with(
+                "Result := not Left = Right and Left < Right or false;\n"
+                "nes.set_background_color($21);\n"
+                "nes.run;",
+                variables=(
+                    "    Left: byte;\n"
+                    "    Right: byte;\n"
+                    "    Result: boolean;"
+                ),
+            )
+        )
+        assignment = program.statements[0]
+        assert isinstance(assignment, Assignment)
+        expression = assignment.value
+        self.assertIsInstance(expression, BooleanBinaryExpression)
+        assert isinstance(expression, BooleanBinaryExpression)
+        self.assertEqual(expression.operator, BooleanOperator.OR)
+        self.assertIsInstance(expression.left, BooleanBinaryExpression)
+        assert isinstance(expression.left, BooleanBinaryExpression)
+        self.assertEqual(expression.left.operator, BooleanOperator.AND)
+        self.assertIsInstance(expression.left.left, ComparisonExpression)
+        assert isinstance(expression.left.left, ComparisonExpression)
+        self.assertEqual(
+            expression.left.left.operator,
+            ComparisonOperator.EQUAL,
+        )
+        self.assertIsInstance(expression.left.left.left, BooleanNotExpression)
+
+    def test_parses_every_comparison_operator(self) -> None:
+        operators = {
+            "=": ComparisonOperator.EQUAL,
+            "<>": ComparisonOperator.NOT_EQUAL,
+            "<": ComparisonOperator.LESS,
+            ">": ComparisonOperator.GREATER,
+            "<=": ComparisonOperator.LESS_EQUAL,
+            ">=": ComparisonOperator.GREATER_EQUAL,
+        }
+        for spelling, expected_operator in operators.items():
+            with self.subTest(operator=spelling):
+                program = parse(
+                    program_with(
+                        f"Result := Left {spelling} Right;\n"
+                        "nes.set_background_color($21);\n"
+                        "nes.run;",
+                        variables=(
+                            "    Left: byte;\n"
+                            "    Right: byte;\n"
+                            "    Result: boolean;"
+                        ),
+                    )
+                )
+                assignment = program.statements[0]
+                assert isinstance(assignment, Assignment)
+                expression = assignment.value
+                self.assertIsInstance(expression, ComparisonExpression)
+                assert isinstance(expression, ComparisonExpression)
+                self.assertEqual(expression.operator, expected_operator)
 
 
 if __name__ == "__main__":

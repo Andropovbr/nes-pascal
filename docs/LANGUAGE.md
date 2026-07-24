@@ -222,6 +222,60 @@ compiler reports E4004 for these incompatible uses.
 Constant declarations remain literal-only in this milestone; their
 initializers cannot contain arithmetic expressions.
 
+## Comparisons
+
+Every comparison produces a normalized `boolean` value: `$00` for `false` or
+`$01` for `true`.
+
+Equality and inequality use `=` and `<>`. Both operands must have exactly the
+same type. They support `byte`, `nes_color`, and `boolean`:
+
+```pascal
+Equal := Counter = Limit;
+Different := BackgroundColor <> $0F;
+SameState := Enabled = true;
+```
+
+Ordered comparisons use `<`, `>`, `<=`, and `>=`. They accept only `byte`
+operands and use unsigned one-byte ordering:
+
+```pascal
+BelowLimit := Counter < Limit;
+AtLeastOne := Counter >= $01;
+```
+
+Comparing different types or using `nes_color` or `boolean` with an ordered
+operator produces E4004.
+
+## Boolean expressions
+
+The operators `not`, `and`, and `or` accept only `boolean` operands and
+produce a normalized `boolean` result:
+
+```pascal
+Ready := Enabled and not Paused;
+InRange := (Counter >= Minimum) and (Counter <= Maximum);
+```
+
+`and` and `or` evaluate from left to right and short-circuit. The right
+operand of `and` is skipped when the left operand is `false`; the right
+operand of `or` is skipped when the left operand is `true`.
+
+Expression precedence, from highest to lowest, is:
+
+1. parentheses;
+2. unary `+`, unary `-`, and `not`;
+3. binary `+` and `-`;
+4. comparisons;
+5. `and`;
+6. `or`.
+
+Use parentheses to negate a comparison:
+
+```pascal
+Different := not (Counter = Limit);
+```
+
 ## Initial commands
 
 ### `nes.set_background_color`
@@ -271,7 +325,7 @@ The current milestone does not support:
 - functions;
 - user-defined parameters;
 - multiplication or division;
-- comparisons or boolean expressions;
+- conditional statements and loops;
 - type inference;
 - implicit conversions;
 - `if`, `while`, `for`, or `case`;

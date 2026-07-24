@@ -14,6 +14,9 @@ class TokenKind(Enum):
     END = auto()
     TRUE = auto()
     FALSE = auto()
+    NOT = auto()
+    AND = auto()
+    OR = auto()
     IDENTIFIER = auto()
     HEX_LITERAL = auto()
     SEMICOLON = auto()
@@ -25,6 +28,11 @@ class TokenKind(Enum):
     ASSIGN = auto()
     PLUS = auto()
     MINUS = auto()
+    NOT_EQUAL = auto()
+    LESS = auto()
+    GREATER = auto()
+    LESS_EQUAL = auto()
+    GREATER_EQUAL = auto()
     EOF = auto()
 
 
@@ -36,6 +44,9 @@ KEYWORDS = {
     "end": TokenKind.END,
     "true": TokenKind.TRUE,
     "false": TokenKind.FALSE,
+    "not": TokenKind.NOT,
+    "and": TokenKind.AND,
+    "or": TokenKind.OR,
 }
 
 PUNCTUATION = {
@@ -47,6 +58,8 @@ PUNCTUATION = {
     "=": TokenKind.EQUAL,
     "+": TokenKind.PLUS,
     "-": TokenKind.MINUS,
+    "<": TokenKind.LESS,
+    ">": TokenKind.GREATER,
 }
 
 
@@ -80,6 +93,22 @@ class Lexer:
                 tokens.append(self._hex_literal())
             elif character == ":" and self._peek() == "=":
                 tokens.append(Token(TokenKind.ASSIGN, ":=", self.line, self.column))
+                self._advance()
+                self._advance()
+            elif character == "<" and self._peek() in ("=", ">"):
+                text = character + self._peek()
+                kind = (
+                    TokenKind.LESS_EQUAL
+                    if self._peek() == "="
+                    else TokenKind.NOT_EQUAL
+                )
+                tokens.append(Token(kind, text, self.line, self.column))
+                self._advance()
+                self._advance()
+            elif character == ">" and self._peek() == "=":
+                tokens.append(
+                    Token(TokenKind.GREATER_EQUAL, ">=", self.line, self.column)
+                )
                 self._advance()
                 self._advance()
             elif character in PUNCTUATION:

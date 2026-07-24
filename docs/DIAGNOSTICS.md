@@ -339,7 +339,9 @@ the range reserved for their category.
 - **Category:** Type System
 - **Explanation:** Assignments and intrinsic arguments require exact type
   matches. Numeric-to-boolean and other implicit conversions are forbidden.
-  Arithmetic expressions and their operands must have type `byte`.
+  Arithmetic expressions and their operands must have type `byte`. Comparison
+  operands must follow the comparison operator's type rules, and Boolean
+  operators require `boolean` operands.
 - **Trigger:**
 
   ```pascal
@@ -358,7 +360,8 @@ the range reserved for their category.
 
 - **Suggested fix:** Use a source value with exactly the target type. Use
   `true` or `false` for a boolean literal, and use arithmetic only with
-  `byte` values.
+  `byte` values. Compare matching types, and use `not`, `and`, and `or` only
+  with `boolean` values.
 
 ## Parser / Syntax (E2000-E2999)
 

@@ -2,10 +2,15 @@
 
 from .ast import (
     BinaryOperator,
+    BooleanOperator,
     BuiltInType,
+    ComparisonOperator,
     ImmediateValue,
     ResolvedAssignment,
     ResolvedBinaryExpression,
+    ResolvedBooleanBinaryExpression,
+    ResolvedBooleanNotExpression,
+    ResolvedComparisonExpression,
     ResolvedProgram,
     ResolvedSetBackgroundColor,
     ResolvedUnaryExpression,
@@ -43,20 +48,21 @@ def generate(program: ResolvedProgram) -> str:
         for statement in program.statements
     )
     variable_lines.extend(
-        f"expression_temporary_{index}: .res 1 ; arithmetic temporary"
+        f"expression_temporary_{index}: .res 1 ; expression temporary"
         for index in range(temporary_count)
     )
     if not variable_lines:
         variable_lines.append("    ; no variables")
 
     statement_lines: list[str] = []
+    label_counter = [0]
     for statement in program.statements:
         if isinstance(statement, ResolvedAssignment):
             statement_lines.extend(
                 [
                     "",
                     f"; Source: {statement.target.name} := value",
-                    *_load_value(statement.value),
+                    *_load_value(statement.value, label_counter),
                     f"    sta {statement.target.label}",
                 ]
             )
@@ -69,7 +75,7 @@ def generate(program: ResolvedProgram) -> str:
                     "    sta $2006               ; universal palette address, high byte",
                     "    lda #$00",
                     "    sta $2006               ; low byte",
-                    *_load_value(statement.argument),
+                    *_load_value(statement.argument, label_counter),
                     "    sta $2007",
                 ]
             )
@@ -162,7 +168,7 @@ RESET:
 """
 
 
-def _load_value(value: ResolvedValue) -> list[str]:
+def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
     if isinstance(value, ImmediateValue):
         if value.type is BuiltInType.BOOLEAN:
             description = "true" if value.value else "false"
@@ -171,7 +177,7 @@ def _load_value(value: ResolvedValue) -> list[str]:
     if isinstance(value, VariableValue):
         return [f"    lda {value.variable.label}"]
     if isinstance(value, ResolvedUnaryExpression):
-        lines = _load_value(value.operand)
+        lines = _load_value(value.operand, label_counter)
         if value.operator is UnaryOperator.PLUS:
             return [*lines, "    ; unary + leaves the byte unchanged"]
         return [
@@ -181,31 +187,49 @@ def _load_value(value: ResolvedValue) -> list[str]:
             "    adc #$01",
         ]
 
-    assert isinstance(value, ResolvedBinaryExpression)
-    return _load_binary_expression(value, 0)
+    if isinstance(value, ResolvedBinaryExpression):
+        return _load_binary_expression(value, 0, label_counter)
+    if isinstance(value, ResolvedComparisonExpression):
+        return _load_comparison_expression(value, 0, label_counter)
+    if isinstance(value, ResolvedBooleanNotExpression):
+        return _load_boolean_not_expression(value, 0, label_counter)
+    assert isinstance(value, ResolvedBooleanBinaryExpression)
+    return _load_boolean_binary_expression(value, 0, label_counter)
 
 
 def _load_binary_expression(
-    expression: ResolvedBinaryExpression, depth: int
+    expression: ResolvedBinaryExpression,
+    depth: int,
+    label_counter: list[int],
 ) -> list[str]:
     temporary = f"expression_temporary_{depth}"
     lines = [
         f"    ; binary {expression.operator.value}: evaluate right operand",
-        *_load_value_at_depth(expression.right, depth + 1),
+        *_load_value_at_depth(expression.right, depth + 1, label_counter),
         f"    sta {temporary}",
         "    ; evaluate left operand",
-        *_load_value_at_depth(expression.left, depth + 1),
+        *_load_value_at_depth(expression.left, depth + 1, label_counter),
     ]
     if expression.operator is BinaryOperator.ADD:
         return [*lines, "    clc", f"    adc {temporary}"]
     return [*lines, "    sec", f"    sbc {temporary}"]
 
 
-def _load_value_at_depth(value: ResolvedValue, depth: int) -> list[str]:
+def _load_value_at_depth(
+    value: ResolvedValue,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
     if isinstance(value, ResolvedBinaryExpression):
-        return _load_binary_expression(value, depth)
+        return _load_binary_expression(value, depth, label_counter)
+    if isinstance(value, ResolvedComparisonExpression):
+        return _load_comparison_expression(value, depth, label_counter)
+    if isinstance(value, ResolvedBooleanNotExpression):
+        return _load_boolean_not_expression(value, depth, label_counter)
+    if isinstance(value, ResolvedBooleanBinaryExpression):
+        return _load_boolean_binary_expression(value, depth, label_counter)
     if isinstance(value, ResolvedUnaryExpression):
-        lines = _load_value_at_depth(value.operand, depth)
+        lines = _load_value_at_depth(value.operand, depth, label_counter)
         if value.operator is UnaryOperator.PLUS:
             return [*lines, "    ; unary + leaves the byte unchanged"]
         return [
@@ -214,15 +238,133 @@ def _load_value_at_depth(value: ResolvedValue, depth: int) -> list[str]:
             "    clc",
             "    adc #$01",
         ]
-    return _load_value(value)
+    return _load_value(value, label_counter)
+
+
+def _load_comparison_expression(
+    expression: ResolvedComparisonExpression,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
+    temporary = f"expression_temporary_{depth}"
+    true_label = _new_label(label_counter, "comparison_true")
+    false_label = _new_label(label_counter, "comparison_false")
+    end_label = _new_label(label_counter, "comparison_end")
+    lines = [
+        f"    ; comparison {expression.operator.value}: evaluate right operand",
+        *_load_value_at_depth(expression.right, depth + 1, label_counter),
+        f"    sta {temporary}",
+        "    ; evaluate left operand",
+        *_load_value_at_depth(expression.left, depth + 1, label_counter),
+        f"    cmp {temporary}",
+    ]
+    branches = {
+        ComparisonOperator.EQUAL: [f"    beq {true_label}"],
+        ComparisonOperator.NOT_EQUAL: [f"    bne {true_label}"],
+        ComparisonOperator.LESS: [f"    bcc {true_label}"],
+        ComparisonOperator.GREATER: [
+            f"    beq {false_label}",
+            f"    bcs {true_label}",
+        ],
+        ComparisonOperator.LESS_EQUAL: [
+            f"    bcc {true_label}",
+            f"    beq {true_label}",
+        ],
+        ComparisonOperator.GREATER_EQUAL: [f"    bcs {true_label}"],
+    }
+    return [
+        *lines,
+        *branches[expression.operator],
+        f"{false_label}:",
+        "    lda #$00              ; false",
+        f"    jmp {end_label}",
+        f"{true_label}:",
+        "    lda #$01              ; true",
+        f"{end_label}:",
+    ]
+
+
+def _load_boolean_not_expression(
+    expression: ResolvedBooleanNotExpression,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
+    true_label = _new_label(label_counter, "not_true")
+    end_label = _new_label(label_counter, "not_end")
+    return [
+        "    ; boolean not",
+        *_load_value_at_depth(expression.operand, depth, label_counter),
+        "    cmp #$00",
+        f"    beq {true_label}",
+        "    lda #$00              ; false",
+        f"    jmp {end_label}",
+        f"{true_label}:",
+        "    lda #$01              ; true",
+        f"{end_label}:",
+    ]
+
+
+def _load_boolean_binary_expression(
+    expression: ResolvedBooleanBinaryExpression,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
+    evaluate_right_label = _new_label(label_counter, "boolean_evaluate_right")
+    true_label = _new_label(label_counter, "boolean_true")
+    false_label = _new_label(label_counter, "boolean_false")
+    end_label = _new_label(label_counter, "boolean_end")
+    lines = [
+        f"    ; boolean {expression.operator.value}: evaluate left operand",
+        *_load_value_at_depth(expression.left, depth, label_counter),
+        "    cmp #$00",
+    ]
+    if expression.operator is BooleanOperator.AND:
+        lines.extend(
+            [
+                f"    bne {evaluate_right_label}",
+                f"    jmp {false_label}       ; short-circuit false",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                f"    beq {evaluate_right_label}",
+                f"    jmp {true_label}        ; short-circuit true",
+            ]
+        )
+    return [
+        *lines,
+        f"{evaluate_right_label}:",
+        "    ; evaluate right operand",
+        *_load_value_at_depth(expression.right, depth, label_counter),
+        "    cmp #$00",
+        f"    bne {true_label}",
+        f"{false_label}:",
+        "    lda #$00              ; false",
+        f"    jmp {end_label}",
+        f"{true_label}:",
+        "    lda #$01              ; true",
+        f"{end_label}:",
+    ]
+
+
+def _new_label(label_counter: list[int], prefix: str) -> str:
+    label = f"@{prefix}_{label_counter[0]}"
+    label_counter[0] += 1
+    return label
 
 
 def _expression_depth(value: ResolvedValue) -> int:
-    if isinstance(value, ResolvedBinaryExpression):
+    if isinstance(value, (ResolvedBinaryExpression, ResolvedComparisonExpression)):
         return 1 + max(
             _expression_depth(value.left),
             _expression_depth(value.right),
         )
-    if isinstance(value, ResolvedUnaryExpression):
+    if isinstance(value, (ResolvedUnaryExpression, ResolvedBooleanNotExpression)):
         return _expression_depth(value.operand)
+    if isinstance(value, ResolvedBooleanBinaryExpression):
+        return max(
+            _expression_depth(value.left),
+            _expression_depth(value.right),
+        )
     return 0

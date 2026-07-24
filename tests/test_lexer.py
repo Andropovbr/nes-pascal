@@ -84,6 +84,22 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(kinds.count(TokenKind.PLUS), 2)
         self.assertEqual(kinds.count(TokenKind.MINUS), 2)
 
+    def test_tokenizes_comparison_and_boolean_operators(self) -> None:
+        tokens = tokenize(
+            "begin Result := not A = B and A <> B or "
+            "A < B or A > B or A <= B or A >= B; end."
+        )
+        kinds = [token.kind for token in tokens]
+        self.assertIn(TokenKind.NOT, kinds)
+        self.assertIn(TokenKind.AND, kinds)
+        self.assertEqual(kinds.count(TokenKind.OR), 4)
+        self.assertIn(TokenKind.EQUAL, kinds)
+        self.assertIn(TokenKind.NOT_EQUAL, kinds)
+        self.assertIn(TokenKind.LESS, kinds)
+        self.assertIn(TokenKind.GREATER, kinds)
+        self.assertIn(TokenKind.LESS_EQUAL, kinds)
+        self.assertIn(TokenKind.GREATER_EQUAL, kinds)
+
 
 if __name__ == "__main__":
     unittest.main()

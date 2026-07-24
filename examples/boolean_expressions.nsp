@@ -1,0 +1,29 @@
+program BooleanExpressions;
+
+const
+    Limit: byte = $10;
+
+var
+    Counter: byte;
+    Equal: boolean;
+    Different: boolean;
+    Less: boolean;
+    Greater: boolean;
+    LessOrEqual: boolean;
+    GreaterOrEqual: boolean;
+    Combined: boolean;
+    BackgroundColor: nes_color;
+
+begin
+    Counter := $0F;
+    Equal := Counter = Limit;
+    Different := Counter <> Limit;
+    Less := Counter < Limit;
+    Greater := Counter > $00;
+    LessOrEqual := Counter <= Limit;
+    GreaterOrEqual := Counter >= Limit;
+    Combined := not Equal and (Less or GreaterOrEqual);
+    BackgroundColor := $21;
+    nes.set_background_color(BackgroundColor);
+    nes.run;
+end.

@@ -4,7 +4,8 @@ NES Pascal is a prototype of a compiled, strongly typed language inspired by
 Pascal and specialized for Nintendo Entertainment System games. The current
 milestone supports strongly typed constants, variables, and assignments using
 the one-byte `nes_color`, `byte`, and `boolean` types, plus byte arithmetic.
-It generates ca65 Assembly for an NROM-256 image.
+It also supports comparisons and short-circuit Boolean expressions. It
+generates ca65 Assembly for an NROM-256 image.
 
 ## Prerequisites
 
@@ -65,6 +66,14 @@ There are no implicit conversions to or from `nes_color` or `boolean`.
 
 See `examples/arithmetic.nsp` for a focused arithmetic example.
 
+Comparisons produce `boolean` values. `=` and `<>` require operands of exactly
+the same type, while `<`, `>`, `<=`, and `>=` accept only `byte`. Boolean
+expressions use `not`, `and`, and `or`; the binary operators use
+short-circuit evaluation.
+
+See `examples/boolean_expressions.nsp` for all comparison and Boolean
+operators.
+
 ## Compilation
 
 Compile the minimal example with:
@@ -77,6 +86,12 @@ Compile the arithmetic example with:
 
 ```text
 python -m nes_pascal.cli examples/arithmetic.nsp -o build/arithmetic.nes
+```
+
+Compile the Boolean-expression example with:
+
+```text
+python -m nes_pascal.cli examples/boolean_expressions.nsp -o build/boolean_expressions.nes
 ```
 
 Or use:
@@ -161,8 +176,11 @@ examples, and suggested fixes.
 - constants cannot refer to other constants;
 - arithmetic is limited to `byte` operands with unary `+` and `-`, binary `+`
   and `-`, and parentheses;
+- equality and inequality require matching types; ordered comparisons are
+  limited to `byte`;
+- Boolean expressions support only `not`, `and`, and `or`;
 - variables use regular RAM; zero-page allocation is not implemented;
-- there are no multiplication, division, comparisons, boolean expressions,
+- there are no conditional statements, loops, multiplication, division,
   procedures, sprites, controller input, audio, runtime strings, recursion,
   or optimizations;
 - only NTSC NES, mapper 0, 32 KiB PRG-ROM, and 8 KiB CHR-ROM are supported;

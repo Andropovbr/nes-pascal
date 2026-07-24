@@ -41,6 +41,9 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_builds_valid_arithmetic_nrom_image(self) -> None:
         self._assert_valid_nrom_image("arithmetic")
 
+    def test_builds_valid_boolean_expressions_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("boolean_expressions")
+
 
 if __name__ == "__main__":
     unittest.main()

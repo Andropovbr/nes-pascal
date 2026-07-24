@@ -4,10 +4,15 @@ from .ast import (
     Assignment,
     BinaryExpression,
     BinaryOperator,
+    BooleanBinaryExpression,
     BooleanLiteral,
+    BooleanNotExpression,
+    BooleanOperator,
     BuiltInType,
     ConstantDeclaration,
     ConstantReference,
+    ComparisonExpression,
+    ComparisonOperator,
     HexLiteral,
     Literal,
     Program,
@@ -219,6 +224,57 @@ class Parser:
         return SetBackgroundColor(argument, position)
 
     def _parse_expression(self) -> ValueExpression:
+        return self._parse_or_expression()
+
+    def _parse_or_expression(self) -> ValueExpression:
+        expression = self._parse_and_expression()
+        while self._check(TokenKind.OR):
+            operator_token = self._current()
+            self.position += 1
+            expression = BooleanBinaryExpression(
+                expression,
+                BooleanOperator.OR,
+                self._parse_and_expression(),
+                SourcePosition(operator_token.line, operator_token.column),
+            )
+        return expression
+
+    def _parse_and_expression(self) -> ValueExpression:
+        expression = self._parse_comparison_expression()
+        while self._check(TokenKind.AND):
+            operator_token = self._current()
+            self.position += 1
+            expression = BooleanBinaryExpression(
+                expression,
+                BooleanOperator.AND,
+                self._parse_comparison_expression(),
+                SourcePosition(operator_token.line, operator_token.column),
+            )
+        return expression
+
+    def _parse_comparison_expression(self) -> ValueExpression:
+        expression = self._parse_arithmetic_expression()
+        comparison_operators = {
+            TokenKind.EQUAL: ComparisonOperator.EQUAL,
+            TokenKind.NOT_EQUAL: ComparisonOperator.NOT_EQUAL,
+            TokenKind.LESS: ComparisonOperator.LESS,
+            TokenKind.GREATER: ComparisonOperator.GREATER,
+            TokenKind.LESS_EQUAL: ComparisonOperator.LESS_EQUAL,
+            TokenKind.GREATER_EQUAL: ComparisonOperator.GREATER_EQUAL,
+        }
+        token = self._current()
+        operator = comparison_operators.get(token.kind)
+        if operator is None:
+            return expression
+        self.position += 1
+        return ComparisonExpression(
+            expression,
+            operator,
+            self._parse_arithmetic_expression(),
+            SourcePosition(token.line, token.column),
+        )
+
+    def _parse_arithmetic_expression(self) -> ValueExpression:
         expression = self._parse_unary_expression()
         while self._current().kind in (TokenKind.PLUS, TokenKind.MINUS):
             operator_token = self._current()
@@ -239,6 +295,12 @@ class Parser:
 
     def _parse_unary_expression(self) -> ValueExpression:
         token = self._current()
+        if token.kind is TokenKind.NOT:
+            self.position += 1
+            return BooleanNotExpression(
+                self._parse_unary_expression(),
+                SourcePosition(token.line, token.column),
+            )
         if token.kind in (TokenKind.PLUS, TokenKind.MINUS):
             self.position += 1
             operator = (
@@ -270,7 +332,7 @@ class Parser:
             expression = self._parse_expression()
             self._expect(
                 TokenKind.RIGHT_PAREN,
-                "Expected ')' after the arithmetic expression.",
+                "Expected ')' after the expression.",
             )
             return expression
         self._error(

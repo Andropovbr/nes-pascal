@@ -28,6 +28,20 @@ class BinaryOperator(Enum):
     SUBTRACT = "-"
 
 
+class ComparisonOperator(Enum):
+    EQUAL = "="
+    NOT_EQUAL = "<>"
+    LESS = "<"
+    GREATER = ">"
+    LESS_EQUAL = "<="
+    GREATER_EQUAL = ">="
+
+
+class BooleanOperator(Enum):
+    AND = "and"
+    OR = "or"
+
+
 @dataclass(frozen=True, slots=True)
 class HexLiteral:
     value: int
@@ -87,6 +101,28 @@ class BinaryExpression:
     position: SourcePosition
 
 
+@dataclass(frozen=True, slots=True)
+class ComparisonExpression:
+    left: ValueExpression
+    operator: ComparisonOperator
+    right: ValueExpression
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class BooleanNotExpression:
+    operand: ValueExpression
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class BooleanBinaryExpression:
+    left: ValueExpression
+    operator: BooleanOperator
+    right: ValueExpression
+    position: SourcePosition
+
+
 ValueExpression = (
     HexLiteral
     | BooleanLiteral
@@ -94,6 +130,9 @@ ValueExpression = (
     | VariableReference
     | UnaryExpression
     | BinaryExpression
+    | ComparisonExpression
+    | BooleanNotExpression
+    | BooleanBinaryExpression
 )
 
 
@@ -158,11 +197,33 @@ class ResolvedBinaryExpression:
     right: ResolvedValue
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedComparisonExpression:
+    left: ResolvedValue
+    operator: ComparisonOperator
+    right: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedBooleanNotExpression:
+    operand: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedBooleanBinaryExpression:
+    left: ResolvedValue
+    operator: BooleanOperator
+    right: ResolvedValue
+
+
 ResolvedValue = (
     ImmediateValue
     | VariableValue
     | ResolvedUnaryExpression
     | ResolvedBinaryExpression
+    | ResolvedComparisonExpression
+    | ResolvedBooleanNotExpression
+    | ResolvedBooleanBinaryExpression
 )
 
 

@@ -5,8 +5,12 @@ from dataclasses import dataclass
 from .ast import (
     Assignment,
     BinaryExpression,
+    BooleanBinaryExpression,
     BooleanLiteral,
+    BooleanNotExpression,
     BuiltInType,
+    ComparisonExpression,
+    ComparisonOperator,
     ConstantDeclaration,
     ConstantReference,
     HexLiteral,
@@ -14,6 +18,9 @@ from .ast import (
     Program,
     ResolvedAssignment,
     ResolvedBinaryExpression,
+    ResolvedBooleanBinaryExpression,
+    ResolvedBooleanNotExpression,
+    ResolvedComparisonExpression,
     ResolvedProgram,
     ResolvedSetBackgroundColor,
     ResolvedStatement,
@@ -168,6 +175,27 @@ class SemanticAnalyzer:
         assigned_variables: set[str],
         assignment_target: ResolvedVariable | None = None,
     ) -> ResolvedValue:
+        if isinstance(
+            expression,
+            (BooleanNotExpression, BooleanBinaryExpression),
+        ):
+            return self._resolve_boolean_expression(
+                expression,
+                expected_type,
+                constants,
+                variables,
+                assigned_variables,
+                assignment_target,
+            )
+        if isinstance(expression, ComparisonExpression):
+            return self._resolve_comparison_expression(
+                expression,
+                expected_type,
+                constants,
+                variables,
+                assigned_variables,
+                assignment_target,
+            )
         if isinstance(expression, (UnaryExpression, BinaryExpression)):
             return self._resolve_arithmetic_expression(
                 expression,
@@ -277,6 +305,169 @@ class SemanticAnalyzer:
             assigned_variables,
         )
         return ResolvedBinaryExpression(left, expression.operator, right)
+
+    def _resolve_boolean_expression(
+        self,
+        expression: BooleanNotExpression | BooleanBinaryExpression,
+        expected_type: BuiltInType,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+        assignment_target: ResolvedVariable | None,
+    ) -> ResolvedValue:
+        self._require_expression_result_type(
+            expression.position,
+            BuiltInType.BOOLEAN,
+            expected_type,
+            "Boolean expression",
+            assignment_target,
+        )
+        if isinstance(expression, BooleanNotExpression):
+            operand = self._resolve_value(
+                expression.operand,
+                BuiltInType.BOOLEAN,
+                constants,
+                variables,
+                assigned_variables,
+            )
+            return ResolvedBooleanNotExpression(operand)
+
+        left = self._resolve_value(
+            expression.left,
+            BuiltInType.BOOLEAN,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        right = self._resolve_value(
+            expression.right,
+            BuiltInType.BOOLEAN,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        return ResolvedBooleanBinaryExpression(left, expression.operator, right)
+
+    def _resolve_comparison_expression(
+        self,
+        expression: ComparisonExpression,
+        expected_type: BuiltInType,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+        assignment_target: ResolvedVariable | None,
+    ) -> ResolvedValue:
+        self._require_expression_result_type(
+            expression.position,
+            BuiltInType.BOOLEAN,
+            expected_type,
+            "Comparison expression",
+            assignment_target,
+        )
+        ordered_operators = {
+            ComparisonOperator.LESS,
+            ComparisonOperator.GREATER,
+            ComparisonOperator.LESS_EQUAL,
+            ComparisonOperator.GREATER_EQUAL,
+        }
+        if expression.operator in ordered_operators:
+            operand_type = BuiltInType.BYTE
+        else:
+            left_type = self._expression_type_hint(
+                expression.left,
+                constants,
+                variables,
+            )
+            right_type = self._expression_type_hint(
+                expression.right,
+                constants,
+                variables,
+            )
+            if (
+                left_type is not None
+                and right_type is not None
+                and left_type is not right_type
+            ):
+                self._error(
+                    expression.position,
+                    DiagnosticCode.INCOMPATIBLE_TYPES,
+                    "Comparison operands must have exactly the same type, but "
+                    f"the left operand has type {left_type.value} and the right "
+                    f"operand has type {right_type.value}.",
+                    "Compare values with exactly matching types.",
+                    len(expression.operator.value),
+                )
+            operand_type = left_type or right_type or BuiltInType.BYTE
+
+        left = self._resolve_value(
+            expression.left,
+            operand_type,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        right = self._resolve_value(
+            expression.right,
+            operand_type,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        return ResolvedComparisonExpression(left, expression.operator, right)
+
+    def _expression_type_hint(
+        self,
+        expression: ValueExpression,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+    ) -> BuiltInType | None:
+        if isinstance(
+            expression,
+            (
+                BooleanLiteral,
+                BooleanNotExpression,
+                BooleanBinaryExpression,
+                ComparisonExpression,
+            ),
+        ):
+            return BuiltInType.BOOLEAN
+        if isinstance(expression, (UnaryExpression, BinaryExpression)):
+            return BuiltInType.BYTE
+        if isinstance(expression, HexLiteral):
+            return None
+        assert isinstance(expression, (ConstantReference, VariableReference))
+        constant = constants.get(expression.name.lower())
+        if constant is not None:
+            return constant.type
+        variable = variables.get(expression.name.lower())
+        return variable.type if variable is not None else None
+
+    def _require_expression_result_type(
+        self,
+        position: SourcePosition,
+        actual_type: BuiltInType,
+        expected_type: BuiltInType,
+        description: str,
+        assignment_target: ResolvedVariable | None,
+    ) -> None:
+        if actual_type is expected_type:
+            return
+        if assignment_target is not None:
+            self._error(
+                position,
+                DiagnosticCode.INCOMPATIBLE_TYPES,
+                f"Cannot assign a {description.lower()} of type "
+                f"{actual_type.value} to variable {assignment_target.name} "
+                f"of type {assignment_target.type.value}.",
+                "The expression and target types must match.",
+            )
+        self._error(
+            position,
+            DiagnosticCode.INCOMPATIBLE_TYPES,
+            f"{description} has type {actual_type.value}, but "
+            f"{expected_type.value} is required.",
+            "Use the expression only where a boolean value is expected.",
+        )
 
     def _require_matching_type(
         self,
