@@ -1,0 +1,11 @@
+program ProcedureRuntime;
+
+procedure StartRuntime;
+begin
+    nes.run;
+end;
+
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.

@@ -21,6 +21,8 @@ from nes_pascal.ast import (
     HexLiteral,
     IfStatement,
     IncrementStatement,
+    ProcedureCall,
+    ProcedureDeclaration,
     RepeatStatement,
     Run,
     SetBackgroundColor,
@@ -480,6 +482,53 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "E2102")
         self.assertIn(
             "Expected 'to' or 'downto' after the initial value.",
+            str(context.exception),
+        )
+
+    def test_parses_parameterless_procedures_and_calls(self) -> None:
+        source = """program Procedures;
+
+procedure First;
+begin
+    Second;
+end;
+
+procedure Second;
+begin
+end;
+
+begin
+    First;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        program = parse(source)
+        self.assertEqual(len(program.procedures), 2)
+        first = program.procedures[0]
+        second = program.procedures[1]
+        self.assertIsInstance(first, ProcedureDeclaration)
+        self.assertIsInstance(second, ProcedureDeclaration)
+        self.assertEqual(first.name, "First")
+        self.assertEqual(second.name, "Second")
+        self.assertIsInstance(first.body[0], ProcedureCall)
+        self.assertIsInstance(program.statements[0], ProcedureCall)
+
+    def test_rejects_procedure_parameters_in_current_milestone(self) -> None:
+        source = """program Parameters;
+procedure Initialize();
+begin
+end;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            parse(source)
+        self.assertEqual(context.exception.code, "E2102")
+        self.assertIn(
+            "Expected ';' after the procedure name.",
             str(context.exception),
         )
 

@@ -8,7 +8,8 @@ It also supports comparisons and short-circuit Boolean expressions. It
 supports structured `if`/`else` statements and generates ca65 Assembly for an
 NROM-256 image. Basic control flow also includes `while`, `repeat`/`until`,
 `for`, `break`, and `continue`. Dedicated `inc` and `dec` operations provide
-predictable one-byte counter updates.
+predictable one-byte counter updates. Parameterless procedures support
+forward and nested acyclic calls.
 
 ## Prerequisites
 
@@ -97,6 +98,10 @@ operations, ascending and descending `for` loops, exact `$00`/`$FF`
 endpoints, and nested loops. It selects background color `$21` only when all
 expected counter values are reached.
 
+The `examples/procedures.nsp` program demonstrates forward procedure
+resolution, nested calls, shared global state, `JSR`/`RTS`, and a conditional
+inside a procedure.
+
 ## Compilation
 
 Compile the minimal example with:
@@ -133,6 +138,12 @@ Compile the counting example with:
 
 ```text
 python -m nes_pascal.cli examples/counting.nsp -o build/counting.nes
+```
+
+Compile the procedure example with:
+
+```text
+python -m nes_pascal.cli examples/procedures.nsp -o build/procedures.nes
 ```
 
 Or use:
@@ -207,8 +218,8 @@ The pipeline is deliberately separated:
 
 - `lexer.py` produces tokens with line and column information;
 - `parser.py` validates grammar and builds the parsed AST in `ast.py`;
-- `semantic.py` validates declarations, resolves references, checks exact
-  assignment types, and rejects reads before assignment;
+- `semantic.py` validates declarations, resolves references and procedure
+  calls, checks exact types, and enforces interprocedural definite assignment;
 - `backend_ca65.py` generates readable, commented Assembly from resolved
   values and allocates variables in regular CPU RAM;
 - `cli.py` writes Assembly and coordinates ca65 and ld65;
@@ -238,8 +249,10 @@ examples, and suggested fixes.
   only during initialization before `nes.run`;
 - `for` supports only `byte` control variables and bounds; its control
   variable cannot be changed inside the body;
+- procedures have no parameters, return values, or local variables;
+- procedure calls may be nested but cannot be recursive;
 - variables use regular RAM; zero-page allocation is not implemented;
-- there is no multiplication, division, procedures, sprites, controller
-  input, audio, runtime strings, recursion, or general optimization pass;
+- there is no multiplication, division, functions, sprites, controller input,
+  audio, runtime strings, recursion, or general optimization pass;
 - only NTSC NES, mapper 0, 32 KiB PRG-ROM, and 8 KiB CHR-ROM are supported;
 - CHR-ROM is empty, and the backend does not provide a game engine.

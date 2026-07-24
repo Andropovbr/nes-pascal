@@ -1,0 +1,16 @@
+program RecursiveProcedure;
+
+procedure First;
+begin
+    Second;
+end;
+
+procedure Second;
+begin
+    First;
+end;
+
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.

@@ -1,0 +1,44 @@
+program Procedures;
+
+var
+    Counter: byte;
+    CallCount: byte;
+    BackgroundColor: nes_color;
+
+procedure BuildState;
+begin
+    InitializeState;
+    AdvanceState;
+end;
+
+procedure AdvanceState;
+begin
+    AddStep;
+    inc(CallCount);
+end;
+
+procedure AddStep;
+begin
+    inc(Counter, $03);
+end;
+
+procedure InitializeState;
+begin
+    Counter := $00;
+    CallCount := $00;
+end;
+
+procedure ChooseColor;
+begin
+    if (Counter = $03) and (CallCount = $01) then
+        BackgroundColor := $21
+    else
+        BackgroundColor := $0F;
+end;
+
+begin
+    BuildState;
+    ChooseColor;
+    nes.set_background_color(BackgroundColor);
+    nes.run;
+end.

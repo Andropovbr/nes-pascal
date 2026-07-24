@@ -136,6 +136,36 @@ class DiagnosticPrecedenceTests(unittest.TestCase):
             "        ^^^^^",
         )
 
+    def test_unknown_procedure_is_preserved(self) -> None:
+        self.assert_primary_diagnostic(
+            "unknown_procedure.nsp",
+            "E3013",
+            4,
+            5,
+            "Unknown procedure: Missing.",
+            "    ^^^^^^^",
+        )
+
+    def test_recursive_procedure_call_is_preserved(self) -> None:
+        self.assert_primary_diagnostic(
+            "recursive_procedure_call.nsp",
+            "E3014",
+            10,
+            5,
+            "Recursive procedure call involving First is not supported.",
+            "    ^^^^^",
+        )
+
+    def test_runtime_command_inside_procedure_is_preserved(self) -> None:
+        self.assert_primary_diagnostic(
+            "procedure_runtime_command.nsp",
+            "E3015",
+            5,
+            5,
+            "nes.run cannot appear inside a procedure.",
+            "    ^^^^^^^",
+        )
+
     def test_assignment_error_precedes_missing_background_color(self) -> None:
         source = """program InvalidPrecedence;
 var

@@ -218,6 +218,12 @@ class ForStatement:
     position: SourcePosition
 
 
+@dataclass(frozen=True, slots=True)
+class ProcedureCall:
+    name: str
+    position: SourcePosition
+
+
 Statement = (
     Assignment
     | SetBackgroundColor
@@ -230,7 +236,15 @@ Statement = (
     | IncrementStatement
     | DecrementStatement
     | ForStatement
+    | ProcedureCall
 )
+
+
+@dataclass(frozen=True, slots=True)
+class ProcedureDeclaration:
+    name: str
+    body: tuple[Statement, ...]
+    position: SourcePosition
 
 
 @dataclass(frozen=True, slots=True)
@@ -238,6 +252,7 @@ class Program:
     name: str
     constants: tuple[ConstantDeclaration, ...]
     variables: tuple[VariableDeclaration, ...]
+    procedures: tuple[ProcedureDeclaration, ...]
     statements: tuple[Statement, ...]
     end_position: SourcePosition | None = field(default=None, compare=False)
 
@@ -364,6 +379,12 @@ class ResolvedForStatement:
     body: tuple[ResolvedStatement, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedProcedureCall:
+    name: str
+    label: str
+
+
 ResolvedStatement = (
     ResolvedAssignment
     | ResolvedSetBackgroundColor
@@ -376,11 +397,20 @@ ResolvedStatement = (
     | ResolvedIncrementStatement
     | ResolvedDecrementStatement
     | ResolvedForStatement
+    | ResolvedProcedureCall
 )
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedProcedure:
+    name: str
+    label: str
+    body: tuple[ResolvedStatement, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class ResolvedProgram:
     name: str
     variables: tuple[ResolvedVariable, ...]
+    procedures: tuple[ResolvedProcedure, ...]
     statements: tuple[ResolvedStatement, ...]

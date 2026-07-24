@@ -118,6 +118,8 @@ class LexerTests(unittest.TestCase):
         self.assertIn(TokenKind.DO, kinds)
         self.assertIn(TokenKind.REPEAT, kinds)
         self.assertIn(TokenKind.UNTIL, kinds)
+        self.assertIn(TokenKind.BREAK, kinds)
+        self.assertIn(TokenKind.CONTINUE, kinds)
 
     def test_tokenizes_update_and_for_keywords(self) -> None:
         tokens = tokenize(
@@ -132,8 +134,14 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(kinds.count(TokenKind.FOR), 2)
         self.assertIn(TokenKind.TO, kinds)
         self.assertIn(TokenKind.DOWNTO, kinds)
-        self.assertIn(TokenKind.BREAK, kinds)
-        self.assertIn(TokenKind.CONTINUE, kinds)
+
+    def test_tokenizes_procedure_declaration_and_call(self) -> None:
+        tokens = tokenize(
+            "procedure Initialize; begin ResetState; end;"
+        )
+        kinds = [token.kind for token in tokens]
+        self.assertEqual(kinds.count(TokenKind.PROCEDURE), 1)
+        self.assertEqual(kinds.count(TokenKind.IDENTIFIER), 2)
 
 
 if __name__ == "__main__":

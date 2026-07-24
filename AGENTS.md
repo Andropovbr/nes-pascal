@@ -73,10 +73,15 @@ var
     RenderingEnabled: boolean;
     WithinLimit: boolean;
 
+procedure InitializeCounters;
 begin
-    BackgroundColor := DefaultBackgroundColor;
     FrameCounter := $00;
     NextFrameCounter := FrameCounter + $01;
+end;
+
+begin
+    BackgroundColor := DefaultBackgroundColor;
+    InitializeCounters;
     inc(NextFrameCounter);
     for FrameCounter := $00 to MaximumFrameCounter do
         inc(NextFrameCounter);
@@ -102,7 +107,8 @@ matches. A direct hexadecimal literal remains valid as the argument to
 Conditional statements support `if`, optional `else`, nested conditionals,
 and compound `begin`/`end` branches. Loops support `while`, `repeat`/`until`,
 `for` with `to` or `downto`, nesting, `break`, and `continue`. Initialized
-`byte` variables support `inc` and `dec` with optional amounts.
+`byte` variables support `inc` and `dec` with optional amounts. Parameterless
+procedures support forward and nested acyclic calls through global state.
 
 The compiler must generate ca65 Assembly, assemble it, and link a valid `.nes`
 ROM. When opened in an emulator, the NES must:
@@ -113,8 +119,8 @@ ROM. When opened in an emulator, the NES must:
 4. enable rendering;
 5. remain in a stable loop.
 
-Do not implement multiplication, division, user-defined procedures, sprites,
-controller input, or audio yet.
+Do not implement multiplication, division, procedure parameters, recursion,
+sprites, controller input, or audio yet.
 
 ## Expected pipeline
 
@@ -201,10 +207,11 @@ Currently supported:
 - nested loops, `break`, and `continue`;
 - `inc` and `dec` operations for initialized `byte` variables;
 - ascending and descending `for` loops with `byte` control variables;
+- parameterless procedures and acyclic procedure calls;
 - parentheses in expressions.
 
 Do not implement type inference, implicit conversions, user-defined types,
-multiplication, or division yet.
+procedure parameters, recursion, multiplication, or division yet.
 
 ## Diagnostics
 

@@ -131,14 +131,14 @@ Goal: support the basic control-flow constructs required for game logic.
 
 ## Milestone 9 — Procedures
 
-* [ ] Procedure declarations
-* [ ] Procedure calls
-* [ ] Procedures without parameters
-* [ ] Forward procedure resolution
-* [ ] Local labels
-* [ ] Nested call validation
-* [ ] `RTS` generation
-* [ ] Basic calling convention
+* [x] Procedure declarations
+* [x] Procedure calls
+* [x] Procedures without parameters
+* [x] Forward procedure resolution
+* [x] Local labels
+* [x] Nested call validation
+* [x] `RTS` generation
+* [x] Basic calling convention
 
 ## Milestone 10 — Procedure Parameters
 

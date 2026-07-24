@@ -37,6 +37,9 @@ the range reserved for their category.
 | E3010 | Semantic Analysis | Loop control outside loop |
 | E3011 | Semantic Analysis | Runtime command inside loop |
 | E3012 | Semantic Analysis | For control variable modification |
+| E3013 | Semantic Analysis | Unknown procedure |
+| E3014 | Semantic Analysis | Recursive procedure call |
+| E3015 | Semantic Analysis | Runtime command inside procedure |
 | E4001 | Type System | Unknown type |
 | E4002 | Type System | Invalid `nes_color` value |
 | E4003 | Type System | Invalid `byte` value |
@@ -162,7 +165,8 @@ the range reserved for their category.
 ### E3004 - Duplicate symbol
 
 - **Category:** Semantic Analysis
-- **Explanation:** Constants and variables share a case-insensitive namespace.
+- **Explanation:** Constants, variables, and procedures share a
+  case-insensitive namespace.
 - **Trigger:**
 
   ```pascal
@@ -246,7 +250,8 @@ the range reserved for their category.
 
 - **Category:** Semantic Analysis
 - **Explanation:** A variable value is read before an earlier statement
-  assigns it.
+  assigns it, or a procedure is called before the globals it requires have
+  been assigned.
 - **Trigger:**
 
   ```pascal
@@ -267,7 +272,8 @@ the range reserved for their category.
                                ^^^^^^^^^^^^^^^
   ```
 
-- **Suggested fix:** Assign the variable before reading it.
+- **Suggested fix:** Assign the variable before reading it or before calling a
+  procedure that requires it.
 
 ### E3009 - Runtime command inside conditional
 
@@ -363,6 +369,81 @@ the range reserved for their category.
 
 - **Suggested fix:** Remove the modification, use a different variable in the
   body, or update the control variable after the loop.
+
+### E3013 - Unknown procedure
+
+- **Category:** Semantic Analysis
+- **Explanation:** A bare procedure call must resolve to a declared procedure.
+  All procedure declarations appear before the main program block, but their
+  relative order does not restrict calls.
+- **Trigger:**
+
+  ```pascal
+  begin
+      Missing;
+  end.
+  ```
+
+- **Expected compiler output:**
+
+  ```text
+  E3013 demo.nsp:2:5
+
+  Unknown procedure: Missing.
+  ```
+
+- **Suggested fix:** Declare the procedure before the main program block or
+  correct the call's spelling.
+
+### E3014 - Recursive procedure call
+
+- **Category:** Semantic Analysis
+- **Explanation:** The current calling convention supports nested acyclic
+  calls but does not support direct or indirect recursion.
+- **Trigger:**
+
+  ```pascal
+  procedure Again;
+  begin
+      Again;
+  end;
+  ```
+
+- **Expected compiler output:**
+
+  ```text
+  E3014 demo.nsp:4:5
+
+  Recursive procedure call involving Again is not supported.
+  ```
+
+- **Suggested fix:** Remove the recursive call cycle and express the repeated
+  work with a supported loop.
+
+### E3015 - Runtime command inside procedure
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.set_background_color` and `nes.run` belong to the
+  main initialization sequence and must execute exactly once. They cannot be
+  hidden behind a procedure call.
+- **Trigger:**
+
+  ```pascal
+  procedure StartRuntime;
+  begin
+      nes.run;
+  end;
+  ```
+
+- **Expected compiler output:**
+
+  ```text
+  E3015 demo.nsp:4:5
+
+  nes.run cannot appear inside a procedure.
+  ```
+
+- **Suggested fix:** Move the runtime command to the main program block.
 
 ## Type System (E4000-E4999)
 

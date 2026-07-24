@@ -1,0 +1,7 @@
+program UnknownProcedure;
+
+begin
+    Missing;
+    nes.set_background_color($21);
+    nes.run;
+end.

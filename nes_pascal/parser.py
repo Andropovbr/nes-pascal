@@ -23,6 +23,8 @@ from .ast import (
     IncrementStatement,
     Literal,
     Program,
+    ProcedureCall,
+    ProcedureDeclaration,
     RepeatStatement,
     Run,
     SetBackgroundColor,
@@ -61,6 +63,7 @@ class Parser:
         self.constant_names = {declaration.name.lower() for declaration in constants}
         variables = self._parse_variables()
         self.variable_names = {declaration.name.lower() for declaration in variables}
+        procedures = self._parse_procedures()
         self._expect(TokenKind.BEGIN, "Expected 'begin' to start the program block.")
 
         statements: list[Statement] = []
@@ -83,6 +86,7 @@ class Parser:
             name.text,
             tuple(constants),
             tuple(variables),
+            tuple(procedures),
             tuple(statements),
             SourcePosition(end_token.line, end_token.column),
         )
@@ -160,6 +164,52 @@ class Parser:
         )
         raise AssertionError("unreachable")
 
+    def _parse_procedures(self) -> list[ProcedureDeclaration]:
+        declarations: list[ProcedureDeclaration] = []
+        while self._check(TokenKind.PROCEDURE):
+            procedure_token = self._expect(
+                TokenKind.PROCEDURE,
+                "Expected 'procedure'.",
+            )
+            name = self._expect(
+                TokenKind.IDENTIFIER,
+                "Expected a procedure name after 'procedure'.",
+            )
+            self._expect(
+                TokenKind.SEMICOLON,
+                "Expected ';' after the procedure name.",
+            )
+            self._expect(
+                TokenKind.BEGIN,
+                "Expected 'begin' to start the procedure body.",
+            )
+            body: list[Statement] = []
+            while not self._check(TokenKind.END):
+                if self._check(TokenKind.EOF):
+                    self._error(
+                        self._current(),
+                        DiagnosticCode.INVALID_SYNTAX,
+                        "Reached the end of the file before the procedure ended.",
+                        "Finish the procedure with 'end;'.",
+                    )
+                body.append(self._parse_statement())
+            self._expect(
+                TokenKind.END,
+                "Expected 'end' after the procedure body.",
+            )
+            self._expect(
+                TokenKind.SEMICOLON,
+                "Expected ';' after the procedure declaration.",
+            )
+            declarations.append(
+                ProcedureDeclaration(
+                    name.text,
+                    tuple(body),
+                    SourcePosition(procedure_token.line, procedure_token.column),
+                )
+            )
+        return declarations
+
     def _parse_literal(self, description: str) -> Literal:
         token = self._current()
         position = SourcePosition(token.line, token.column)
@@ -209,6 +259,11 @@ class Parser:
             )
         if self._check(TokenKind.IDENTIFIER) and self._peek_kind() is TokenKind.ASSIGN:
             return self._parse_assignment(consume_terminator)
+        if (
+            self._check(TokenKind.IDENTIFIER)
+            and self._peek_kind() is TokenKind.SEMICOLON
+        ):
+            return self._parse_procedure_call(consume_terminator)
 
         namespace = self._expect(
             TokenKind.IDENTIFIER,
@@ -244,6 +299,24 @@ class Parser:
             target.text,
             SourcePosition(target.line, target.column),
             value,
+        )
+
+    def _parse_procedure_call(
+        self,
+        consume_terminator: bool,
+    ) -> ProcedureCall:
+        name = self._expect(
+            TokenKind.IDENTIFIER,
+            "Expected a procedure name.",
+        )
+        if consume_terminator:
+            self._expect(
+                TokenKind.SEMICOLON,
+                "Expected ';' after the procedure call.",
+            )
+        return ProcedureCall(
+            name.text,
+            SourcePosition(name.line, name.column),
         )
 
     def _parse_background_color(
@@ -579,7 +652,8 @@ class Parser:
             token,
             DiagnosticCode.UNKNOWN_COMMAND,
             f"Unknown command: {name}.",
-            "Use an assignment, inc/dec update, control-flow statement, "
+            "Use an assignment, procedure call, inc/dec update, "
+            "control-flow statement, "
             "nes.set_background_color(value);, or nes.run;.",
         )
 

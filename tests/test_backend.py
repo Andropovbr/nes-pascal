@@ -148,6 +148,21 @@ end.
         self.assertEqual(assembly.count("    lda variable_Limit"), 1)
         self.assertIn("    sta for_limit_0   ; evaluate final value once", assembly)
 
+    def test_procedure_program_matches_golden_assembly(self) -> None:
+        source_path = ROOT / "examples" / "procedures.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        actual = generate(analyze(parse(source, filename), source, filename))
+        expected = (ROOT / "tests" / "golden" / "procedures.asm").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(actual, expected)
+        self.assertIn("    jsr procedure_BuildState", actual)
+        self.assertIn("    jsr procedure_InitializeState", actual)
+        self.assertIn("procedure_ChooseColor:", actual)
+        self.assertIn("@if_then_", actual)
+        self.assertEqual(actual.count("    rts"), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

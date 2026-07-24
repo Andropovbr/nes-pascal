@@ -30,6 +30,9 @@ class DiagnosticCode(StrEnum):
     LOOP_CONTROL_OUTSIDE_LOOP = "E3010"
     LOOP_RUNTIME_COMMAND = "E3011"
     FOR_CONTROL_VARIABLE_MODIFICATION = "E3012"
+    UNKNOWN_PROCEDURE = "E3013"
+    RECURSIVE_PROCEDURE_CALL = "E3014"
+    PROCEDURE_RUNTIME_COMMAND = "E3015"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -93,6 +96,15 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.FOR_CONTROL_VARIABLE_MODIFICATION: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "For control variable modification"
+    ),
+    DiagnosticCode.UNKNOWN_PROCEDURE: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Unknown procedure"
+    ),
+    DiagnosticCode.RECURSIVE_PROCEDURE_CALL: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Recursive procedure call"
+    ),
+    DiagnosticCode.PROCEDURE_RUNTIME_COMMAND: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Runtime command inside procedure"
     ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"

@@ -22,6 +22,8 @@ from .ast import (
     ImmediateValue,
     IncrementStatement,
     Program,
+    ProcedureCall,
+    ProcedureDeclaration,
     RepeatStatement,
     ResolvedAssignment,
     ResolvedBinaryExpression,
@@ -36,6 +38,8 @@ from .ast import (
     ResolvedIncrementStatement,
     ResolvedRepeatStatement,
     ResolvedProgram,
+    ResolvedProcedure,
+    ResolvedProcedureCall,
     ResolvedSetBackgroundColor,
     ResolvedStatement,
     ResolvedValue,
@@ -45,6 +49,7 @@ from .ast import (
     Run,
     SetBackgroundColor,
     SourcePosition,
+    Statement,
     UnaryExpression,
     ValueExpression,
     VariableValue,
@@ -60,10 +65,25 @@ class TypedConstant:
     value: int
 
 
+@dataclass(frozen=True, slots=True)
+class ProcedureSymbol:
+    declaration: ProcedureDeclaration
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProcedureSummary:
+    required_variables: frozenset[str]
+    assigned_variables: frozenset[str]
+    procedure: ResolvedProcedure
+
+
 class SemanticAnalyzer:
     def __init__(self, source: str, filename: str = "<input>") -> None:
         self.source_lines = source.splitlines()
         self.filename = filename
+        self.required_variables: set[str] | None = None
+        self.procedure_summaries: dict[str, ProcedureSummary] = {}
 
     def analyze(self, program: Program) -> ResolvedProgram:
         constants: dict[str, TypedConstant] = {}
@@ -99,6 +119,56 @@ class SemanticAnalyzer:
             resolved_variables.append(variable)
             declared_names.add(normalized_name)
 
+        procedures: dict[str, ProcedureSymbol] = {}
+        for declaration in program.procedures:
+            normalized_name = declaration.name.lower()
+            self._ensure_unique_name(
+                declaration.name,
+                declaration.position,
+                declared_names,
+            )
+            procedures[normalized_name] = ProcedureSymbol(
+                declaration,
+                f"procedure_{declaration.name}",
+            )
+            declared_names.add(normalized_name)
+
+        procedure_order = self._procedure_resolution_order(
+            program.procedures,
+            procedures,
+        )
+        self._validate_known_procedure_calls(
+            program.statements,
+            procedures,
+        )
+        resolved_procedures: dict[str, ResolvedProcedure] = {}
+        for normalized_name in procedure_order:
+            symbol = procedures[normalized_name]
+            self.required_variables = set()
+            body, assigned_variables = self._resolve_statements(
+                symbol.declaration.body,
+                constants,
+                variables,
+                set(),
+                inside_conditional=False,
+                loop_depth=0,
+                protected_control_variables=frozenset(),
+                inside_procedure=True,
+            )
+            required_variables = frozenset(self.required_variables)
+            resolved_procedure = ResolvedProcedure(
+                symbol.declaration.name,
+                symbol.label,
+                body,
+            )
+            self.procedure_summaries[normalized_name] = ProcedureSummary(
+                required_variables,
+                frozenset(assigned_variables | required_variables),
+                resolved_procedure,
+            )
+            resolved_procedures[normalized_name] = resolved_procedure
+
+        self.required_variables = None
         resolved_statements, _ = self._resolve_statements(
             program.statements,
             constants,
@@ -107,12 +177,17 @@ class SemanticAnalyzer:
             inside_conditional=False,
             loop_depth=0,
             protected_control_variables=frozenset(),
+            inside_procedure=False,
         )
 
         self._validate_program_structure(program)
         return ResolvedProgram(
             program.name,
             tuple(resolved_variables),
+            tuple(
+                resolved_procedures[declaration.name.lower()]
+                for declaration in program.procedures
+            ),
             resolved_statements,
         )
 
@@ -129,7 +204,8 @@ class SemanticAnalyzer:
             | ContinueStatement
             | IncrementStatement
             | DecrementStatement
-            | ForStatement,
+            | ForStatement
+            | ProcedureCall,
             ...,
         ],
         constants: dict[str, TypedConstant],
@@ -138,6 +214,7 @@ class SemanticAnalyzer:
         inside_conditional: bool,
         loop_depth: int,
         protected_control_variables: frozenset[str],
+        inside_procedure: bool,
     ) -> tuple[tuple[ResolvedStatement, ...], set[str]]:
         current_assignments = set(assigned_variables)
         resolved_statements: list[ResolvedStatement] = []
@@ -172,6 +249,7 @@ class SemanticAnalyzer:
                     inside_conditional=True,
                     loop_depth=loop_depth,
                     protected_control_variables=protected_control_variables,
+                    inside_procedure=inside_procedure,
                 )
                 resolved_else = None
                 if statement.else_branch is not None:
@@ -183,6 +261,7 @@ class SemanticAnalyzer:
                         inside_conditional=True,
                         loop_depth=loop_depth,
                         protected_control_variables=protected_control_variables,
+                        inside_procedure=inside_procedure,
                     )
                     current_assignments = (
                         then_assignments & else_assignments
@@ -210,6 +289,7 @@ class SemanticAnalyzer:
                     inside_conditional=inside_conditional,
                     loop_depth=loop_depth + 1,
                     protected_control_variables=protected_control_variables,
+                    inside_procedure=inside_procedure,
                 )
                 resolved_statements.append(
                     ResolvedWhileStatement(condition, body)
@@ -223,6 +303,7 @@ class SemanticAnalyzer:
                     inside_conditional=inside_conditional,
                     loop_depth=loop_depth + 1,
                     protected_control_variables=protected_control_variables,
+                    inside_procedure=inside_procedure,
                 )
                 condition = self._resolve_value(
                     statement.condition,
@@ -310,6 +391,7 @@ class SemanticAnalyzer:
                     protected_control_variables=(
                         protected_control_variables | {normalized_target}
                     ),
+                    inside_procedure=inside_procedure,
                 )
                 resolved_statements.append(
                     ResolvedForStatement(
@@ -321,6 +403,33 @@ class SemanticAnalyzer:
                     )
                 )
                 current_assignments.add(normalized_target)
+            elif isinstance(statement, ProcedureCall):
+                summary = self.procedure_summaries[statement.name.lower()]
+                missing_variables = (
+                    summary.required_variables - current_assignments
+                )
+                if missing_variables and self.required_variables is None:
+                    normalized_variable = sorted(missing_variables)[0]
+                    variable = variables[normalized_variable]
+                    self._error(
+                        statement.position,
+                        DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT,
+                        f"Procedure {statement.name} requires variable "
+                        f"{variable.name} to be assigned before the call.",
+                        f"Assign {variable.name} before calling "
+                        f"{statement.name}.",
+                        len(statement.name),
+                    )
+                if self.required_variables is not None:
+                    self.required_variables.update(missing_variables)
+                current_assignments.update(missing_variables)
+                current_assignments.update(summary.assigned_variables)
+                resolved_statements.append(
+                    ResolvedProcedureCall(
+                        summary.procedure.name,
+                        summary.procedure.label,
+                    )
+                )
             elif isinstance(statement, (BreakStatement, ContinueStatement)):
                 if loop_depth == 0:
                     self._error(
@@ -335,6 +444,11 @@ class SemanticAnalyzer:
                 else:
                     resolved_statements.append(ResolvedContinueStatement())
             elif isinstance(statement, SetBackgroundColor):
+                if inside_procedure:
+                    self._procedure_runtime_command_error(
+                        statement.position,
+                        "nes.set_background_color",
+                    )
                 if loop_depth > 0:
                     self._loop_runtime_command_error(
                         statement.position,
@@ -358,6 +472,11 @@ class SemanticAnalyzer:
                 )
             else:
                 assert isinstance(statement, Run)
+                if inside_procedure:
+                    self._procedure_runtime_command_error(
+                        statement.position,
+                        "nes.run",
+                    )
                 if loop_depth > 0:
                     self._loop_runtime_command_error(
                         statement.position,
@@ -373,6 +492,100 @@ class SemanticAnalyzer:
         return (
             tuple(resolved_statements),
             current_assignments,
+        )
+
+    def _procedure_resolution_order(
+        self,
+        declarations: tuple[ProcedureDeclaration, ...],
+        procedures: dict[str, ProcedureSymbol],
+    ) -> list[str]:
+        calls_by_procedure: dict[str, tuple[ProcedureCall, ...]] = {}
+        for declaration in declarations:
+            normalized_name = declaration.name.lower()
+            calls = tuple(self._procedure_calls(declaration.body))
+            self._validate_known_procedure_calls(
+                declaration.body,
+                procedures,
+            )
+            calls_by_procedure[normalized_name] = calls
+
+        states: dict[str, int] = {}
+        order: list[str] = []
+
+        def visit(normalized_name: str) -> None:
+            states[normalized_name] = 1
+            for call in calls_by_procedure[normalized_name]:
+                callee_name = call.name.lower()
+                callee_state = states.get(callee_name, 0)
+                if callee_state == 1:
+                    self._error(
+                        call.position,
+                        DiagnosticCode.RECURSIVE_PROCEDURE_CALL,
+                        f"Recursive procedure call involving "
+                        f"{call.name} is not supported.",
+                        "Remove the direct or indirect recursive call.",
+                        len(call.name),
+                    )
+                if callee_state == 0:
+                    visit(callee_name)
+            states[normalized_name] = 2
+            order.append(normalized_name)
+
+        for declaration in declarations:
+            normalized_name = declaration.name.lower()
+            if states.get(normalized_name, 0) == 0:
+                visit(normalized_name)
+        return order
+
+    def _validate_known_procedure_calls(
+        self,
+        statements: tuple[Statement, ...],
+        procedures: dict[str, ProcedureSymbol],
+    ) -> None:
+        for call in self._procedure_calls(statements):
+            if call.name.lower() in procedures:
+                continue
+            self._error(
+                call.position,
+                DiagnosticCode.UNKNOWN_PROCEDURE,
+                f"Unknown procedure: {call.name}.",
+                "Declare the procedure before the main program block.",
+                len(call.name),
+            )
+
+    def _procedure_calls(
+        self,
+        statements: tuple[Statement, ...],
+    ) -> list[ProcedureCall]:
+        calls: list[ProcedureCall] = []
+        for statement in statements:
+            if isinstance(statement, ProcedureCall):
+                calls.append(statement)
+            elif isinstance(statement, IfStatement):
+                calls.extend(self._procedure_calls(statement.then_branch))
+                if statement.else_branch is not None:
+                    calls.extend(
+                        self._procedure_calls(statement.else_branch)
+                    )
+            elif isinstance(
+                statement,
+                (WhileStatement, RepeatStatement, ForStatement),
+            ):
+                calls.extend(self._procedure_calls(statement.body))
+        return calls
+
+    def _procedure_runtime_command_error(
+        self,
+        position: SourcePosition | None,
+        command: str,
+    ) -> None:
+        assert position is not None
+        self._error(
+            position,
+            DiagnosticCode.PROCEDURE_RUNTIME_COMMAND,
+            f"{command} cannot appear inside a procedure.",
+            "Move the NES runtime command to the main program block.",
+            len(command),
         )
 
     def _loop_runtime_command_error(
@@ -450,13 +663,17 @@ class SemanticAnalyzer:
         )
         self._require_byte_target(target, position, "Increment and decrement")
         if name.lower() not in assigned_variables:
-            self._error(
-                position,
-                DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT,
-                f"Variable {name} is read before it is assigned.",
-                "Assign a value to the variable before updating it.",
-                len(name),
-            )
+            if self.required_variables is not None:
+                self.required_variables.add(name.lower())
+                assigned_variables.add(name.lower())
+            else:
+                self._error(
+                    position,
+                    DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT,
+                    f"Variable {name} is read before it is assigned.",
+                    "Assign a value to the variable before updating it.",
+                    len(name),
+                )
         return target
 
     def _resolve_for_target(
@@ -631,13 +848,17 @@ class SemanticAnalyzer:
             assignment_target,
         )
         if normalized_name not in assigned_variables:
-            self._error(
-                expression.position,
-                DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT,
-                f"Variable {expression.name} is read before it is assigned.",
-                "Assign a value to the variable before reading it.",
-                len(expression.name),
-            )
+            if self.required_variables is not None:
+                self.required_variables.add(normalized_name)
+                assigned_variables.add(normalized_name)
+            else:
+                self._error(
+                    expression.position,
+                    DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT,
+                    f"Variable {expression.name} is read before it is assigned.",
+                    "Assign a value to the variable before reading it.",
+                    len(expression.name),
+                )
         return VariableValue(variable)
 
     def _resolve_arithmetic_expression(
@@ -1026,6 +1247,7 @@ class SemanticAnalyzer:
                 IncrementStatement,
                 DecrementStatement,
                 ForStatement,
+                ProcedureCall,
             ),
         ):
             return statement.position

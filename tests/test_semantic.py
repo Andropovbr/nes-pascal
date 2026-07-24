@@ -16,6 +16,7 @@ from nes_pascal.ast import (
     ResolvedForStatement,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
+    ResolvedProcedureCall,
     ResolvedRepeatStatement,
     ResolvedSetBackgroundColor,
     ResolvedUnaryExpression,
@@ -902,6 +903,228 @@ end.
                     "For control variable Index cannot be modified",
                     str(context.exception),
                 )
+
+    def test_resolves_forward_and_nested_procedure_calls(self) -> None:
+        source = """program Procedures;
+var
+    Counter: byte;
+procedure Start;
+begin
+    Initialize;
+    Advance;
+end;
+procedure Advance;
+begin
+    inc(Counter);
+end;
+procedure Initialize;
+begin
+    Counter := $00;
+end;
+begin
+    Start;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        self.assertEqual(
+            [procedure.name for procedure in resolved.procedures],
+            ["Start", "Advance", "Initialize"],
+        )
+        start = resolved.procedures[0]
+        self.assertIsInstance(start.body[0], ResolvedProcedureCall)
+        self.assertIsInstance(start.body[1], ResolvedProcedureCall)
+        self.assertIsInstance(
+            resolved.statements[0],
+            ResolvedProcedureCall,
+        )
+
+    def test_procedure_assignments_propagate_to_the_caller(self) -> None:
+        source = """program ProcedureAssignment;
+var
+    Counter: byte;
+    Result: byte;
+procedure Initialize;
+begin
+    Counter := $01;
+end;
+begin
+    Initialize;
+    Result := Counter;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        self.assertIsInstance(resolved.statements[1], ResolvedAssignment)
+
+    def test_procedure_read_precondition_accepts_assigned_variable(self) -> None:
+        source = """program ProcedureRequirement;
+var
+    Counter: byte;
+procedure Advance;
+begin
+    inc(Counter);
+end;
+begin
+    Counter := $00;
+    Advance;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        self.assertIsInstance(
+            resolved.statements[1],
+            ResolvedProcedureCall,
+        )
+
+    def test_rejects_call_with_unassigned_required_variable(self) -> None:
+        source = """program ProcedureRequirement;
+var
+    Counter: byte;
+procedure Advance;
+begin
+    inc(Counter);
+end;
+begin
+    Advance;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3008")
+        self.assertIn(
+            "Procedure Advance requires variable Counter",
+            str(context.exception),
+        )
+
+    def test_procedure_conditional_assignment_is_not_definite(self) -> None:
+        source = """program ConditionalProcedure;
+var
+    Enabled: boolean;
+    Counter: byte;
+    Result: byte;
+procedure MaybeAssign;
+begin
+    if Enabled then
+        Counter := $01;
+end;
+begin
+    Enabled := true;
+    MaybeAssign;
+    Result := Counter;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3008")
+        self.assertIn(
+            "Variable Counter is read before it is assigned.",
+            str(context.exception),
+        )
+
+    def test_rejects_duplicate_procedure_name(self) -> None:
+        source = """program DuplicateProcedure;
+procedure Initialize;
+begin
+end;
+procedure INITIALIZE;
+begin
+end;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3004")
+
+    def test_rejects_name_collision_between_variable_and_procedure(self) -> None:
+        source = """program ProcedureCollision;
+var
+    Initialize: byte;
+procedure INITIALIZE;
+begin
+end;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3004")
+
+    def test_rejects_unknown_procedure(self) -> None:
+        source = """program UnknownProcedure;
+begin
+    Missing;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3013")
+
+    def test_rejects_direct_and_indirect_recursion(self) -> None:
+        sources = (
+            """program DirectRecursion;
+procedure Again;
+begin
+    Again;
+end;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+""",
+            """program IndirectRecursion;
+procedure First;
+begin
+    Second;
+end;
+procedure Second;
+begin
+    First;
+end;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+""",
+        )
+        for source in sources:
+            with self.subTest(program=source.splitlines()[0]):
+                with self.assertRaises(CompilerError) as context:
+                    analyze_source(source)
+                self.assertEqual(context.exception.code, "E3014")
+
+    def test_rejects_runtime_command_inside_procedure(self) -> None:
+        source = """program ProcedureRuntime;
+procedure StartRuntime;
+begin
+    nes.run;
+end;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3015")
+        self.assertIn(
+            "nes.run cannot appear inside a procedure.",
+            str(context.exception),
+        )
 
 
 if __name__ == "__main__":
