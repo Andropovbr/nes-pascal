@@ -109,6 +109,18 @@ class LexerTests(unittest.TestCase):
         self.assertIn(TokenKind.THEN, kinds)
         self.assertIn(TokenKind.ELSE, kinds)
 
+    def test_tokenizes_loop_keywords(self) -> None:
+        tokens = tokenize(
+            "begin while Ready do break; repeat continue; until Ready; end."
+        )
+        kinds = [token.kind for token in tokens]
+        self.assertIn(TokenKind.WHILE, kinds)
+        self.assertIn(TokenKind.DO, kinds)
+        self.assertIn(TokenKind.REPEAT, kinds)
+        self.assertIn(TokenKind.UNTIL, kinds)
+        self.assertIn(TokenKind.BREAK, kinds)
+        self.assertIn(TokenKind.CONTINUE, kinds)
+
 
 if __name__ == "__main__":
     unittest.main()

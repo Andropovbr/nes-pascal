@@ -15,6 +15,12 @@ class TokenKind(Enum):
     IF = auto()
     THEN = auto()
     ELSE = auto()
+    WHILE = auto()
+    DO = auto()
+    REPEAT = auto()
+    UNTIL = auto()
+    BREAK = auto()
+    CONTINUE = auto()
     TRUE = auto()
     FALSE = auto()
     NOT = auto()
@@ -48,6 +54,12 @@ KEYWORDS = {
     "if": TokenKind.IF,
     "then": TokenKind.THEN,
     "else": TokenKind.ELSE,
+    "while": TokenKind.WHILE,
+    "do": TokenKind.DO,
+    "repeat": TokenKind.REPEAT,
+    "until": TokenKind.UNTIL,
+    "break": TokenKind.BREAK,
+    "continue": TokenKind.CONTINUE,
     "true": TokenKind.TRUE,
     "false": TokenKind.FALSE,
     "not": TokenKind.NOT,

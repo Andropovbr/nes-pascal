@@ -10,13 +10,17 @@ from .ast import (
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
+    ResolvedBreakStatement,
     ResolvedComparisonExpression,
+    ResolvedContinueStatement,
     ResolvedIfStatement,
     ResolvedProgram,
+    ResolvedRepeatStatement,
     ResolvedSetBackgroundColor,
     ResolvedStatement,
     ResolvedUnaryExpression,
     ResolvedValue,
+    ResolvedWhileStatement,
     Run,
     UnaryOperator,
     VariableValue,
@@ -51,7 +55,11 @@ def generate(program: ResolvedProgram) -> str:
         variable_lines.append("    ; no variables")
 
     label_counter = [0]
-    statement_lines = _generate_statements(program.statements, label_counter)
+    statement_lines = _generate_statements(
+        program.statements,
+        label_counter,
+        (),
+    )
 
     variables = "\n".join(variable_lines)
     statements = "\n".join(statement_lines)
@@ -128,6 +136,7 @@ RESET:
 def _generate_statements(
     statements: tuple[ResolvedStatement, ...],
     label_counter: list[int],
+    loop_targets: tuple[tuple[str, str], ...],
 ) -> list[str]:
     statement_lines: list[str] = []
     for statement in statements:
@@ -168,8 +177,7 @@ def _generate_statements(
                     "    jmp @main_loop",
                 ]
             )
-        else:
-            assert isinstance(statement, ResolvedIfStatement)
+        elif isinstance(statement, ResolvedIfStatement):
             then_label = _new_label(label_counter, "if_then")
             end_label = _new_label(label_counter, "if_end")
             else_label = (
@@ -186,7 +194,11 @@ def _generate_statements(
                     f"    bne {then_label}",
                     f"    jmp {else_label}       ; long-branch-safe false path",
                     f"{then_label}:",
-                    *_generate_statements(statement.then_branch, label_counter),
+                    *_generate_statements(
+                        statement.then_branch,
+                        label_counter,
+                        loop_targets,
+                    ),
                 ]
             )
             if statement.else_branch is not None:
@@ -197,10 +209,77 @@ def _generate_statements(
                         *_generate_statements(
                             statement.else_branch,
                             label_counter,
+                            loop_targets,
                         ),
                     ]
                 )
             statement_lines.append(f"{end_label}:")
+        elif isinstance(statement, ResolvedWhileStatement):
+            condition_label = _new_label(label_counter, "while_condition")
+            body_label = _new_label(label_counter, "while_body")
+            end_label = _new_label(label_counter, "while_end")
+            statement_lines.extend(
+                [
+                    "",
+                    "; Source: while condition do",
+                    f"{condition_label}:",
+                    *_load_value(statement.condition, label_counter),
+                    "    cmp #$00",
+                    f"    bne {body_label}",
+                    f"    jmp {end_label}       ; long-branch-safe loop exit",
+                    f"{body_label}:",
+                    *_generate_statements(
+                        statement.body,
+                        label_counter,
+                        (*loop_targets, (end_label, condition_label)),
+                    ),
+                    f"    jmp {condition_label}",
+                    f"{end_label}:",
+                ]
+            )
+        elif isinstance(statement, ResolvedRepeatStatement):
+            body_label = _new_label(label_counter, "repeat_body")
+            condition_label = _new_label(label_counter, "repeat_condition")
+            end_label = _new_label(label_counter, "repeat_end")
+            statement_lines.extend(
+                [
+                    "",
+                    "; Source: repeat until condition",
+                    f"{body_label}:",
+                    *_generate_statements(
+                        statement.body,
+                        label_counter,
+                        (*loop_targets, (end_label, condition_label)),
+                    ),
+                    f"{condition_label}:",
+                    *_load_value(statement.condition, label_counter),
+                    "    cmp #$00",
+                    f"    bne {end_label}",
+                    f"    jmp {body_label}       ; long-branch-safe repeat",
+                    f"{end_label}:",
+                ]
+            )
+        elif isinstance(statement, ResolvedBreakStatement):
+            assert loop_targets
+            break_label, _ = loop_targets[-1]
+            statement_lines.extend(
+                [
+                    "",
+                    "; Source: break",
+                    f"    jmp {break_label}",
+                ]
+            )
+        else:
+            assert isinstance(statement, ResolvedContinueStatement)
+            assert loop_targets
+            _, continue_label = loop_targets[-1]
+            statement_lines.extend(
+                [
+                    "",
+                    "; Source: continue",
+                    f"    jmp {continue_label}",
+                ]
+            )
 
     return statement_lines
 
@@ -424,5 +503,13 @@ def _statement_expression_depth(statement: ResolvedStatement) -> int:
             )
         return max(
             [_expression_depth(statement.condition), *branch_depths],
+        )
+    if isinstance(statement, (ResolvedWhileStatement, ResolvedRepeatStatement)):
+        body_depths = [
+            _statement_expression_depth(body_statement)
+            for body_statement in statement.body
+        ]
+        return max(
+            [_expression_depth(statement.condition), *body_depths],
         )
     return 0

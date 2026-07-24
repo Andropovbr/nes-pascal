@@ -102,12 +102,12 @@ Goal: support the basic control-flow constructs required for game logic.
 
 ## Milestone 7 — Basic Loops
 
-* [ ] `while` loops
-* [ ] `repeat / until` loops
-* [ ] Nested loops
-* [ ] Loop condition validation
-* [ ] `break`
-* [ ] `continue`
+* [x] `while` loops
+* [x] `repeat / until` loops
+* [x] Nested loops
+* [x] Loop condition validation
+* [x] `break`
+* [x] `continue`
 
 ## Milestone 8 — Increment and Decrement Operations
 

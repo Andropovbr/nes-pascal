@@ -34,6 +34,8 @@ the range reserved for their category.
 | E3007 | Semantic Analysis | Unknown assignment target |
 | E3008 | Semantic Analysis | Variable read before assignment |
 | E3009 | Semantic Analysis | Runtime command inside conditional |
+| E3010 | Semantic Analysis | Loop control outside loop |
+| E3011 | Semantic Analysis | Runtime command inside loop |
 | E4001 | Type System | Unknown type |
 | E4002 | Type System | Invalid `nes_color` value |
 | E4003 | Type System | Invalid `byte` value |
@@ -289,6 +291,52 @@ the range reserved for their category.
 
 - **Suggested fix:** Move the NES runtime command out of the conditional and
   place it in the top-level program block.
+
+### E3010 - Loop control outside loop
+
+- **Category:** Semantic Analysis
+- **Explanation:** `break` and `continue` require an enclosing `while` or
+  `repeat` loop that provides their control-flow target.
+- **Trigger:**
+
+  ```pascal
+  begin
+      break;
+  end.
+  ```
+
+- **Expected compiler output:**
+
+  ```text
+  E3010 demo.nsp:2:5
+
+  break can appear only inside a loop.
+  ```
+
+- **Suggested fix:** Move the statement inside a loop or remove it.
+
+### E3011 - Runtime command inside loop
+
+- **Category:** Semantic Analysis
+- **Explanation:** NES initialization commands must execute exactly once.
+  `nes.set_background_color` and `nes.run` cannot be repeated by a loop.
+- **Trigger:**
+
+  ```pascal
+  while Running do
+      nes.run;
+  ```
+
+- **Expected compiler output:**
+
+  ```text
+  E3011 demo.nsp:2:5
+
+  nes.run cannot appear inside a loop body.
+  ```
+
+- **Suggested fix:** Move the NES runtime command out of the loop and into the
+  top-level program block.
 
 ## Type System (E4000-E4999)
 

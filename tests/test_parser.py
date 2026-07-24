@@ -9,12 +9,15 @@ from nes_pascal.ast import (
     BooleanOperator,
     BooleanLiteral,
     BuiltInType,
+    BreakStatement,
     ConstantDeclaration,
     ConstantReference,
     ComparisonExpression,
     ComparisonOperator,
+    ContinueStatement,
     HexLiteral,
     IfStatement,
+    RepeatStatement,
     Run,
     SetBackgroundColor,
     SourcePosition,
@@ -22,6 +25,7 @@ from nes_pascal.ast import (
     UnaryOperator,
     VariableDeclaration,
     VariableReference,
+    WhileStatement,
 )
 from nes_pascal.diagnostics import CompilerError
 from nes_pascal.parser import parse
@@ -349,6 +353,68 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "E2102")
         self.assertIn(
             "Expected 'then' after the if condition.",
+            str(context.exception),
+        )
+
+    def test_parses_while_with_nested_loop_control(self) -> None:
+        program = parse(
+            program_with(
+                "while Running do\n"
+                "begin\n"
+                "    if Skip then\n"
+                "        continue;\n"
+                "    break;\n"
+                "end;\n"
+                "nes.set_background_color($21);\n"
+                "nes.run;",
+                variables=(
+                    "    Running: boolean;\n"
+                    "    Skip: boolean;"
+                ),
+            )
+        )
+        loop = program.statements[0]
+        self.assertIsInstance(loop, WhileStatement)
+        assert isinstance(loop, WhileStatement)
+        self.assertEqual(len(loop.body), 2)
+        nested_if = loop.body[0]
+        assert isinstance(nested_if, IfStatement)
+        self.assertIsInstance(nested_if.then_branch[0], ContinueStatement)
+        self.assertIsInstance(loop.body[1], BreakStatement)
+
+    def test_parses_repeat_until_loop(self) -> None:
+        program = parse(
+            program_with(
+                "repeat\n"
+                "    Counter := Counter + $01;\n"
+                "until Counter = $03;\n"
+                "nes.set_background_color($21);\n"
+                "nes.run;",
+                variables="    Counter: byte;",
+            )
+        )
+        loop = program.statements[0]
+        self.assertIsInstance(loop, RepeatStatement)
+        assert isinstance(loop, RepeatStatement)
+        self.assertEqual(len(loop.body), 1)
+        self.assertIsInstance(loop.condition, ComparisonExpression)
+
+    def test_rejects_while_without_do(self) -> None:
+        with self.assertRaises(CompilerError) as context:
+            parse(
+                program_with(
+                    "while Ready Counter := $01;\n"
+                    "nes.set_background_color($21);\n"
+                    "nes.run;",
+                    variables=(
+                        "    Ready: boolean;\n"
+                        "    Counter: byte;"
+                    ),
+                )
+            )
+        self.assertEqual(context.exception.code, "E2102")
+        self.assertIn(
+            "Expected 'do' after the while condition.",
             str(context.exception),
         )
 

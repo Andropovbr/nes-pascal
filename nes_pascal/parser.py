@@ -8,15 +8,18 @@ from .ast import (
     BooleanLiteral,
     BooleanNotExpression,
     BooleanOperator,
+    BreakStatement,
     BuiltInType,
     ConstantDeclaration,
     ConstantReference,
     ComparisonExpression,
     ComparisonOperator,
+    ContinueStatement,
     HexLiteral,
     IfStatement,
     Literal,
     Program,
+    RepeatStatement,
     Run,
     SetBackgroundColor,
     SourcePosition,
@@ -26,6 +29,7 @@ from .ast import (
     ValueExpression,
     VariableDeclaration,
     VariableReference,
+    WhileStatement,
 )
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
 from .lexer import Token, TokenKind, tokenize
@@ -173,12 +177,26 @@ class Parser:
     def _parse_statement(self, consume_terminator: bool = True) -> Statement:
         if self._check(TokenKind.IF):
             return self._parse_if_statement(consume_terminator)
+        if self._check(TokenKind.WHILE):
+            return self._parse_while_statement(consume_terminator)
+        if self._check(TokenKind.REPEAT):
+            return self._parse_repeat_statement(consume_terminator)
+        if self._check(TokenKind.BREAK):
+            return self._parse_loop_control_statement(
+                TokenKind.BREAK,
+                consume_terminator,
+            )
+        if self._check(TokenKind.CONTINUE):
+            return self._parse_loop_control_statement(
+                TokenKind.CONTINUE,
+                consume_terminator,
+            )
         if self._check(TokenKind.IDENTIFIER) and self._peek_kind() is TokenKind.ASSIGN:
             return self._parse_assignment(consume_terminator)
 
         namespace = self._expect(
             TokenKind.IDENTIFIER,
-            "Expected an assignment, if statement, "
+            "Expected an assignment, control-flow statement, "
             "nes.set_background_color, or nes.run.",
         )
         self._expect(TokenKind.DOT, "Expected '.' after 'nes'.")
@@ -252,6 +270,69 @@ class Parser:
             else_branch,
             SourcePosition(if_token.line, if_token.column),
         )
+
+    def _parse_while_statement(
+        self,
+        consume_terminator: bool,
+    ) -> WhileStatement:
+        while_token = self._expect(TokenKind.WHILE, "Expected 'while'.")
+        condition = self._parse_expression()
+        self._expect(TokenKind.DO, "Expected 'do' after the while condition.")
+        body = self._parse_conditional_branch()
+        if consume_terminator:
+            self._expect(
+                TokenKind.SEMICOLON,
+                "Expected ';' after the while statement.",
+            )
+        return WhileStatement(
+            condition,
+            body,
+            SourcePosition(while_token.line, while_token.column),
+        )
+
+    def _parse_repeat_statement(
+        self,
+        consume_terminator: bool,
+    ) -> RepeatStatement:
+        repeat_token = self._expect(TokenKind.REPEAT, "Expected 'repeat'.")
+        body: list[Statement] = []
+        while not self._check(TokenKind.UNTIL):
+            if self._check(TokenKind.EOF):
+                self._error(
+                    self._current(),
+                    DiagnosticCode.INVALID_SYNTAX,
+                    "Reached the end of the file before 'until'.",
+                    "Finish the repeat loop with 'until condition;'.",
+                )
+            body.append(self._parse_statement())
+        self._expect(TokenKind.UNTIL, "Expected 'until' after the repeat body.")
+        condition = self._parse_expression()
+        if consume_terminator:
+            self._expect(
+                TokenKind.SEMICOLON,
+                "Expected ';' after the repeat loop condition.",
+            )
+        return RepeatStatement(
+            tuple(body),
+            condition,
+            SourcePosition(repeat_token.line, repeat_token.column),
+        )
+
+    def _parse_loop_control_statement(
+        self,
+        kind: TokenKind,
+        consume_terminator: bool,
+    ) -> BreakStatement | ContinueStatement:
+        token = self._expect(kind, f"Expected '{kind.name.lower()}'.")
+        if consume_terminator:
+            self._expect(
+                TokenKind.SEMICOLON,
+                f"Expected ';' after '{token.text.lower()}'.",
+            )
+        position = SourcePosition(token.line, token.column)
+        if kind is TokenKind.BREAK:
+            return BreakStatement(position)
+        return ContinueStatement(position)
 
     def _parse_conditional_branch(self) -> tuple[Statement, ...]:
         if not self._match(TokenKind.BEGIN):
@@ -396,7 +477,7 @@ class Parser:
             token,
             DiagnosticCode.UNKNOWN_COMMAND,
             f"Unknown command: {name}.",
-            "Use an assignment, if statement, "
+            "Use an assignment, control-flow statement, "
             "nes.set_background_color(value);, or nes.run;.",
         )
 

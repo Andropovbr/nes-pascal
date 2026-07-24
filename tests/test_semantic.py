@@ -9,10 +9,14 @@ from nes_pascal.ast import (
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
+    ResolvedBreakStatement,
     ResolvedComparisonExpression,
+    ResolvedContinueStatement,
     ResolvedIfStatement,
+    ResolvedRepeatStatement,
     ResolvedSetBackgroundColor,
     ResolvedUnaryExpression,
+    ResolvedWhileStatement,
     Run,
     VariableValue,
 )
@@ -579,6 +583,136 @@ end.
         self.assertEqual(context.exception.code, "E3009")
         self.assertIn(
             "nes.run cannot appear inside a conditional branch.",
+            str(context.exception),
+        )
+
+    def test_resolves_nested_loops_break_and_continue(self) -> None:
+        source = """program Loops;
+var
+    Counter: byte;
+    Running: boolean;
+begin
+    Counter := $00;
+    Running := true;
+    while Running do
+    begin
+        repeat
+            Counter := Counter + $01;
+            if Counter = $02 then
+                continue;
+        until Counter >= $03;
+        break;
+    end;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        while_loop = resolved.statements[2]
+        self.assertIsInstance(while_loop, ResolvedWhileStatement)
+        assert isinstance(while_loop, ResolvedWhileStatement)
+        repeat_loop = while_loop.body[0]
+        self.assertIsInstance(repeat_loop, ResolvedRepeatStatement)
+        assert isinstance(repeat_loop, ResolvedRepeatStatement)
+        nested_if = repeat_loop.body[1]
+        assert isinstance(nested_if, ResolvedIfStatement)
+        self.assertIsInstance(
+            nested_if.then_branch[0],
+            ResolvedContinueStatement,
+        )
+        self.assertIsInstance(while_loop.body[1], ResolvedBreakStatement)
+
+    def test_loop_assignment_does_not_propagate_after_loop(self) -> None:
+        source = """program Loops;
+var
+    Running: boolean;
+    Counter: byte;
+    Result: byte;
+begin
+    Running := false;
+    while Running do
+        Counter := $01;
+    Result := Counter;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3008")
+        self.assertIn("Counter is read before it is assigned.", str(context.exception))
+
+    def test_rejects_non_boolean_loop_conditions(self) -> None:
+        sources = (
+            """program InvalidWhile;
+var
+    Counter: byte;
+begin
+    Counter := $01;
+    while Counter do
+        Counter := $02;
+    nes.set_background_color($21);
+    nes.run;
+end.
+""",
+            """program InvalidRepeat;
+var
+    Counter: byte;
+begin
+    Counter := $01;
+    repeat
+        Counter := Counter + $01;
+    until Counter;
+    nes.set_background_color($21);
+    nes.run;
+end.
+""",
+        )
+        for source in sources:
+            with self.subTest(program=source.splitlines()[0]):
+                with self.assertRaises(CompilerError) as context:
+                    analyze_source(source)
+                self.assertEqual(context.exception.code, "E4004")
+                self.assertIn(
+                    "Counter has type byte, but boolean is required.",
+                    str(context.exception),
+                )
+
+    def test_rejects_break_and_continue_outside_loop(self) -> None:
+        for statement in ("break", "continue"):
+            with self.subTest(statement=statement):
+                source = f"""program InvalidLoopControl;
+begin
+    {statement};
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+                with self.assertRaises(CompilerError) as context:
+                    analyze_source(source)
+                self.assertEqual(context.exception.code, "E3010")
+                self.assertIn(
+                    f"{statement} can appear only inside a loop.",
+                    str(context.exception),
+                )
+
+    def test_rejects_runtime_command_inside_loop(self) -> None:
+        source = """program InvalidLoopRuntime;
+var
+    Running: boolean;
+begin
+    Running := true;
+    while Running do
+        nes.run;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3011")
+        self.assertIn(
+            "nes.run cannot appear inside a loop body.",
             str(context.exception),
         )
 

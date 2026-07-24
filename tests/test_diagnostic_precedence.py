@@ -106,6 +106,26 @@ class DiagnosticPrecedenceTests(unittest.TestCase):
             "        ^^^^^^^",
         )
 
+    def test_loop_control_outside_loop_is_preserved(self) -> None:
+        self.assert_primary_diagnostic(
+            "loop_control_outside_loop.nsp",
+            "E3010",
+            4,
+            5,
+            "break can appear only inside a loop.",
+            "    ^",
+        )
+
+    def test_runtime_command_inside_loop_is_preserved(self) -> None:
+        self.assert_primary_diagnostic(
+            "loop_runtime_command.nsp",
+            "E3011",
+            9,
+            9,
+            "nes.run cannot appear inside a loop body.",
+            "        ^^^^^^^",
+        )
+
     def test_assignment_error_precedes_missing_background_color(self) -> None:
         source = """program InvalidPrecedence;
 var

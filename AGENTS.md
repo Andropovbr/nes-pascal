@@ -77,6 +77,8 @@ begin
     BackgroundColor := DefaultBackgroundColor;
     FrameCounter := $00;
     NextFrameCounter := FrameCounter + $01;
+    while NextFrameCounter < MaximumFrameCounter do
+        NextFrameCounter := NextFrameCounter + $01;
     RenderingEnabled := true;
     WithinLimit := RenderingEnabled and
         (NextFrameCounter <= MaximumFrameCounter);
@@ -97,7 +99,8 @@ matches. A direct hexadecimal literal remains valid as the argument to
 256. Comparisons produce `boolean` values. Boolean expressions support `not`,
 `and`, and `or`, with short-circuit evaluation for the binary operators.
 Conditional statements support `if`, optional `else`, nested conditionals,
-and compound `begin`/`end` branches.
+and compound `begin`/`end` branches. Loops support `while`, `repeat`/`until`,
+nesting, `break`, and `continue`.
 
 The compiler must generate ca65 Assembly, assemble it, and link a valid `.nes`
 ROM. When opened in an emulator, the NES must:
@@ -108,8 +111,8 @@ ROM. When opened in an emulator, the NES must:
 4. enable rendering;
 5. remain in a stable loop.
 
-Do not implement loops, multiplication, division, user-defined procedures,
-sprites, controller input, or audio yet.
+Do not implement dedicated increment or decrement operations, multiplication,
+division, user-defined procedures, sprites, controller input, or audio yet.
 
 ## Expected pipeline
 
@@ -192,10 +195,12 @@ Currently supported:
 - boolean operators `not`, `and`, and `or`;
 - `if` statements with optional `else`;
 - nested conditionals and compound branches;
+- `while` and `repeat`/`until` loops;
+- nested loops, `break`, and `continue`;
 - parentheses in expressions.
 
 Do not implement type inference, implicit conversions, user-defined types,
-multiplication, division, or loops yet.
+dedicated increment or decrement operations, multiplication, or division yet.
 
 ## Diagnostics
 

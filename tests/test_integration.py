@@ -1,13 +1,19 @@
-from pathlib import Path
+import os
 import shutil
+import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 
 from nes_pascal.cli import compile_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOLCHAIN_AVAILABLE = shutil.which("ca65") is not None and shutil.which("ld65") is not None
+TOOLCHAIN_AVAILABLE = (
+    shutil.which("ca65") is not None
+    and shutil.which("ld65") is not None
+)
+MESEN_PATH = os.environ.get("MESEN_PATH") or shutil.which("Mesen")
 
 
 @unittest.skipUnless(
@@ -47,6 +53,9 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_builds_valid_conditionals_nrom_image(self) -> None:
         self._assert_valid_nrom_image("conditionals")
 
+    def test_loop_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("loops")
+
     def test_conditional_branch_larger_than_relative_branch_range(self) -> None:
         assignments = "\n".join(
             "        Counter := Counter + $01;" for _ in range(80)
@@ -73,6 +82,35 @@ end.
             compile_source(source_path, rom_path)
             rom = rom_path.read_bytes()
         self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
+
+
+@unittest.skipUnless(
+    TOOLCHAIN_AVAILABLE and MESEN_PATH is not None,
+    "emulator integration skipped: ca65, ld65, and MESEN_PATH are required",
+)
+class MesenIntegrationTests(unittest.TestCase):
+    def test_loop_example_reaches_expected_runtime_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            rom_path = Path(temporary_directory) / "loops.nes"
+            compile_source(ROOT / "examples" / "loops.nsp", rom_path)
+            result = subprocess.run(
+                [
+                    str(MESEN_PATH),
+                    "--testRunner",
+                    str(rom_path),
+                    str(ROOT / "tests" / "mesen" / "verify_loops.lua"),
+                ],
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=30,
+            )
+
+        self.assertEqual(
+            result.returncode,
+            0,
+            f"Mesen runtime validation failed:\n{result.stdout}\n{result.stderr}",
+        )
 
 
 if __name__ == "__main__":

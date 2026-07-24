@@ -1,0 +1,32 @@
+program Loops;
+
+const
+    Target: byte = $06;
+
+var
+    Counter: byte;
+    InnerCounter: byte;
+    BackgroundColor: nes_color;
+
+begin
+    Counter := $00;
+    InnerCounter := $00;
+    while Counter < Target do
+    begin
+        Counter := Counter + $01;
+        if Counter = $02 then
+            continue;
+        if Counter = $05 then
+            break;
+        InnerCounter := InnerCounter + $01;
+    end;
+    repeat
+        InnerCounter := InnerCounter - $01;
+    until InnerCounter = $00;
+    if Counter = $05 then
+        BackgroundColor := $21
+    else
+        BackgroundColor := $0F;
+    nes.set_background_color(BackgroundColor);
+    nes.run;
+end.

@@ -1,0 +1,12 @@
+program InvalidLoopRuntime;
+
+var
+    Running: boolean;
+
+begin
+    Running := true;
+    while Running do
+        nes.run;
+    nes.set_background_color($21);
+    nes.run;
+end.

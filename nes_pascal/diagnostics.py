@@ -27,6 +27,8 @@ class DiagnosticCode(StrEnum):
     UNKNOWN_ASSIGNMENT_TARGET = "E3007"
     VARIABLE_READ_BEFORE_ASSIGNMENT = "E3008"
     CONDITIONAL_RUNTIME_COMMAND = "E3009"
+    LOOP_CONTROL_OUTSIDE_LOOP = "E3010"
+    LOOP_RUNTIME_COMMAND = "E3011"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -81,6 +83,12 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.CONDITIONAL_RUNTIME_COMMAND: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Runtime command inside conditional"
+    ),
+    DiagnosticCode.LOOP_CONTROL_OUTSIDE_LOOP: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Loop control outside loop"
+    ),
+    DiagnosticCode.LOOP_RUNTIME_COMMAND: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Runtime command inside loop"
     ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"

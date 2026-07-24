@@ -8,26 +8,33 @@ from .ast import (
     BooleanBinaryExpression,
     BooleanLiteral,
     BooleanNotExpression,
+    BreakStatement,
     BuiltInType,
     ComparisonExpression,
     ComparisonOperator,
     ConstantDeclaration,
     ConstantReference,
+    ContinueStatement,
     HexLiteral,
     IfStatement,
     ImmediateValue,
     Program,
+    RepeatStatement,
     ResolvedAssignment,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
+    ResolvedBreakStatement,
     ResolvedComparisonExpression,
+    ResolvedContinueStatement,
     ResolvedIfStatement,
+    ResolvedRepeatStatement,
     ResolvedProgram,
     ResolvedSetBackgroundColor,
     ResolvedStatement,
     ResolvedValue,
     ResolvedVariable,
+    ResolvedWhileStatement,
     ResolvedUnaryExpression,
     Run,
     SetBackgroundColor,
@@ -36,6 +43,7 @@ from .ast import (
     ValueExpression,
     VariableValue,
     VariableReference,
+    WhileStatement,
 )
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
 
@@ -91,6 +99,7 @@ class SemanticAnalyzer:
             variables,
             set(),
             inside_conditional=False,
+            loop_depth=0,
         )
 
         self._validate_program_structure(program)
@@ -103,13 +112,21 @@ class SemanticAnalyzer:
     def _resolve_statements(
         self,
         statements: tuple[
-            Assignment | SetBackgroundColor | Run | IfStatement,
+            Assignment
+            | SetBackgroundColor
+            | Run
+            | IfStatement
+            | WhileStatement
+            | RepeatStatement
+            | BreakStatement
+            | ContinueStatement,
             ...,
         ],
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
         assigned_variables: set[str],
         inside_conditional: bool,
+        loop_depth: int,
     ) -> tuple[tuple[ResolvedStatement, ...], set[str]]:
         current_assignments = set(assigned_variables)
         resolved_statements: list[ResolvedStatement] = []
@@ -137,6 +154,7 @@ class SemanticAnalyzer:
                     variables,
                     current_assignments,
                     inside_conditional=True,
+                    loop_depth=loop_depth,
                 )
                 resolved_else = None
                 if statement.else_branch is not None:
@@ -146,6 +164,7 @@ class SemanticAnalyzer:
                         variables,
                         current_assignments,
                         inside_conditional=True,
+                        loop_depth=loop_depth,
                     )
                     current_assignments = (
                         then_assignments & else_assignments
@@ -157,7 +176,63 @@ class SemanticAnalyzer:
                         resolved_else,
                     )
                 )
+            elif isinstance(statement, WhileStatement):
+                condition = self._resolve_value(
+                    statement.condition,
+                    BuiltInType.BOOLEAN,
+                    constants,
+                    variables,
+                    current_assignments,
+                )
+                body, _ = self._resolve_statements(
+                    statement.body,
+                    constants,
+                    variables,
+                    current_assignments,
+                    inside_conditional=inside_conditional,
+                    loop_depth=loop_depth + 1,
+                )
+                resolved_statements.append(
+                    ResolvedWhileStatement(condition, body)
+                )
+            elif isinstance(statement, RepeatStatement):
+                body, _ = self._resolve_statements(
+                    statement.body,
+                    constants,
+                    variables,
+                    current_assignments,
+                    inside_conditional=inside_conditional,
+                    loop_depth=loop_depth + 1,
+                )
+                condition = self._resolve_value(
+                    statement.condition,
+                    BuiltInType.BOOLEAN,
+                    constants,
+                    variables,
+                    current_assignments,
+                )
+                resolved_statements.append(
+                    ResolvedRepeatStatement(body, condition)
+                )
+            elif isinstance(statement, (BreakStatement, ContinueStatement)):
+                if loop_depth == 0:
+                    self._error(
+                        statement.position,
+                        DiagnosticCode.LOOP_CONTROL_OUTSIDE_LOOP,
+                        f"{type(statement).__name__.removesuffix('Statement').lower()} "
+                        "can appear only inside a loop.",
+                        "Move the statement inside a while or repeat loop.",
+                    )
+                if isinstance(statement, BreakStatement):
+                    resolved_statements.append(ResolvedBreakStatement())
+                else:
+                    resolved_statements.append(ResolvedContinueStatement())
             elif isinstance(statement, SetBackgroundColor):
+                if loop_depth > 0:
+                    self._loop_runtime_command_error(
+                        statement.position,
+                        "nes.set_background_color",
+                    )
                 if inside_conditional:
                     self._conditional_runtime_command_error(
                         statement.position,
@@ -176,6 +251,11 @@ class SemanticAnalyzer:
                 )
             else:
                 assert isinstance(statement, Run)
+                if loop_depth > 0:
+                    self._loop_runtime_command_error(
+                        statement.position,
+                        "nes.run",
+                    )
                 if inside_conditional:
                     self._conditional_runtime_command_error(
                         statement.position,
@@ -186,6 +266,20 @@ class SemanticAnalyzer:
         return (
             tuple(resolved_statements),
             current_assignments,
+        )
+
+    def _loop_runtime_command_error(
+        self,
+        position: SourcePosition | None,
+        command: str,
+    ) -> None:
+        assert position is not None
+        self._error(
+            position,
+            DiagnosticCode.LOOP_RUNTIME_COMMAND,
+            f"{command} cannot appear inside a loop body.",
+            "Move the NES runtime command to the top-level program block.",
+            len(command),
         )
 
     def _conditional_runtime_command_error(
@@ -694,12 +788,31 @@ class SemanticAnalyzer:
 
     def _statement_position(
         self,
-        statement: Assignment | SetBackgroundColor | Run | IfStatement,
+        statement: (
+            Assignment
+            | SetBackgroundColor
+            | Run
+            | IfStatement
+            | WhileStatement
+            | RepeatStatement
+            | BreakStatement
+            | ContinueStatement
+        ),
         program: Program,
     ) -> SourcePosition:
         if isinstance(statement, Assignment):
             return statement.target_position
         if isinstance(statement, IfStatement):
+            return statement.position
+        if isinstance(
+            statement,
+            (
+                WhileStatement,
+                RepeatStatement,
+                BreakStatement,
+                ContinueStatement,
+            ),
+        ):
             return statement.position
         if statement.position is not None:
             return statement.position

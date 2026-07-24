@@ -162,7 +162,40 @@ class IfStatement:
     position: SourcePosition
 
 
-Statement = Assignment | SetBackgroundColor | Run | IfStatement
+@dataclass(frozen=True, slots=True)
+class WhileStatement:
+    condition: ValueExpression
+    body: tuple[Statement, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class RepeatStatement:
+    body: tuple[Statement, ...]
+    condition: ValueExpression
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class BreakStatement:
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class ContinueStatement:
+    position: SourcePosition
+
+
+Statement = (
+    Assignment
+    | SetBackgroundColor
+    | Run
+    | IfStatement
+    | WhileStatement
+    | RepeatStatement
+    | BreakStatement
+    | ContinueStatement
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -253,8 +286,37 @@ class ResolvedIfStatement:
     else_branch: tuple[ResolvedStatement, ...] | None
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedWhileStatement:
+    condition: ResolvedValue
+    body: tuple[ResolvedStatement, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedRepeatStatement:
+    body: tuple[ResolvedStatement, ...]
+    condition: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedBreakStatement:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedContinueStatement:
+    pass
+
+
 ResolvedStatement = (
-    ResolvedAssignment | ResolvedSetBackgroundColor | Run | ResolvedIfStatement
+    ResolvedAssignment
+    | ResolvedSetBackgroundColor
+    | Run
+    | ResolvedIfStatement
+    | ResolvedWhileStatement
+    | ResolvedRepeatStatement
+    | ResolvedBreakStatement
+    | ResolvedContinueStatement
 )
 
 

@@ -74,6 +74,21 @@ class BackendGoldenTests(unittest.TestCase):
         self.assertIn("@if_else_", actual)
         self.assertIn("@if_end_", actual)
 
+    def test_loop_program_matches_golden_assembly(self) -> None:
+        source_path = ROOT / "examples" / "loops.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        actual = generate(analyze(parse(source, filename), source, filename))
+        expected = (ROOT / "tests" / "golden" / "loops.asm").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(actual, expected)
+        self.assertIn("; Source: while condition do", actual)
+        self.assertIn("; Source: repeat until condition", actual)
+        self.assertIn("; Source: break", actual)
+        self.assertIn("; Source: continue", actual)
+        self.assertIn("; long-branch-safe loop exit", actual)
+
 
 if __name__ == "__main__":
     unittest.main()

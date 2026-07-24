@@ -6,7 +6,8 @@ milestone supports strongly typed constants, variables, and assignments using
 the one-byte `nes_color`, `byte`, and `boolean` types, plus byte arithmetic.
 It also supports comparisons and short-circuit Boolean expressions. It
 supports structured `if`/`else` statements and generates ca65 Assembly for an
-NROM-256 image.
+NROM-256 image. Basic control flow also includes `while`, `repeat`/`until`,
+`break`, and `continue`.
 
 ## Prerequisites
 
@@ -81,6 +82,14 @@ be nested. Definite-assignment analysis follows both control-flow paths.
 
 See `examples/conditionals.nsp` for simple, compound, and nested branches.
 
+Loops require `boolean` conditions and may be nested. `break` exits the
+nearest loop, while `continue` starts its next condition check. Loop bodies
+may be single statements or structured statement sequences.
+
+The practical `examples/loops.nsp` program counts to a target, exercises
+`break` and `continue`, counts back down with `repeat`/`until`, and selects
+background color `$21` when the expected state is reached.
+
 ## Compilation
 
 Compile the minimal example with:
@@ -105,6 +114,12 @@ Compile the conditional example with:
 
 ```text
 python -m nes_pascal.cli examples/conditionals.nsp -o build/conditionals.nes
+```
+
+Compile the practical loop example with:
+
+```text
+python -m nes_pascal.cli examples/loops.nsp -o build/loops.nes
 ```
 
 Or use:
@@ -134,6 +149,18 @@ make test
 The integration test assembles and links the ROM, then validates its header,
 mapper, banks, vectors, CHR data, and final size. It is skipped with an
 explicit message when `ca65` or `ld65` is unavailable.
+
+To include the optional headless Mesen behavior test, point `MESEN_PATH` to
+the emulator executable before running the suite. The test compiles
+`examples/loops.nsp`, executes the ROM, and verifies the final loop variables
+and universal background color:
+
+```powershell
+$env:MESEN_PATH = "C:\path\to\Mesen.exe"
+python -m unittest discover -s tests -v
+```
+
+The test is skipped clearly when Mesen or the cc65 toolchain is unavailable.
 
 Remove build artifacts with:
 
@@ -194,8 +221,11 @@ examples, and suggested fixes.
 - Boolean expressions support only `not`, `and`, and `or`;
 - conditional branches support assignments and nested conditionals; NES
   runtime commands remain top-level only;
+- loops support `while`, `repeat`/`until`, `break`, and `continue`, but execute
+  only during initialization before `nes.run`;
 - variables use regular RAM; zero-page allocation is not implemented;
-- there are no loops, multiplication, division, procedures, sprites,
-  controller input, audio, runtime strings, recursion, or optimizations;
+- there are no dedicated increment/decrement operations, multiplication,
+  division, procedures, sprites, controller input, audio, runtime strings,
+  recursion, or optimizations;
 - only NTSC NES, mapper 0, 32 KiB PRG-ROM, and 8 KiB CHR-ROM are supported;
 - CHR-ROM is empty, and the backend does not provide a game engine.
