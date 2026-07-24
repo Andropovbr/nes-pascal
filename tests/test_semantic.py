@@ -1,10 +1,13 @@
 import unittest
 
 from nes_pascal.ast import (
+    BinaryOperator,
     BuiltInType,
     ImmediateValue,
     ResolvedAssignment,
+    ResolvedBinaryExpression,
     ResolvedSetBackgroundColor,
+    ResolvedUnaryExpression,
     Run,
     VariableValue,
 )
@@ -278,6 +281,83 @@ end.
         with self.assertRaises(CompilerError) as context:
             analyze_source(source)
         self.assertEqual(context.exception.code, "E3004")
+
+    def test_resolves_byte_arithmetic_with_constants_and_variables(self) -> None:
+        source = """program Arithmetic;
+const
+    Step: byte = $02;
+var
+    Counter: byte;
+    Result: byte;
+begin
+    Counter := $05;
+    Result := -(Counter + Step) - $01;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        assignment = resolved.statements[1]
+        assert isinstance(assignment, ResolvedAssignment)
+        expression = assignment.value
+        self.assertIsInstance(expression, ResolvedBinaryExpression)
+        assert isinstance(expression, ResolvedBinaryExpression)
+        self.assertEqual(expression.operator, BinaryOperator.SUBTRACT)
+        self.assertIsInstance(expression.left, ResolvedUnaryExpression)
+
+    def test_rejects_arithmetic_for_nes_color(self) -> None:
+        source = """program Arithmetic;
+var
+    Color: nes_color;
+begin
+    Color := $20 + $01;
+    nes.set_background_color(Color);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E4004")
+        self.assertIn(
+            "arithmetic expression of type byte",
+            str(context.exception),
+        )
+
+    def test_rejects_boolean_operand_in_byte_arithmetic(self) -> None:
+        source = """program Arithmetic;
+var
+    Counter: byte;
+    Enabled: boolean;
+begin
+    Enabled := true;
+    Counter := $01 + Enabled;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E4004")
+        self.assertIn(
+            "Enabled has type boolean, but byte is required.",
+            str(context.exception),
+        )
+
+    def test_detects_uninitialized_variable_inside_arithmetic(self) -> None:
+        source = """program Arithmetic;
+var
+    Counter: byte;
+    Result: byte;
+begin
+    Result := Counter + $01;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3008")
+        self.assertIn("Counter is read before it is assigned.", str(context.exception))
 
 
 if __name__ == "__main__":

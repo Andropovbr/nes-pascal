@@ -339,6 +339,7 @@ the range reserved for their category.
 - **Category:** Type System
 - **Explanation:** Assignments and intrinsic arguments require exact type
   matches. Numeric-to-boolean and other implicit conversions are forbidden.
+  Arithmetic expressions and their operands must have type `byte`.
 - **Trigger:**
 
   ```pascal
@@ -356,7 +357,8 @@ the range reserved for their category.
   ```
 
 - **Suggested fix:** Use a source value with exactly the target type. Use
-  `true` or `false` for a boolean literal.
+  `true` or `false` for a boolean literal, and use arithmetic only with
+  `byte` values.
 
 ## Parser / Syntax (E2000-E2999)
 
@@ -397,7 +399,7 @@ the range reserved for their category.
   ```text
   E2102 demo.nsp:1:12
 
-  Expected a literal or identifier.
+  Expected a literal, identifier, or parenthesized expression.
   ```
 
 - **Suggested fix:** Follow the declaration and statement grammar documented

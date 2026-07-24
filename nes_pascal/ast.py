@@ -1,5 +1,7 @@
 """AST nodes supported by the current language milestone."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -14,6 +16,16 @@ class BuiltInType(Enum):
     NES_COLOR = "nes_color"
     BYTE = "byte"
     BOOLEAN = "boolean"
+
+
+class UnaryOperator(Enum):
+    PLUS = "+"
+    NEGATE = "-"
+
+
+class BinaryOperator(Enum):
+    ADD = "+"
+    SUBTRACT = "-"
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,8 +72,28 @@ class VariableReference:
     position: SourcePosition
 
 
+@dataclass(frozen=True, slots=True)
+class UnaryExpression:
+    operator: UnaryOperator
+    operand: ValueExpression
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class BinaryExpression:
+    left: ValueExpression
+    operator: BinaryOperator
+    right: ValueExpression
+    position: SourcePosition
+
+
 ValueExpression = (
-    HexLiteral | BooleanLiteral | ConstantReference | VariableReference
+    HexLiteral
+    | BooleanLiteral
+    | ConstantReference
+    | VariableReference
+    | UnaryExpression
+    | BinaryExpression
 )
 
 
@@ -113,7 +145,25 @@ class VariableValue:
     variable: ResolvedVariable
 
 
-ResolvedValue = ImmediateValue | VariableValue
+@dataclass(frozen=True, slots=True)
+class ResolvedUnaryExpression:
+    operator: UnaryOperator
+    operand: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedBinaryExpression:
+    left: ResolvedValue
+    operator: BinaryOperator
+    right: ResolvedValue
+
+
+ResolvedValue = (
+    ImmediateValue
+    | VariableValue
+    | ResolvedUnaryExpression
+    | ResolvedBinaryExpression
+)
 
 
 @dataclass(frozen=True, slots=True)

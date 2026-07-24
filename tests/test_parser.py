@@ -2,6 +2,8 @@ import unittest
 
 from nes_pascal.ast import (
     Assignment,
+    BinaryExpression,
+    BinaryOperator,
     BooleanLiteral,
     BuiltInType,
     ConstantDeclaration,
@@ -10,6 +12,8 @@ from nes_pascal.ast import (
     Run,
     SetBackgroundColor,
     SourcePosition,
+    UnaryExpression,
+    UnaryOperator,
     VariableDeclaration,
     VariableReference,
 )
@@ -169,6 +173,47 @@ class ParserTests(unittest.TestCase):
                 BuiltInType.BOOLEAN,
             ],
         )
+
+    def test_parses_left_associative_arithmetic_expression(self) -> None:
+        program = parse(
+            program_with(
+                "Counter := $08 - $03 + $01;\n"
+                "nes.set_background_color($21);\n"
+                "nes.run;",
+                variables="    Counter: byte;",
+            )
+        )
+        assignment = program.statements[0]
+        self.assertIsInstance(assignment, Assignment)
+        assert isinstance(assignment, Assignment)
+        expression = assignment.value
+        self.assertIsInstance(expression, BinaryExpression)
+        assert isinstance(expression, BinaryExpression)
+        self.assertEqual(expression.operator, BinaryOperator.ADD)
+        self.assertIsInstance(expression.left, BinaryExpression)
+        assert isinstance(expression.left, BinaryExpression)
+        self.assertEqual(expression.left.operator, BinaryOperator.SUBTRACT)
+
+    def test_parentheses_and_unary_operators_override_grouping(self) -> None:
+        program = parse(
+            program_with(
+                "Counter := -($01 + +$02);\n"
+                "nes.set_background_color($21);\n"
+                "nes.run;",
+                variables="    Counter: byte;",
+            )
+        )
+        assignment = program.statements[0]
+        assert isinstance(assignment, Assignment)
+        expression = assignment.value
+        self.assertIsInstance(expression, UnaryExpression)
+        assert isinstance(expression, UnaryExpression)
+        self.assertEqual(expression.operator, UnaryOperator.NEGATE)
+        self.assertIsInstance(expression.operand, BinaryExpression)
+        assert isinstance(expression.operand, BinaryExpression)
+        self.assertIsInstance(expression.operand.right, UnaryExpression)
+        assert isinstance(expression.operand.right, UnaryExpression)
+        self.assertEqual(expression.operand.right.operator, UnaryOperator.PLUS)
 
 
 if __name__ == "__main__":

@@ -32,9 +32,9 @@ Each milestone should produce a working compiler capable of generating a valid N
 ---
 
 ## Milestone 4
-- [ ] Arithmetic expressions
-- [ ] Unary operators
-- [ ] Binary operators
+- [x] Arithmetic expressions
+- [x] Unary operators
+- [x] Binary operators
 
 ---
 

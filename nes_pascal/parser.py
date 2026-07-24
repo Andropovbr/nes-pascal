@@ -2,6 +2,8 @@
 
 from .ast import (
     Assignment,
+    BinaryExpression,
+    BinaryOperator,
     BooleanLiteral,
     BuiltInType,
     ConstantDeclaration,
@@ -13,6 +15,8 @@ from .ast import (
     SetBackgroundColor,
     SourcePosition,
     Statement,
+    UnaryExpression,
+    UnaryOperator,
     ValueExpression,
     VariableDeclaration,
     VariableReference,
@@ -188,7 +192,7 @@ class Parser:
     def _parse_assignment(self) -> Assignment:
         target = self._expect(TokenKind.IDENTIFIER, "Expected an assignment target.")
         self._expect(TokenKind.ASSIGN, "Expected ':=' after the assignment target.")
-        value = self._parse_value()
+        value = self._parse_expression()
         self._expect(TokenKind.SEMICOLON, "Expected ';' after the assignment.")
         return Assignment(
             target.text,
@@ -203,7 +207,7 @@ class Parser:
             TokenKind.LEFT_PAREN,
             "Expected '(' after 'nes.set_background_color'.",
         )
-        argument = self._parse_value()
+        argument = self._parse_expression()
         self._expect(
             TokenKind.RIGHT_PAREN,
             "Expected ')' after the background color.",
@@ -214,7 +218,42 @@ class Parser:
         )
         return SetBackgroundColor(argument, position)
 
-    def _parse_value(self) -> ValueExpression:
+    def _parse_expression(self) -> ValueExpression:
+        expression = self._parse_unary_expression()
+        while self._current().kind in (TokenKind.PLUS, TokenKind.MINUS):
+            operator_token = self._current()
+            self.position += 1
+            operator = (
+                BinaryOperator.ADD
+                if operator_token.kind is TokenKind.PLUS
+                else BinaryOperator.SUBTRACT
+            )
+            right = self._parse_unary_expression()
+            expression = BinaryExpression(
+                expression,
+                operator,
+                right,
+                SourcePosition(operator_token.line, operator_token.column),
+            )
+        return expression
+
+    def _parse_unary_expression(self) -> ValueExpression:
+        token = self._current()
+        if token.kind in (TokenKind.PLUS, TokenKind.MINUS):
+            self.position += 1
+            operator = (
+                UnaryOperator.PLUS
+                if token.kind is TokenKind.PLUS
+                else UnaryOperator.NEGATE
+            )
+            return UnaryExpression(
+                operator,
+                self._parse_unary_expression(),
+                SourcePosition(token.line, token.column),
+            )
+        return self._parse_primary_expression()
+
+    def _parse_primary_expression(self) -> ValueExpression:
         token = self._current()
         if token.kind in (
             TokenKind.HEX_LITERAL,
@@ -227,11 +266,19 @@ class Parser:
             if token.text.lower() in self.variable_names:
                 return VariableReference(token.text, position)
             return ConstantReference(token.text, position)
+        if self._match(TokenKind.LEFT_PAREN):
+            expression = self._parse_expression()
+            self._expect(
+                TokenKind.RIGHT_PAREN,
+                "Expected ')' after the arithmetic expression.",
+            )
+            return expression
         self._error(
             token,
             DiagnosticCode.INVALID_SYNTAX,
-            "Expected a literal or identifier.",
-            "Use a hexadecimal value, boolean value, constant, or variable.",
+            "Expected a literal, identifier, or parenthesized expression.",
+            "Use a hexadecimal value, boolean value, constant, variable, "
+            "or an expression in parentheses.",
         )
         raise AssertionError("unreachable")
 

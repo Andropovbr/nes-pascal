@@ -15,10 +15,10 @@ TOOLCHAIN_AVAILABLE = shutil.which("ca65") is not None and shutil.which("ld65") 
     "integration skipped: ca65 and/or ld65 are not installed",
 )
 class ToolchainIntegrationTests(unittest.TestCase):
-    def test_builds_valid_nrom_image(self) -> None:
+    def _assert_valid_nrom_image(self, example_name: str) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
-            rom_path = Path(temporary_directory) / "minimal.nes"
-            compile_source(ROOT / "examples" / "minimal.nsp", rom_path)
+            rom_path = Path(temporary_directory) / f"{example_name}.nes"
+            compile_source(ROOT / "examples" / f"{example_name}.nsp", rom_path)
             rom = rom_path.read_bytes()
 
         self.assertEqual(rom[:4], b"NES\x1a")
@@ -34,6 +34,12 @@ class ToolchainIntegrationTests(unittest.TestCase):
         reset = int.from_bytes(rom[vector_offset + 2 : vector_offset + 4], "little")
         irq = int.from_bytes(rom[vector_offset + 4 : vector_offset + 6], "little")
         self.assertEqual((nmi, reset, irq), (0x8000, 0x8002, 0x8001))
+
+    def test_builds_valid_minimal_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("minimal")
+
+    def test_builds_valid_arithmetic_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("arithmetic")
 
 
 if __name__ == "__main__":

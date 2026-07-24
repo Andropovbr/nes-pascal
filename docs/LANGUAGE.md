@@ -69,7 +69,7 @@ use the `true` and `false` keywords.
 A constant declaration has this grammar:
 
 ```text
-Identifier : Type = HexLiteral ;
+Identifier : Type = Literal ;
 ```
 
 Declarations appear in a `const` section between the program header and the
@@ -171,7 +171,8 @@ The right-hand side may be:
 - a hexadecimal literal;
 - `true` or `false`;
 - a constant reference;
-- a previously assigned variable reference.
+- a previously assigned variable reference;
+- a `byte` arithmetic expression.
 
 Both sides must have exactly the same type. There are no implicit conversions.
 Reading a variable before an earlier assignment is a compilation error.
@@ -187,6 +188,39 @@ Assignment diagnostics preserve the earliest primary error:
 Whole-program checks such as E3003 run only after statement-level semantic
 analysis succeeds. See [DIAGNOSTICS.md](DIAGNOSTICS.md) for the complete
 diagnostic reference and examples.
+
+## Arithmetic expressions
+
+Arithmetic is defined only for `byte` values. Operands may be hexadecimal
+literals, `byte` constants, previously assigned `byte` variables, or nested
+arithmetic expressions.
+
+Supported operators:
+
+- unary `+`, which leaves the value unchanged;
+- unary `-`, which computes the two's-complement negation;
+- binary `+`;
+- binary `-`.
+
+Parentheses group expressions. Unary operators bind more tightly than binary
+operators. Binary `+` and `-` have equal precedence and associate from left to
+right:
+
+```pascal
+Counter := $08 - $03 + $01;
+Result := -(Counter + Step);
+```
+
+All results wrap modulo 256. For example, `$FF + $01` produces `$00`, and
+`$00 - $01` produces `$FF`. This behavior directly reflects one-byte 6502
+arithmetic.
+
+Arithmetic expressions always have type `byte`. They cannot be assigned to
+`nes_color` or `boolean`, and those types cannot be used as operands. The
+compiler reports E4004 for these incompatible uses.
+
+Constant declarations remain literal-only in this milestone; their
+initializers cannot contain arithmetic expressions.
 
 ## Initial commands
 
@@ -236,7 +270,8 @@ The current milestone does not support:
 - procedures;
 - functions;
 - user-defined parameters;
-- arithmetic expressions;
+- multiplication or division;
+- comparisons or boolean expressions;
 - type inference;
 - implicit conversions;
 - `if`, `while`, `for`, or `case`;

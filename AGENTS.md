@@ -68,11 +68,13 @@ const
 var
     BackgroundColor: nes_color;
     FrameCounter: byte;
+    NextFrameCounter: byte;
     RenderingEnabled: boolean;
 
 begin
     BackgroundColor := DefaultBackgroundColor;
     FrameCounter := $00;
+    NextFrameCounter := FrameCounter + $01;
     RenderingEnabled := true;
     nes.set_background_color(BackgroundColor);
     nes.run;
@@ -82,7 +84,9 @@ end.
 The built-in types `nes_color`, `byte`, and `boolean` each occupy one byte.
 Variables require explicit declarations and assignments require exact type
 matches. A direct hexadecimal literal remains valid as the argument to
-`nes.set_background_color`.
+`nes.set_background_color`. Arithmetic expressions support unary and binary
+`+` and `-`, parentheses, and `byte` operands only. Arithmetic wraps modulo
+256.
 
 The compiler must generate ca65 Assembly, assemble it, and link a valid `.nes`
 ROM. When opened in an emulator, the NES must:
@@ -93,8 +97,8 @@ ROM. When opened in an emulator, the NES must:
 4. enable rendering;
 5. remain in a stable loop.
 
-Do not implement arithmetic expressions, user-defined procedures, sprites,
-controller input, or audio yet.
+Do not implement multiplication, division, comparisons, boolean expressions,
+user-defined procedures, sprites, controller input, or audio yet.
 
 ## Expected pipeline
 
@@ -170,10 +174,12 @@ Currently supported:
 - explicitly typed constants;
 - explicitly typed variables in a `var` section;
 - assignment with `:=`;
-- constant and initialized-variable references.
+- constant and initialized-variable references;
+- `byte` arithmetic using unary and binary `+` and `-`;
+- parentheses in arithmetic expressions.
 
-Do not implement type inference, arithmetic expressions, implicit
-conversions, or user-defined types yet.
+Do not implement type inference, implicit conversions, user-defined types,
+multiplication, division, comparisons, or boolean expressions yet.
 
 ## Diagnostics
 

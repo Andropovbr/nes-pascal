@@ -30,6 +30,21 @@ class BackendGoldenTests(unittest.TestCase):
         self.assertIn("sta variable_BackgroundColor", assembly)
         self.assertIn("lda variable_BackgroundColor", assembly)
 
+    def test_arithmetic_program_matches_golden_assembly(self) -> None:
+        source_path = ROOT / "examples" / "arithmetic.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        actual = generate(analyze(parse(source, filename), source, filename))
+        expected = (ROOT / "tests" / "golden" / "arithmetic.asm").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(actual, expected)
+        self.assertIn("expression_temporary_0: .res 1", actual)
+        self.assertIn("expression_temporary_1: .res 1", actual)
+        self.assertIn("adc expression_temporary_1", actual)
+        self.assertIn("sbc expression_temporary_0", actual)
+        self.assertIn("eor #$FF", actual)
+
 
 if __name__ == "__main__":
     unittest.main()

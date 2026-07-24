@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from .ast import (
     Assignment,
+    BinaryExpression,
     BooleanLiteral,
     BuiltInType,
     ConstantDeclaration,
@@ -12,14 +13,17 @@ from .ast import (
     ImmediateValue,
     Program,
     ResolvedAssignment,
+    ResolvedBinaryExpression,
     ResolvedProgram,
     ResolvedSetBackgroundColor,
     ResolvedStatement,
     ResolvedValue,
     ResolvedVariable,
+    ResolvedUnaryExpression,
     Run,
     SetBackgroundColor,
     SourcePosition,
+    UnaryExpression,
     ValueExpression,
     VariableValue,
     VariableReference,
@@ -164,6 +168,15 @@ class SemanticAnalyzer:
         assigned_variables: set[str],
         assignment_target: ResolvedVariable | None = None,
     ) -> ResolvedValue:
+        if isinstance(expression, (UnaryExpression, BinaryExpression)):
+            return self._resolve_arithmetic_expression(
+                expression,
+                expected_type,
+                constants,
+                variables,
+                assigned_variables,
+                assignment_target,
+            )
         if isinstance(expression, (HexLiteral, BooleanLiteral)):
             return ImmediateValue(
                 self._evaluate_literal(
@@ -211,6 +224,59 @@ class SemanticAnalyzer:
                 len(expression.name),
             )
         return VariableValue(variable)
+
+    def _resolve_arithmetic_expression(
+        self,
+        expression: UnaryExpression | BinaryExpression,
+        expected_type: BuiltInType,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+        assignment_target: ResolvedVariable | None,
+    ) -> ResolvedValue:
+        if expected_type is not BuiltInType.BYTE:
+            if assignment_target is not None:
+                self._error(
+                    expression.position,
+                    DiagnosticCode.INCOMPATIBLE_TYPES,
+                    "Cannot assign an arithmetic expression of type byte to "
+                    f"variable {assignment_target.name} of type "
+                    f"{assignment_target.type.value}.",
+                    "Arithmetic expressions require a byte target.",
+                )
+            self._error(
+                expression.position,
+                DiagnosticCode.INCOMPATIBLE_TYPES,
+                f"Arithmetic expressions have type byte, but "
+                f"{expected_type.value} is required.",
+                "Use arithmetic only where a byte value is expected.",
+            )
+
+        if isinstance(expression, UnaryExpression):
+            operand = self._resolve_value(
+                expression.operand,
+                BuiltInType.BYTE,
+                constants,
+                variables,
+                assigned_variables,
+            )
+            return ResolvedUnaryExpression(expression.operator, operand)
+
+        left = self._resolve_value(
+            expression.left,
+            BuiltInType.BYTE,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        right = self._resolve_value(
+            expression.right,
+            BuiltInType.BYTE,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        return ResolvedBinaryExpression(left, expression.operator, right)
 
     def _require_matching_type(
         self,

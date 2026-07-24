@@ -23,6 +23,8 @@ class TokenKind(Enum):
     COLON = auto()
     EQUAL = auto()
     ASSIGN = auto()
+    PLUS = auto()
+    MINUS = auto()
     EOF = auto()
 
 
@@ -43,6 +45,8 @@ PUNCTUATION = {
     ")": TokenKind.RIGHT_PAREN,
     ":": TokenKind.COLON,
     "=": TokenKind.EQUAL,
+    "+": TokenKind.PLUS,
+    "-": TokenKind.MINUS,
 }
 
 

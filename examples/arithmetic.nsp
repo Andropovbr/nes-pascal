@@ -1,0 +1,17 @@
+program Arithmetic;
+
+const
+    Step: byte = $02;
+
+var
+    Counter: byte;
+    Result: byte;
+    BackgroundColor: nes_color;
+
+begin
+    Counter := $05;
+    Result := -(Counter + Step) - $01;
+    BackgroundColor := $21;
+    nes.set_background_color(BackgroundColor);
+    nes.run;
+end.

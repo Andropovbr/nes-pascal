@@ -1,13 +1,17 @@
 """ca65 Assembly generation for an NROM-256 image."""
 
 from .ast import (
+    BinaryOperator,
     BuiltInType,
     ImmediateValue,
     ResolvedAssignment,
+    ResolvedBinaryExpression,
     ResolvedProgram,
     ResolvedSetBackgroundColor,
+    ResolvedUnaryExpression,
     ResolvedValue,
     Run,
+    UnaryOperator,
     VariableValue,
 )
 
@@ -28,6 +32,20 @@ def generate(program: ResolvedProgram) -> str:
         f"{variable.label}: .res 1       ; {variable.name}: {variable.type.value}"
         for variable in program.variables
     ]
+    temporary_count = max(
+        (
+            _expression_depth(statement.value)
+            if isinstance(statement, ResolvedAssignment)
+            else _expression_depth(statement.argument)
+            if isinstance(statement, ResolvedSetBackgroundColor)
+            else 0
+        )
+        for statement in program.statements
+    )
+    variable_lines.extend(
+        f"expression_temporary_{index}: .res 1 ; arithmetic temporary"
+        for index in range(temporary_count)
+    )
     if not variable_lines:
         variable_lines.append("    ; no variables")
 
@@ -150,5 +168,61 @@ def _load_value(value: ResolvedValue) -> list[str]:
             description = "true" if value.value else "false"
             return [f"    lda #${value.value:02X}              ; {description}"]
         return [f"    lda #${value.value:02X}"]
-    assert isinstance(value, VariableValue)
-    return [f"    lda {value.variable.label}"]
+    if isinstance(value, VariableValue):
+        return [f"    lda {value.variable.label}"]
+    if isinstance(value, ResolvedUnaryExpression):
+        lines = _load_value(value.operand)
+        if value.operator is UnaryOperator.PLUS:
+            return [*lines, "    ; unary + leaves the byte unchanged"]
+        return [
+            *lines,
+            "    eor #$FF                ; unary -: two's complement",
+            "    clc",
+            "    adc #$01",
+        ]
+
+    assert isinstance(value, ResolvedBinaryExpression)
+    return _load_binary_expression(value, 0)
+
+
+def _load_binary_expression(
+    expression: ResolvedBinaryExpression, depth: int
+) -> list[str]:
+    temporary = f"expression_temporary_{depth}"
+    lines = [
+        f"    ; binary {expression.operator.value}: evaluate right operand",
+        *_load_value_at_depth(expression.right, depth + 1),
+        f"    sta {temporary}",
+        "    ; evaluate left operand",
+        *_load_value_at_depth(expression.left, depth + 1),
+    ]
+    if expression.operator is BinaryOperator.ADD:
+        return [*lines, "    clc", f"    adc {temporary}"]
+    return [*lines, "    sec", f"    sbc {temporary}"]
+
+
+def _load_value_at_depth(value: ResolvedValue, depth: int) -> list[str]:
+    if isinstance(value, ResolvedBinaryExpression):
+        return _load_binary_expression(value, depth)
+    if isinstance(value, ResolvedUnaryExpression):
+        lines = _load_value_at_depth(value.operand, depth)
+        if value.operator is UnaryOperator.PLUS:
+            return [*lines, "    ; unary + leaves the byte unchanged"]
+        return [
+            *lines,
+            "    eor #$FF                ; unary -: two's complement",
+            "    clc",
+            "    adc #$01",
+        ]
+    return _load_value(value)
+
+
+def _expression_depth(value: ResolvedValue) -> int:
+    if isinstance(value, ResolvedBinaryExpression):
+        return 1 + max(
+            _expression_depth(value.left),
+            _expression_depth(value.right),
+        )
+    if isinstance(value, ResolvedUnaryExpression):
+        return _expression_depth(value.operand)
+    return 0

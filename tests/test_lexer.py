@@ -78,6 +78,12 @@ class LexerTests(unittest.TestCase):
         )
         self.assertIn(TokenKind.TRUE, [token.kind for token in tokens])
 
+    def test_tokenizes_arithmetic_operators(self) -> None:
+        tokens = tokenize("begin Counter := -$01 + +$02 - $03; end.")
+        kinds = [token.kind for token in tokens]
+        self.assertEqual(kinds.count(TokenKind.PLUS), 2)
+        self.assertEqual(kinds.count(TokenKind.MINUS), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

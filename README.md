@@ -3,8 +3,8 @@
 NES Pascal is a prototype of a compiled, strongly typed language inspired by
 Pascal and specialized for Nintendo Entertainment System games. The current
 milestone supports strongly typed constants, variables, and assignments using
-the one-byte `nes_color`, `byte`, and `boolean` types. It generates ca65
-Assembly for an NROM-256 image.
+the one-byte `nes_color`, `byte`, and `boolean` types, plus byte arithmetic.
+It generates ca65 Assembly for an NROM-256 image.
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ python -m pip install -e .
 
 ## Supported source
 
-The included example exercises every Milestone 3 type:
+The minimal example exercises every built-in type:
 
 ```pascal
 program Minimal;
@@ -58,12 +58,25 @@ Constants and variables require explicit types. Assignment uses `:=`, requires
 an exact type match, and does not perform implicit conversion. Variables must
 be assigned before they are read.
 
+Arithmetic expressions are available only for `byte`. Binary `+` and `-` are
+left-associative, unary `+` and `-` are supported, and parentheses control
+grouping. Results wrap modulo 256, matching the one-byte 6502 operations.
+There are no implicit conversions to or from `nes_color` or `boolean`.
+
+See `examples/arithmetic.nsp` for a focused arithmetic example.
+
 ## Compilation
 
 Compile the minimal example with:
 
 ```text
 python -m nes_pascal.cli examples/minimal.nsp -o build/minimal.nes
+```
+
+Compile the arithmetic example with:
+
+```text
+python -m nes_pascal.cli examples/arithmetic.nsp -o build/arithmetic.nes
 ```
 
 Or use:
@@ -146,8 +159,11 @@ examples, and suggested fixes.
 - `nes_color` and `byte` initializers use hexadecimal literals, while
   `boolean` uses `true` or `false`;
 - constants cannot refer to other constants;
+- arithmetic is limited to `byte` operands with unary `+` and `-`, binary `+`
+  and `-`, and parentheses;
 - variables use regular RAM; zero-page allocation is not implemented;
-- there are no general expressions, arithmetic, procedures, sprites,
-  controller input, audio, runtime strings, recursion, or optimizations;
+- there are no multiplication, division, comparisons, boolean expressions,
+  procedures, sprites, controller input, audio, runtime strings, recursion,
+  or optimizations;
 - only NTSC NES, mapper 0, 32 KiB PRG-ROM, and 8 KiB CHR-ROM are supported;
 - CHR-ROM is empty, and the backend does not provide a game engine.
