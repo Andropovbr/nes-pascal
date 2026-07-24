@@ -89,6 +89,65 @@ class BackendGoldenTests(unittest.TestCase):
         self.assertIn("; Source: continue", actual)
         self.assertIn("; long-branch-safe loop exit", actual)
 
+    def test_counting_program_matches_golden_assembly(self) -> None:
+        source_path = ROOT / "examples" / "counting.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        actual = generate(analyze(parse(source, filename), source, filename))
+        expected = (ROOT / "tests" / "golden" / "counting.asm").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(actual, expected)
+        self.assertIn("    inc variable_Counter", actual)
+        self.assertIn("    dec variable_Counter", actual)
+        self.assertIn("; Source: inc(Sum, amount)", actual)
+        self.assertIn("; Source: dec(Counter, amount)", actual)
+        self.assertIn("; evaluate final value once", actual)
+        self.assertIn("; stop before byte wraparound", actual)
+        self.assertIn("; long-branch-safe loop exit", actual)
+
+    def test_for_break_and_continue_target_innermost_loop(self) -> None:
+        source = """program ForControl;
+var
+    Index: byte;
+begin
+    for Index := $00 to $03 do
+    begin
+        if Index = $01 then
+            continue;
+        if Index = $02 then
+            break;
+    end;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        assembly = generate(analyze(parse(source), source))
+        self.assertRegex(assembly, r"; Source: continue\n    jmp @for_step_\d+")
+        self.assertRegex(assembly, r"; Source: break\n    jmp @for_end_\d+")
+
+    def test_for_final_value_is_loaded_once_before_the_loop(self) -> None:
+        source = """program CachedLimit;
+var
+    Index: byte;
+    Limit: byte;
+    Total: byte;
+begin
+    Limit := $03;
+    Total := $00;
+    for Index := $00 to Limit do
+    begin
+        Limit := $00;
+        inc(Total);
+    end;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        assembly = generate(analyze(parse(source), source))
+        self.assertEqual(assembly.count("    lda variable_Limit"), 1)
+        self.assertIn("    sta for_limit_0   ; evaluate final value once", assembly)
+
 
 if __name__ == "__main__":
     unittest.main()

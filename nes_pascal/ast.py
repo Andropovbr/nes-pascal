@@ -186,6 +186,38 @@ class ContinueStatement:
     position: SourcePosition
 
 
+@dataclass(frozen=True, slots=True)
+class IncrementStatement:
+    target: str
+    target_position: SourcePosition
+    amount: ValueExpression | None
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class DecrementStatement:
+    target: str
+    target_position: SourcePosition
+    amount: ValueExpression | None
+    position: SourcePosition
+
+
+class ForDirection(Enum):
+    TO = "to"
+    DOWNTO = "downto"
+
+
+@dataclass(frozen=True, slots=True)
+class ForStatement:
+    target: str
+    target_position: SourcePosition
+    initial: ValueExpression
+    final: ValueExpression
+    direction: ForDirection
+    body: tuple[Statement, ...]
+    position: SourcePosition
+
+
 Statement = (
     Assignment
     | SetBackgroundColor
@@ -195,6 +227,9 @@ Statement = (
     | RepeatStatement
     | BreakStatement
     | ContinueStatement
+    | IncrementStatement
+    | DecrementStatement
+    | ForStatement
 )
 
 
@@ -308,6 +343,27 @@ class ResolvedContinueStatement:
     pass
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedIncrementStatement:
+    target: ResolvedVariable
+    amount: ResolvedValue | None
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedDecrementStatement:
+    target: ResolvedVariable
+    amount: ResolvedValue | None
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedForStatement:
+    target: ResolvedVariable
+    initial: ResolvedValue
+    final: ResolvedValue
+    direction: ForDirection
+    body: tuple[ResolvedStatement, ...]
+
+
 ResolvedStatement = (
     ResolvedAssignment
     | ResolvedSetBackgroundColor
@@ -317,6 +373,9 @@ ResolvedStatement = (
     | ResolvedRepeatStatement
     | ResolvedBreakStatement
     | ResolvedContinueStatement
+    | ResolvedIncrementStatement
+    | ResolvedDecrementStatement
+    | ResolvedForStatement
 )
 
 

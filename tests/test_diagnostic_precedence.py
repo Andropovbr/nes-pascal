@@ -126,6 +126,16 @@ class DiagnosticPrecedenceTests(unittest.TestCase):
             "        ^^^^^^^",
         )
 
+    def test_for_control_variable_modification_is_preserved(self) -> None:
+        self.assert_primary_diagnostic(
+            "for_control_variable_modification.nsp",
+            "E3012",
+            8,
+            9,
+            "For control variable Index cannot be modified inside its loop body.",
+            "        ^^^^^",
+        )
+
     def test_assignment_error_precedes_missing_background_color(self) -> None:
         source = """program InvalidPrecedence;
 var

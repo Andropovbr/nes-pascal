@@ -12,7 +12,10 @@ from nes_pascal.ast import (
     ResolvedBreakStatement,
     ResolvedComparisonExpression,
     ResolvedContinueStatement,
+    ResolvedDecrementStatement,
+    ResolvedForStatement,
     ResolvedIfStatement,
+    ResolvedIncrementStatement,
     ResolvedRepeatStatement,
     ResolvedSetBackgroundColor,
     ResolvedUnaryExpression,
@@ -715,6 +718,190 @@ end.
             "nes.run cannot appear inside a loop body.",
             str(context.exception),
         )
+
+    def test_resolves_updates_and_nested_for_loops(self) -> None:
+        source = """program Counting;
+var
+    Counter: byte;
+    Outer: byte;
+    Inner: byte;
+begin
+    Counter := $00;
+    inc(Counter);
+    dec(Counter, $02);
+    for Outer := $00 to $01 do
+    begin
+        for Inner := $01 downto $00 do
+            inc(Counter, Inner);
+    end;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        self.assertIsInstance(
+            resolved.statements[1],
+            ResolvedIncrementStatement,
+        )
+        self.assertIsInstance(
+            resolved.statements[2],
+            ResolvedDecrementStatement,
+        )
+        outer = resolved.statements[3]
+        self.assertIsInstance(outer, ResolvedForStatement)
+        assert isinstance(outer, ResolvedForStatement)
+        inner = outer.body[0]
+        self.assertIsInstance(inner, ResolvedForStatement)
+
+    def test_for_control_variable_is_definitely_assigned_after_loop(self) -> None:
+        source = """program Counting;
+var
+    Index: byte;
+    Result: byte;
+begin
+    for Index := $03 to $01 do
+        break;
+    Result := Index;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        assignment = resolved.statements[1]
+        self.assertIsInstance(assignment, ResolvedAssignment)
+
+    def test_for_final_expression_can_read_initialized_control(self) -> None:
+        source = """program Counting;
+var
+    Index: byte;
+begin
+    for Index := $01 to Index + $02 do
+        continue;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        self.assertIsInstance(resolved.statements[0], ResolvedForStatement)
+
+    def test_rejects_update_before_assignment(self) -> None:
+        source = """program InvalidUpdate;
+var
+    Counter: byte;
+begin
+    inc(Counter);
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3008")
+        self.assertIn(
+            "Variable Counter is read before it is assigned.",
+            str(context.exception),
+        )
+
+    def test_rejects_non_byte_update_target_and_amount(self) -> None:
+        sources = (
+            """program InvalidTarget;
+var
+    Enabled: boolean;
+begin
+    Enabled := true;
+    inc(Enabled);
+    nes.set_background_color($21);
+    nes.run;
+end.
+""",
+            """program InvalidAmount;
+var
+    Counter: byte;
+    Enabled: boolean;
+begin
+    Counter := $00;
+    Enabled := true;
+    inc(Counter, Enabled);
+    nes.set_background_color($21);
+    nes.run;
+end.
+""",
+        )
+        for source in sources:
+            with self.subTest(program=source.splitlines()[0]):
+                with self.assertRaises(CompilerError) as context:
+                    analyze_source(source)
+                self.assertEqual(context.exception.code, "E4004")
+
+    def test_rejects_non_byte_for_components(self) -> None:
+        sources = (
+            """program InvalidControl;
+var
+    Enabled: boolean;
+begin
+    for Enabled := $00 to $01 do
+        break;
+    nes.set_background_color($21);
+    nes.run;
+end.
+""",
+            """program InvalidFinal;
+var
+    Index: byte;
+    Enabled: boolean;
+begin
+    Enabled := true;
+    for Index := $00 to Enabled do
+        break;
+    nes.set_background_color($21);
+    nes.run;
+end.
+""",
+            """program InvalidInitial;
+var
+    Index: byte;
+begin
+    for Index := true to $01 do
+        break;
+    nes.set_background_color($21);
+    nes.run;
+end.
+""",
+        )
+        for source in sources:
+            with self.subTest(program=source.splitlines()[0]):
+                with self.assertRaises(CompilerError) as context:
+                    analyze_source(source)
+                self.assertEqual(context.exception.code, "E4004")
+
+    def test_rejects_for_control_variable_modification(self) -> None:
+        statements = (
+            "Index := $02;",
+            "inc(Index);",
+            "dec(Index, $01);",
+            "for Index := $00 to $01 do break;",
+        )
+        for statement in statements:
+            with self.subTest(statement=statement):
+                source = f"""program InvalidControl;
+var
+    Index: byte;
+begin
+    for Index := $00 to $03 do
+    begin
+        {statement}
+    end;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+                with self.assertRaises(CompilerError) as context:
+                    analyze_source(source)
+                self.assertEqual(context.exception.code, "E3012")
+                self.assertIn(
+                    "For control variable Index cannot be modified",
+                    str(context.exception),
+                )
 
 
 if __name__ == "__main__":

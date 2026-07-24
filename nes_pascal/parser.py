@@ -15,8 +15,12 @@ from .ast import (
     ComparisonExpression,
     ComparisonOperator,
     ContinueStatement,
+    DecrementStatement,
+    ForDirection,
+    ForStatement,
     HexLiteral,
     IfStatement,
+    IncrementStatement,
     Literal,
     Program,
     RepeatStatement,
@@ -181,6 +185,18 @@ class Parser:
             return self._parse_while_statement(consume_terminator)
         if self._check(TokenKind.REPEAT):
             return self._parse_repeat_statement(consume_terminator)
+        if self._check(TokenKind.FOR):
+            return self._parse_for_statement(consume_terminator)
+        if self._check(TokenKind.INC):
+            return self._parse_update_statement(
+                TokenKind.INC,
+                consume_terminator,
+            )
+        if self._check(TokenKind.DEC):
+            return self._parse_update_statement(
+                TokenKind.DEC,
+                consume_terminator,
+            )
         if self._check(TokenKind.BREAK):
             return self._parse_loop_control_statement(
                 TokenKind.BREAK,
@@ -196,7 +212,7 @@ class Parser:
 
         namespace = self._expect(
             TokenKind.IDENTIFIER,
-            "Expected an assignment, control-flow statement, "
+            "Expected an assignment, update, control-flow statement, "
             "nes.set_background_color, or nes.run.",
         )
         self._expect(TokenKind.DOT, "Expected '.' after 'nes'.")
@@ -333,6 +349,92 @@ class Parser:
         if kind is TokenKind.BREAK:
             return BreakStatement(position)
         return ContinueStatement(position)
+
+    def _parse_update_statement(
+        self,
+        kind: TokenKind,
+        consume_terminator: bool,
+    ) -> IncrementStatement | DecrementStatement:
+        command = self._expect(kind, f"Expected '{kind.name.lower()}'.")
+        self._expect(
+            TokenKind.LEFT_PAREN,
+            f"Expected '(' after '{command.text.lower()}'.",
+        )
+        target = self._expect(
+            TokenKind.IDENTIFIER,
+            f"Expected a variable name in '{command.text.lower()}'.",
+        )
+        amount = None
+        if self._match(TokenKind.COMMA):
+            amount = self._parse_expression()
+        self._expect(
+            TokenKind.RIGHT_PAREN,
+            f"Expected ')' after '{command.text.lower()}'.",
+        )
+        if consume_terminator:
+            self._expect(
+                TokenKind.SEMICOLON,
+                f"Expected ';' after '{command.text.lower()}(...)'.",
+            )
+        position = SourcePosition(command.line, command.column)
+        target_position = SourcePosition(target.line, target.column)
+        if kind is TokenKind.INC:
+            return IncrementStatement(
+                target.text,
+                target_position,
+                amount,
+                position,
+            )
+        return DecrementStatement(
+            target.text,
+            target_position,
+            amount,
+            position,
+        )
+
+    def _parse_for_statement(
+        self,
+        consume_terminator: bool,
+    ) -> ForStatement:
+        for_token = self._expect(TokenKind.FOR, "Expected 'for'.")
+        target = self._expect(
+            TokenKind.IDENTIFIER,
+            "Expected a control variable after 'for'.",
+        )
+        self._expect(
+            TokenKind.ASSIGN,
+            "Expected ':=' after the for control variable.",
+        )
+        initial = self._parse_expression()
+        direction_token = self._current()
+        if self._match(TokenKind.TO):
+            direction = ForDirection.TO
+        elif self._match(TokenKind.DOWNTO):
+            direction = ForDirection.DOWNTO
+        else:
+            self._error(
+                direction_token,
+                DiagnosticCode.INVALID_SYNTAX,
+                "Expected 'to' or 'downto' after the initial value.",
+                "Use 'for Counter := $00 to $10 do' or use 'downto'.",
+            )
+        final = self._parse_expression()
+        self._expect(TokenKind.DO, "Expected 'do' after the final value.")
+        body = self._parse_conditional_branch()
+        if consume_terminator:
+            self._expect(
+                TokenKind.SEMICOLON,
+                "Expected ';' after the for statement.",
+            )
+        return ForStatement(
+            target.text,
+            SourcePosition(target.line, target.column),
+            initial,
+            final,
+            direction,
+            body,
+            SourcePosition(for_token.line, for_token.column),
+        )
 
     def _parse_conditional_branch(self) -> tuple[Statement, ...]:
         if not self._match(TokenKind.BEGIN):
@@ -477,7 +579,7 @@ class Parser:
             token,
             DiagnosticCode.UNKNOWN_COMMAND,
             f"Unknown command: {name}.",
-            "Use an assignment, control-flow statement, "
+            "Use an assignment, inc/dec update, control-flow statement, "
             "nes.set_background_color(value);, or nes.run;.",
         )
 

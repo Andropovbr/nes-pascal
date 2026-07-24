@@ -21,6 +21,11 @@ class TokenKind(Enum):
     UNTIL = auto()
     BREAK = auto()
     CONTINUE = auto()
+    INC = auto()
+    DEC = auto()
+    FOR = auto()
+    TO = auto()
+    DOWNTO = auto()
     TRUE = auto()
     FALSE = auto()
     NOT = auto()
@@ -32,6 +37,7 @@ class TokenKind(Enum):
     DOT = auto()
     LEFT_PAREN = auto()
     RIGHT_PAREN = auto()
+    COMMA = auto()
     COLON = auto()
     EQUAL = auto()
     ASSIGN = auto()
@@ -60,6 +66,11 @@ KEYWORDS = {
     "until": TokenKind.UNTIL,
     "break": TokenKind.BREAK,
     "continue": TokenKind.CONTINUE,
+    "inc": TokenKind.INC,
+    "dec": TokenKind.DEC,
+    "for": TokenKind.FOR,
+    "to": TokenKind.TO,
+    "downto": TokenKind.DOWNTO,
     "true": TokenKind.TRUE,
     "false": TokenKind.FALSE,
     "not": TokenKind.NOT,
@@ -72,6 +83,7 @@ PUNCTUATION = {
     ".": TokenKind.DOT,
     "(": TokenKind.LEFT_PAREN,
     ")": TokenKind.RIGHT_PAREN,
+    ",": TokenKind.COMMA,
     ":": TokenKind.COLON,
     "=": TokenKind.EQUAL,
     "+": TokenKind.PLUS,

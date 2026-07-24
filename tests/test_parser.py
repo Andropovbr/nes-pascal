@@ -15,8 +15,12 @@ from nes_pascal.ast import (
     ComparisonExpression,
     ComparisonOperator,
     ContinueStatement,
+    DecrementStatement,
+    ForDirection,
+    ForStatement,
     HexLiteral,
     IfStatement,
+    IncrementStatement,
     RepeatStatement,
     Run,
     SetBackgroundColor,
@@ -415,6 +419,67 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(context.exception.code, "E2102")
         self.assertIn(
             "Expected 'do' after the while condition.",
+            str(context.exception),
+        )
+
+    def test_parses_increment_and_decrement_statements(self) -> None:
+        program = parse(
+            program_with(
+                "inc(Counter);\n"
+                "dec(Counter, Step + $01);\n"
+                "nes.set_background_color($21);\n"
+                "nes.run;",
+                variables="    Counter: byte;\n    Step: byte;",
+            )
+        )
+        increment = program.statements[0]
+        decrement = program.statements[1]
+        self.assertIsInstance(increment, IncrementStatement)
+        self.assertIsInstance(decrement, DecrementStatement)
+        assert isinstance(increment, IncrementStatement)
+        assert isinstance(decrement, DecrementStatement)
+        self.assertIsNone(increment.amount)
+        self.assertIsInstance(decrement.amount, BinaryExpression)
+
+    def test_parses_ascending_descending_and_nested_for_loops(self) -> None:
+        program = parse(
+            program_with(
+                "for Outer := $00 to $02 do\n"
+                "begin\n"
+                "    for Inner := $02 downto $00 do\n"
+                "        inc(Counter);\n"
+                "end;\n"
+                "nes.set_background_color($21);\n"
+                "nes.run;",
+                variables=(
+                    "    Counter: byte;\n"
+                    "    Outer: byte;\n"
+                    "    Inner: byte;"
+                ),
+            )
+        )
+        outer = program.statements[0]
+        self.assertIsInstance(outer, ForStatement)
+        assert isinstance(outer, ForStatement)
+        self.assertIs(outer.direction, ForDirection.TO)
+        inner = outer.body[0]
+        self.assertIsInstance(inner, ForStatement)
+        assert isinstance(inner, ForStatement)
+        self.assertIs(inner.direction, ForDirection.DOWNTO)
+
+    def test_rejects_for_without_direction(self) -> None:
+        with self.assertRaises(CompilerError) as context:
+            parse(
+                program_with(
+                    "for Counter := $00 $03 do inc(Counter);\n"
+                    "nes.set_background_color($21);\n"
+                    "nes.run;",
+                    variables="    Counter: byte;",
+                )
+            )
+        self.assertEqual(context.exception.code, "E2102")
+        self.assertIn(
+            "Expected 'to' or 'downto' after the initial value.",
             str(context.exception),
         )
 

@@ -7,7 +7,8 @@ the one-byte `nes_color`, `byte`, and `boolean` types, plus byte arithmetic.
 It also supports comparisons and short-circuit Boolean expressions. It
 supports structured `if`/`else` statements and generates ca65 Assembly for an
 NROM-256 image. Basic control flow also includes `while`, `repeat`/`until`,
-`break`, and `continue`.
+`for`, `break`, and `continue`. Dedicated `inc` and `dec` operations provide
+predictable one-byte counter updates.
 
 ## Prerequisites
 
@@ -82,13 +83,19 @@ be nested. Definite-assignment analysis follows both control-flow paths.
 
 See `examples/conditionals.nsp` for simple, compound, and nested branches.
 
-Loops require `boolean` conditions and may be nested. `break` exits the
-nearest loop, while `continue` starts its next condition check. Loop bodies
-may be single statements or structured statement sequences.
+`while` and `repeat` loops require `boolean` conditions and may be nested.
+`break` exits the nearest loop, while `continue` starts its next condition
+check. Loop bodies may be single statements or structured statement
+sequences.
 
 The practical `examples/loops.nsp` program counts to a target, exercises
 `break` and `continue`, counts back down with `repeat`/`until`, and selects
 background color `$21` when the expected state is reached.
+
+The `examples/counting.nsp` program demonstrates wrapping `inc`/`dec`
+operations, ascending and descending `for` loops, exact `$00`/`$FF`
+endpoints, and nested loops. It selects background color `$21` only when all
+expected counter values are reached.
 
 ## Compilation
 
@@ -122,6 +129,12 @@ Compile the practical loop example with:
 python -m nes_pascal.cli examples/loops.nsp -o build/loops.nes
 ```
 
+Compile the counting example with:
+
+```text
+python -m nes_pascal.cli examples/counting.nsp -o build/counting.nes
+```
+
 Or use:
 
 ```text
@@ -152,8 +165,8 @@ explicit message when `ca65` or `ld65` is unavailable.
 
 To include the optional headless Mesen behavior test, point `MESEN_PATH` to
 the emulator executable before running the suite. The test compiles
-`examples/loops.nsp`, executes the ROM, and verifies the final loop variables
-and universal background color:
+the behavior examples, executes their ROMs, and verifies final variables and
+the universal background color:
 
 ```powershell
 $env:MESEN_PATH = "C:\path\to\Mesen.exe"
@@ -208,8 +221,8 @@ examples, and suggested fixes.
 
 ## Current limitations
 
-- only `program`, optional `const` and `var` sections, assignment, `if`/`else`,
-  `nes.set_background_color`, and `nes.run` are supported;
+- statements are limited to assignment, `inc`/`dec`, `if`/`else`, basic
+  loops, `break`/`continue`, `nes.set_background_color`, and `nes.run`;
 - `nes_color`, `byte`, and `boolean` are the only built-in types;
 - `nes_color` and `byte` initializers use hexadecimal literals, while
   `boolean` uses `true` or `false`;
@@ -223,9 +236,10 @@ examples, and suggested fixes.
   runtime commands remain top-level only;
 - loops support `while`, `repeat`/`until`, `break`, and `continue`, but execute
   only during initialization before `nes.run`;
+- `for` supports only `byte` control variables and bounds; its control
+  variable cannot be changed inside the body;
 - variables use regular RAM; zero-page allocation is not implemented;
-- there are no dedicated increment/decrement operations, multiplication,
-  division, procedures, sprites, controller input, audio, runtime strings,
-  recursion, or optimizations;
+- there is no multiplication, division, procedures, sprites, controller
+  input, audio, runtime strings, recursion, or general optimization pass;
 - only NTSC NES, mapper 0, 32 KiB PRG-ROM, and 8 KiB CHR-ROM are supported;
 - CHR-ROM is empty, and the backend does not provide a game engine.

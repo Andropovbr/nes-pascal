@@ -1,0 +1,11 @@
+program InvalidForControl;
+
+var
+    Index: byte;
+
+begin
+    for Index := $00 to $03 do
+        Index := $01;
+    nes.set_background_color($21);
+    nes.run;
+end.

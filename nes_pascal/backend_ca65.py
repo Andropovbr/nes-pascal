@@ -5,6 +5,7 @@ from .ast import (
     BooleanOperator,
     BuiltInType,
     ComparisonOperator,
+    ForDirection,
     ImmediateValue,
     ResolvedAssignment,
     ResolvedBinaryExpression,
@@ -13,7 +14,10 @@ from .ast import (
     ResolvedBreakStatement,
     ResolvedComparisonExpression,
     ResolvedContinueStatement,
+    ResolvedDecrementStatement,
+    ResolvedForStatement,
     ResolvedIfStatement,
+    ResolvedIncrementStatement,
     ResolvedProgram,
     ResolvedRepeatStatement,
     ResolvedSetBackgroundColor,
@@ -51,6 +55,14 @@ def generate(program: ResolvedProgram) -> str:
         f"expression_temporary_{index}: .res 1 ; expression temporary"
         for index in range(temporary_count)
     )
+    for_temporary_count = sum(
+        _count_for_statements(statement)
+        for statement in program.statements
+    )
+    variable_lines.extend(
+        f"for_limit_{index}: .res 1        ; cached for-loop final value"
+        for index in range(for_temporary_count)
+    )
     if not variable_lines:
         variable_lines.append("    ; no variables")
 
@@ -59,6 +71,7 @@ def generate(program: ResolvedProgram) -> str:
         program.statements,
         label_counter,
         (),
+        [0],
     )
 
     variables = "\n".join(variable_lines)
@@ -137,6 +150,7 @@ def _generate_statements(
     statements: tuple[ResolvedStatement, ...],
     label_counter: list[int],
     loop_targets: tuple[tuple[str, str], ...],
+    for_counter: list[int],
 ) -> list[str]:
     statement_lines: list[str] = []
     for statement in statements:
@@ -198,6 +212,7 @@ def _generate_statements(
                         statement.then_branch,
                         label_counter,
                         loop_targets,
+                        for_counter,
                     ),
                 ]
             )
@@ -210,6 +225,7 @@ def _generate_statements(
                             statement.else_branch,
                             label_counter,
                             loop_targets,
+                            for_counter,
                         ),
                     ]
                 )
@@ -232,6 +248,7 @@ def _generate_statements(
                         statement.body,
                         label_counter,
                         (*loop_targets, (end_label, condition_label)),
+                        for_counter,
                     ),
                     f"    jmp {condition_label}",
                     f"{end_label}:",
@@ -250,12 +267,72 @@ def _generate_statements(
                         statement.body,
                         label_counter,
                         (*loop_targets, (end_label, condition_label)),
+                        for_counter,
                     ),
                     f"{condition_label}:",
                     *_load_value(statement.condition, label_counter),
                     "    cmp #$00",
                     f"    bne {end_label}",
                     f"    jmp {body_label}       ; long-branch-safe repeat",
+                    f"{end_label}:",
+                ]
+            )
+        elif isinstance(statement, ResolvedIncrementStatement):
+            statement_lines.extend(
+                _generate_increment(statement, label_counter)
+            )
+        elif isinstance(statement, ResolvedDecrementStatement):
+            statement_lines.extend(
+                _generate_decrement(statement, label_counter)
+            )
+        elif isinstance(statement, ResolvedForStatement):
+            for_index = for_counter[0]
+            for_counter[0] += 1
+            limit_temporary = f"for_limit_{for_index}"
+            condition_label = _new_label(label_counter, "for_condition")
+            body_label = _new_label(label_counter, "for_body")
+            step_label = _new_label(label_counter, "for_step")
+            end_label = _new_label(label_counter, "for_end")
+            condition_branches = (
+                [
+                    f"    bcc {body_label}",
+                    f"    beq {body_label}",
+                ]
+                if statement.direction is ForDirection.TO
+                else [f"    bcs {body_label}"]
+            )
+            step_instruction = (
+                f"    inc {statement.target.label}"
+                if statement.direction is ForDirection.TO
+                else f"    dec {statement.target.label}"
+            )
+            statement_lines.extend(
+                [
+                    "",
+                    f"; Source: for variable := initial "
+                    f"{statement.direction.value} final do",
+                    *_load_value(statement.initial, label_counter),
+                    f"    sta {statement.target.label}",
+                    *_load_value(statement.final, label_counter),
+                    f"    sta {limit_temporary}   ; evaluate final value once",
+                    f"{condition_label}:",
+                    f"    lda {statement.target.label}",
+                    f"    cmp {limit_temporary}",
+                    *condition_branches,
+                    f"    jmp {end_label}       ; long-branch-safe loop exit",
+                    f"{body_label}:",
+                    *_generate_statements(
+                        statement.body,
+                        label_counter,
+                        (*loop_targets, (end_label, step_label)),
+                        for_counter,
+                    ),
+                    f"{step_label}:",
+                    f"    lda {statement.target.label}",
+                    f"    cmp {limit_temporary}",
+                    f"    beq {end_label}        ; stop before byte wraparound",
+                    step_instruction,
+                    f"    jmp {condition_label}",
                     f"{end_label}:",
                 ]
             )
@@ -282,6 +359,48 @@ def _generate_statements(
             )
 
     return statement_lines
+
+
+def _generate_increment(
+    statement: ResolvedIncrementStatement,
+    label_counter: list[int],
+) -> list[str]:
+    if statement.amount is None:
+        return [
+            "",
+            f"; Source: inc({statement.target.name})",
+            f"    inc {statement.target.label}",
+        ]
+    return [
+        "",
+        f"; Source: inc({statement.target.name}, amount)",
+        *_load_value(statement.amount, label_counter),
+        "    clc",
+        f"    adc {statement.target.label}",
+        f"    sta {statement.target.label}",
+    ]
+
+
+def _generate_decrement(
+    statement: ResolvedDecrementStatement,
+    label_counter: list[int],
+) -> list[str]:
+    if statement.amount is None:
+        return [
+            "",
+            f"; Source: dec({statement.target.name})",
+            f"    dec {statement.target.label}",
+        ]
+    return [
+        "",
+        f"; Source: dec({statement.target.name}, amount)",
+        *_load_value(statement.amount, label_counter),
+        "    sta expression_temporary_0",
+        f"    lda {statement.target.label}",
+        "    sec",
+        "    sbc expression_temporary_0",
+        f"    sta {statement.target.label}",
+    ]
 
 
 def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
@@ -491,6 +610,18 @@ def _statement_expression_depth(statement: ResolvedStatement) -> int:
         return _expression_depth(statement.value)
     if isinstance(statement, ResolvedSetBackgroundColor):
         return _expression_depth(statement.argument)
+    if isinstance(statement, ResolvedIncrementStatement):
+        return (
+            _expression_depth(statement.amount)
+            if statement.amount is not None
+            else 0
+        )
+    if isinstance(statement, ResolvedDecrementStatement):
+        return (
+            max(1, _expression_depth(statement.amount))
+            if statement.amount is not None
+            else 0
+        )
     if isinstance(statement, ResolvedIfStatement):
         branch_depths = [
             _statement_expression_depth(branch_statement)
@@ -511,5 +642,42 @@ def _statement_expression_depth(statement: ResolvedStatement) -> int:
         ]
         return max(
             [_expression_depth(statement.condition), *body_depths],
+        )
+    if isinstance(statement, ResolvedForStatement):
+        body_depths = [
+            _statement_expression_depth(body_statement)
+            for body_statement in statement.body
+        ]
+        return max(
+            [
+                _expression_depth(statement.initial),
+                _expression_depth(statement.final),
+                *body_depths,
+            ],
+        )
+    return 0
+
+
+def _count_for_statements(statement: ResolvedStatement) -> int:
+    if isinstance(statement, ResolvedForStatement):
+        return 1 + sum(
+            _count_for_statements(body_statement)
+            for body_statement in statement.body
+        )
+    if isinstance(statement, ResolvedIfStatement):
+        count = sum(
+            _count_for_statements(branch_statement)
+            for branch_statement in statement.then_branch
+        )
+        if statement.else_branch is not None:
+            count += sum(
+                _count_for_statements(branch_statement)
+                for branch_statement in statement.else_branch
+            )
+        return count
+    if isinstance(statement, (ResolvedWhileStatement, ResolvedRepeatStatement)):
+        return sum(
+            _count_for_statements(body_statement)
+            for body_statement in statement.body
         )
     return 0

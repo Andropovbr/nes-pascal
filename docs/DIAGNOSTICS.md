@@ -36,6 +36,7 @@ the range reserved for their category.
 | E3009 | Semantic Analysis | Runtime command inside conditional |
 | E3010 | Semantic Analysis | Loop control outside loop |
 | E3011 | Semantic Analysis | Runtime command inside loop |
+| E3012 | Semantic Analysis | For control variable modification |
 | E4001 | Type System | Unknown type |
 | E4002 | Type System | Invalid `nes_color` value |
 | E4003 | Type System | Invalid `byte` value |
@@ -338,6 +339,31 @@ the range reserved for their category.
 - **Suggested fix:** Move the NES runtime command out of the loop and into the
   top-level program block.
 
+### E3012 - For control variable modification
+
+- **Category:** Semantic Analysis
+- **Explanation:** A `for` loop owns its control variable while its body is
+  executing. Assigning it, updating it with `inc` or `dec`, or reusing it as
+  the control variable of a nested `for` would make loop termination
+  unpredictable.
+- **Trigger:**
+
+  ```pascal
+  for Index := $00 to $03 do
+      Index := $01;
+  ```
+
+- **Expected compiler output:**
+
+  ```text
+  E3012 demo.nsp:2:5
+
+  For control variable Index cannot be modified inside its loop body.
+  ```
+
+- **Suggested fix:** Remove the modification, use a different variable in the
+  body, or update the control variable after the loop.
+
 ## Type System (E4000-E4999)
 
 ### E4001 - Unknown type
@@ -414,7 +440,8 @@ the range reserved for their category.
   matches. Numeric-to-boolean and other implicit conversions are forbidden.
   Arithmetic expressions and their operands must have type `byte`. Comparison
   operands must follow the comparison operator's type rules, and Boolean
-  operators require `boolean` operands.
+  operators require `boolean` operands. Increment/decrement targets and
+  amounts, plus `for` control variables and bounds, must have type `byte`.
 - **Trigger:**
 
   ```pascal
@@ -457,7 +484,7 @@ the range reserved for their category.
   ```
 
 - **Suggested fix:** Use `nes.set_background_color(value);`, `nes.run;`, or an
-  assignment.
+  assignment, update, or documented control-flow statement.
 
 ### E2102 - Invalid syntax
 

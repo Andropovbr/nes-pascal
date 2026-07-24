@@ -77,8 +77,9 @@ begin
     BackgroundColor := DefaultBackgroundColor;
     FrameCounter := $00;
     NextFrameCounter := FrameCounter + $01;
-    while NextFrameCounter < MaximumFrameCounter do
-        NextFrameCounter := NextFrameCounter + $01;
+    inc(NextFrameCounter);
+    for FrameCounter := $00 to MaximumFrameCounter do
+        inc(NextFrameCounter);
     RenderingEnabled := true;
     WithinLimit := RenderingEnabled and
         (NextFrameCounter <= MaximumFrameCounter);
@@ -100,7 +101,8 @@ matches. A direct hexadecimal literal remains valid as the argument to
 `and`, and `or`, with short-circuit evaluation for the binary operators.
 Conditional statements support `if`, optional `else`, nested conditionals,
 and compound `begin`/`end` branches. Loops support `while`, `repeat`/`until`,
-nesting, `break`, and `continue`.
+`for` with `to` or `downto`, nesting, `break`, and `continue`. Initialized
+`byte` variables support `inc` and `dec` with optional amounts.
 
 The compiler must generate ca65 Assembly, assemble it, and link a valid `.nes`
 ROM. When opened in an emulator, the NES must:
@@ -111,8 +113,8 @@ ROM. When opened in an emulator, the NES must:
 4. enable rendering;
 5. remain in a stable loop.
 
-Do not implement dedicated increment or decrement operations, multiplication,
-division, user-defined procedures, sprites, controller input, or audio yet.
+Do not implement multiplication, division, user-defined procedures, sprites,
+controller input, or audio yet.
 
 ## Expected pipeline
 
@@ -197,10 +199,12 @@ Currently supported:
 - nested conditionals and compound branches;
 - `while` and `repeat`/`until` loops;
 - nested loops, `break`, and `continue`;
+- `inc` and `dec` operations for initialized `byte` variables;
+- ascending and descending `for` loops with `byte` control variables;
 - parentheses in expressions.
 
 Do not implement type inference, implicit conversions, user-defined types,
-dedicated increment or decrement operations, multiplication, or division yet.
+multiplication, or division yet.
 
 ## Diagnostics
 

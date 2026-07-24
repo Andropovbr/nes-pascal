@@ -15,9 +15,12 @@ from .ast import (
     ConstantDeclaration,
     ConstantReference,
     ContinueStatement,
+    DecrementStatement,
+    ForStatement,
     HexLiteral,
     IfStatement,
     ImmediateValue,
+    IncrementStatement,
     Program,
     RepeatStatement,
     ResolvedAssignment,
@@ -27,7 +30,10 @@ from .ast import (
     ResolvedBreakStatement,
     ResolvedComparisonExpression,
     ResolvedContinueStatement,
+    ResolvedDecrementStatement,
+    ResolvedForStatement,
     ResolvedIfStatement,
+    ResolvedIncrementStatement,
     ResolvedRepeatStatement,
     ResolvedProgram,
     ResolvedSetBackgroundColor,
@@ -100,6 +106,7 @@ class SemanticAnalyzer:
             set(),
             inside_conditional=False,
             loop_depth=0,
+            protected_control_variables=frozenset(),
         )
 
         self._validate_program_structure(program)
@@ -119,7 +126,10 @@ class SemanticAnalyzer:
             | WhileStatement
             | RepeatStatement
             | BreakStatement
-            | ContinueStatement,
+            | ContinueStatement
+            | IncrementStatement
+            | DecrementStatement
+            | ForStatement,
             ...,
         ],
         constants: dict[str, TypedConstant],
@@ -127,11 +137,17 @@ class SemanticAnalyzer:
         assigned_variables: set[str],
         inside_conditional: bool,
         loop_depth: int,
+        protected_control_variables: frozenset[str],
     ) -> tuple[tuple[ResolvedStatement, ...], set[str]]:
         current_assignments = set(assigned_variables)
         resolved_statements: list[ResolvedStatement] = []
         for statement in statements:
             if isinstance(statement, Assignment):
+                self._reject_control_variable_modification(
+                    statement.target,
+                    statement.target_position,
+                    protected_control_variables,
+                )
                 resolved = self._resolve_assignment(
                     statement,
                     constants,
@@ -155,6 +171,7 @@ class SemanticAnalyzer:
                     current_assignments,
                     inside_conditional=True,
                     loop_depth=loop_depth,
+                    protected_control_variables=protected_control_variables,
                 )
                 resolved_else = None
                 if statement.else_branch is not None:
@@ -165,6 +182,7 @@ class SemanticAnalyzer:
                         current_assignments,
                         inside_conditional=True,
                         loop_depth=loop_depth,
+                        protected_control_variables=protected_control_variables,
                     )
                     current_assignments = (
                         then_assignments & else_assignments
@@ -191,6 +209,7 @@ class SemanticAnalyzer:
                     current_assignments,
                     inside_conditional=inside_conditional,
                     loop_depth=loop_depth + 1,
+                    protected_control_variables=protected_control_variables,
                 )
                 resolved_statements.append(
                     ResolvedWhileStatement(condition, body)
@@ -203,6 +222,7 @@ class SemanticAnalyzer:
                     current_assignments,
                     inside_conditional=inside_conditional,
                     loop_depth=loop_depth + 1,
+                    protected_control_variables=protected_control_variables,
                 )
                 condition = self._resolve_value(
                     statement.condition,
@@ -214,6 +234,93 @@ class SemanticAnalyzer:
                 resolved_statements.append(
                     ResolvedRepeatStatement(body, condition)
                 )
+            elif isinstance(
+                statement,
+                (IncrementStatement, DecrementStatement),
+            ):
+                self._reject_control_variable_modification(
+                    statement.target,
+                    statement.target_position,
+                    protected_control_variables,
+                )
+                target = self._resolve_update_target(
+                    statement.target,
+                    statement.target_position,
+                    constants,
+                    variables,
+                    current_assignments,
+                )
+                amount = (
+                    self._resolve_value(
+                        statement.amount,
+                        BuiltInType.BYTE,
+                        constants,
+                        variables,
+                        current_assignments,
+                    )
+                    if statement.amount is not None
+                    else None
+                )
+                if isinstance(statement, IncrementStatement):
+                    resolved_statements.append(
+                        ResolvedIncrementStatement(target, amount)
+                    )
+                else:
+                    resolved_statements.append(
+                        ResolvedDecrementStatement(target, amount)
+                    )
+            elif isinstance(statement, ForStatement):
+                normalized_target = statement.target.lower()
+                self._reject_control_variable_modification(
+                    statement.target,
+                    statement.target_position,
+                    protected_control_variables,
+                )
+                target = self._resolve_for_target(
+                    statement.target,
+                    statement.target_position,
+                    constants,
+                    variables,
+                )
+                initial = self._resolve_value(
+                    statement.initial,
+                    BuiltInType.BYTE,
+                    constants,
+                    variables,
+                    current_assignments,
+                )
+                assignments_with_control = {
+                    *current_assignments,
+                    normalized_target,
+                }
+                final = self._resolve_value(
+                    statement.final,
+                    BuiltInType.BYTE,
+                    constants,
+                    variables,
+                    assignments_with_control,
+                )
+                body, _ = self._resolve_statements(
+                    statement.body,
+                    constants,
+                    variables,
+                    assignments_with_control,
+                    inside_conditional=inside_conditional,
+                    loop_depth=loop_depth + 1,
+                    protected_control_variables=(
+                        protected_control_variables | {normalized_target}
+                    ),
+                )
+                resolved_statements.append(
+                    ResolvedForStatement(
+                        target,
+                        initial,
+                        final,
+                        statement.direction,
+                        body,
+                    )
+                )
+                current_assignments.add(normalized_target)
             elif isinstance(statement, (BreakStatement, ContinueStatement)):
                 if loop_depth == 0:
                     self._error(
@@ -221,7 +328,7 @@ class SemanticAnalyzer:
                         DiagnosticCode.LOOP_CONTROL_OUTSIDE_LOOP,
                         f"{type(statement).__name__.removesuffix('Statement').lower()} "
                         "can appear only inside a loop.",
-                        "Move the statement inside a while or repeat loop.",
+                        "Move the statement inside a while, repeat, or for loop.",
                     )
                 if isinstance(statement, BreakStatement):
                     resolved_statements.append(ResolvedBreakStatement())
@@ -309,6 +416,108 @@ class SemanticAnalyzer:
             DiagnosticCode.DUPLICATE_SYMBOL,
             f"Symbol {name} is already declared.",
             "Use a unique name for every constant and variable.",
+        )
+
+    def _reject_control_variable_modification(
+        self,
+        name: str,
+        position: SourcePosition,
+        protected_control_variables: frozenset[str],
+    ) -> None:
+        if name.lower() not in protected_control_variables:
+            return
+        self._error(
+            position,
+            DiagnosticCode.FOR_CONTROL_VARIABLE_MODIFICATION,
+            f"For control variable {name} cannot be modified inside its loop body.",
+            "Remove the assignment or update the value after the for loop.",
+            len(name),
+        )
+
+    def _resolve_update_target(
+        self,
+        name: str,
+        position: SourcePosition,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+    ) -> ResolvedVariable:
+        target = self._resolve_mutable_target(
+            name,
+            position,
+            constants,
+            variables,
+        )
+        self._require_byte_target(target, position, "Increment and decrement")
+        if name.lower() not in assigned_variables:
+            self._error(
+                position,
+                DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT,
+                f"Variable {name} is read before it is assigned.",
+                "Assign a value to the variable before updating it.",
+                len(name),
+            )
+        return target
+
+    def _resolve_for_target(
+        self,
+        name: str,
+        position: SourcePosition,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+    ) -> ResolvedVariable:
+        target = self._resolve_mutable_target(
+            name,
+            position,
+            constants,
+            variables,
+        )
+        self._require_byte_target(target, position, "A for control variable")
+        return target
+
+    def _resolve_mutable_target(
+        self,
+        name: str,
+        position: SourcePosition,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+    ) -> ResolvedVariable:
+        normalized_name = name.lower()
+        target = variables.get(normalized_name)
+        if target is not None:
+            return target
+        if normalized_name in constants:
+            self._error(
+                position,
+                DiagnosticCode.ASSIGNMENT_TO_CONSTANT,
+                f"Cannot assign to constant {name}.",
+                "Use a variable as the target.",
+                len(name),
+            )
+        self._error(
+            position,
+            DiagnosticCode.UNKNOWN_ASSIGNMENT_TARGET,
+            f"Unknown variable: {name}.",
+            "Declare the variable in the var section before using it.",
+            len(name),
+        )
+        raise AssertionError("unreachable")
+
+    def _require_byte_target(
+        self,
+        target: ResolvedVariable,
+        position: SourcePosition,
+        description: str,
+    ) -> None:
+        if target.type is BuiltInType.BYTE:
+            return
+        self._error(
+            position,
+            DiagnosticCode.INCOMPATIBLE_TYPES,
+            f"{description} must have type byte, but {target.name} has type "
+            f"{target.type.value}.",
+            "Use a variable declared as byte.",
+            len(target.name),
         )
 
     def _resolve_assignment(
@@ -797,6 +1006,9 @@ class SemanticAnalyzer:
             | RepeatStatement
             | BreakStatement
             | ContinueStatement
+            | IncrementStatement
+            | DecrementStatement
+            | ForStatement
         ),
         program: Program,
     ) -> SourcePosition:
@@ -811,6 +1023,9 @@ class SemanticAnalyzer:
                 RepeatStatement,
                 BreakStatement,
                 ContinueStatement,
+                IncrementStatement,
+                DecrementStatement,
+                ForStatement,
             ),
         ):
             return statement.position

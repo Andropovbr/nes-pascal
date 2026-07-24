@@ -118,6 +118,20 @@ class LexerTests(unittest.TestCase):
         self.assertIn(TokenKind.DO, kinds)
         self.assertIn(TokenKind.REPEAT, kinds)
         self.assertIn(TokenKind.UNTIL, kinds)
+
+    def test_tokenizes_update_and_for_keywords(self) -> None:
+        tokens = tokenize(
+            "begin inc(Counter, $02); dec(Counter); "
+            "for Counter := $00 to $03 do break; "
+            "for Counter := $03 downto $00 do continue; end."
+        )
+        kinds = [token.kind for token in tokens]
+        self.assertIn(TokenKind.INC, kinds)
+        self.assertIn(TokenKind.DEC, kinds)
+        self.assertIn(TokenKind.COMMA, kinds)
+        self.assertEqual(kinds.count(TokenKind.FOR), 2)
+        self.assertIn(TokenKind.TO, kinds)
+        self.assertIn(TokenKind.DOWNTO, kinds)
         self.assertIn(TokenKind.BREAK, kinds)
         self.assertIn(TokenKind.CONTINUE, kinds)
 

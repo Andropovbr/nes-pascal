@@ -13,7 +13,7 @@ TOOLCHAIN_AVAILABLE = (
     shutil.which("ca65") is not None
     and shutil.which("ld65") is not None
 )
-MESEN_PATH = os.environ.get("MESEN_PATH") or shutil.which("Mesen")
+MESEN_PATH = os.environ.get("MESEN_PATH")
 
 
 @unittest.skipUnless(
@@ -56,6 +56,9 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_loop_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("loops")
 
+    def test_counting_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("counting")
+
     def test_conditional_branch_larger_than_relative_branch_range(self) -> None:
         assignments = "\n".join(
             "        Counter := Counter + $01;" for _ in range(80)
@@ -83,22 +86,46 @@ end.
             rom = rom_path.read_bytes()
         self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
 
+    def test_for_body_larger_than_relative_branch_range(self) -> None:
+        updates = "\n".join("        inc(Total);" for _ in range(80))
+        source = f"""program LongFor;
+var
+    Index: byte;
+    Total: byte;
+begin
+    Total := $00;
+    for Index := $00 to $01 do
+    begin
+{updates}
+    end;
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source_path = Path(temporary_directory) / "long_for.nsp"
+            rom_path = Path(temporary_directory) / "long_for.nes"
+            source_path.write_text(source, encoding="utf-8")
+            compile_source(source_path, rom_path)
+            rom = rom_path.read_bytes()
+        self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
+
 
 @unittest.skipUnless(
     TOOLCHAIN_AVAILABLE and MESEN_PATH is not None,
     "emulator integration skipped: ca65, ld65, and MESEN_PATH are required",
 )
 class MesenIntegrationTests(unittest.TestCase):
-    def test_loop_example_reaches_expected_runtime_state(self) -> None:
+    def _run_mesen_test(self, example_name: str, script_name: str) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
-            rom_path = Path(temporary_directory) / "loops.nes"
-            compile_source(ROOT / "examples" / "loops.nsp", rom_path)
+            rom_path = Path(temporary_directory) / f"{example_name}.nes"
+            compile_source(ROOT / "examples" / f"{example_name}.nsp", rom_path)
             result = subprocess.run(
                 [
                     str(MESEN_PATH),
                     "--testRunner",
                     str(rom_path),
-                    str(ROOT / "tests" / "mesen" / "verify_loops.lua"),
+                    str(ROOT / "tests" / "mesen" / script_name),
                 ],
                 capture_output=True,
                 check=False,
@@ -110,6 +137,15 @@ class MesenIntegrationTests(unittest.TestCase):
             result.returncode,
             0,
             f"Mesen runtime validation failed:\n{result.stdout}\n{result.stderr}",
+        )
+
+    def test_loop_example_reaches_expected_runtime_state(self) -> None:
+        self._run_mesen_test("loops", "verify_loops.lua")
+
+    def test_counting_example_reaches_expected_runtime_state(self) -> None:
+        self._run_mesen_test(
+            "counting",
+            "verify_counting.lua",
         )
 
 

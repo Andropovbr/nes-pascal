@@ -1,0 +1,43 @@
+program Counting;
+
+var
+    Counter: byte;
+    Sum: byte;
+    Index: byte;
+    Reverse: byte;
+    Edge: byte;
+    Outer: byte;
+    Inner: byte;
+    BackgroundColor: nes_color;
+
+begin
+    Counter := $FE;
+    inc(Counter);
+    inc(Counter);
+    dec(Counter);
+    dec(Counter, $02);
+
+    Sum := $00;
+    for Index := $00 to $03 do
+        inc(Sum);
+    for Reverse := $02 downto $00 do
+    begin
+        inc(Sum, $02);
+    end;
+    for Edge := $FF to $FF do
+        inc(Sum);
+    for Edge := $00 downto $00 do
+        inc(Sum);
+    for Outer := $00 to $01 do
+    begin
+        for Inner := $00 to $01 do
+            inc(Sum);
+    end;
+
+    if (Counter = $FD) and (Sum = $10) then
+        BackgroundColor := $21
+    else
+        BackgroundColor := $0F;
+    nes.set_background_color(BackgroundColor);
+    nes.run;
+end.

@@ -392,6 +392,64 @@ The backend uses absolute jumps for loop back edges and exits, with relative
 branches targeting only nearby labels. Large and nested loop bodies therefore
 do not depend on the 6502 relative-branch range.
 
+## Increment and decrement operations
+
+`inc` and `dec` update an initialized `byte` variable. The one-argument forms
+add or subtract one:
+
+```pascal
+inc(Counter);
+dec(Counter);
+```
+
+An optional `byte` expression specifies the amount:
+
+```pascal
+inc(Counter, Step);
+dec(Counter, Step + $01);
+```
+
+Updates wrap modulo 256, like other `byte` arithmetic. Incrementing `$FF`
+produces `$00`; decrementing `$00` produces `$FF`. The one-argument forms
+generate the 6502 `INC` and `DEC` instructions directly. The target must
+already be assigned because an update reads its previous value.
+
+## `for` loops
+
+An ascending `for` loop includes both bounds:
+
+```pascal
+for Index := $00 to $03 do
+    inc(Total);
+```
+
+A descending loop uses `downto`:
+
+```pascal
+for Index := $03 downto $00 do
+begin
+    inc(Total, $02);
+end;
+```
+
+The control variable, initial expression, and final expression must all have
+type `byte`. The compiler assigns the initial value before evaluating and
+caching the final value. The final expression is evaluated exactly once.
+The body may be a single statement or a `begin`/`end` block, and `for` loops
+may be nested.
+
+The control variable is definitely assigned after the loop, even when the
+initial range is empty, because initialization occurs before the first range
+check. A non-empty loop that completes normally leaves it at the final value;
+an empty range leaves it at the initialized value. Assigning the control
+variable, applying `inc` or `dec` to it, or reusing it as a nested loop's
+control variable produces E3012.
+
+`break` exits a `for` loop. `continue` advances to its next value. Endpoint
+checks occur before increment or decrement, so `$FF` for `to` and `$00` for
+`downto` terminate without wrapping into another iteration. The backend uses
+nearby relative branches and absolute jumps so large bodies remain valid.
+
 ## Initial commands
 
 ### `nes.set_background_color`
@@ -441,10 +499,9 @@ The current milestone does not support:
 - functions;
 - user-defined parameters;
 - multiplication or division;
-- dedicated increment or decrement statements;
 - type inference;
 - implicit conversions;
-- `for` or `case`;
+- `case`;
 - arrays or records;
 - inline Assembly;
 - sprites, controller input, or audio.

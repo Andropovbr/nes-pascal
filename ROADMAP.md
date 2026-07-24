@@ -111,12 +111,23 @@ Goal: support the basic control-flow constructs required for game logic.
 
 ## Milestone 8 — Increment and Decrement Operations
 
-* [ ] `inc(variable)`
-* [ ] `inc(variable, amount)`
-* [ ] `dec(variable)`
-* [ ] `dec(variable, amount)`
-* [ ] Optimized `INC` and `DEC` generation where possible
-* [ ] Wraparound behavior for `byte`
+* [x] `inc(variable)`
+* [x] `inc(variable, amount)`
+* [x] `dec(variable)`
+* [x] `dec(variable, amount)`
+* [x] Optimized `INC` and `DEC` generation where possible
+* [x] Wraparound behavior for `byte`
+* [x] `for variable := initial_value to final_value do`
+* [x] `for variable := initial_value downto final_value do`
+* [x] Single statements and `begin/end` blocks
+* [x] Nested `for` loops
+* [x] Control variable must be `byte`
+* [x] Initial and final expressions must be `byte`
+* [x] Final value evaluated once before loop execution
+* [x] Control variable cannot be modified inside the loop body
+* [x] Correct termination at `$00` and `$FF`
+* [x] Long-branch-safe ca65 generation
+* [x] Definite assignment analysis for the control variable
 
 ## Milestone 9 — Procedures
 
