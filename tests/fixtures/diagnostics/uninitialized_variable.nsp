@@ -1,0 +1,9 @@
+program UninitializedVariable;
+
+var
+    BackgroundColor: nes_color;
+
+begin
+    nes.set_background_color(BackgroundColor);
+    nes.run;
+end.

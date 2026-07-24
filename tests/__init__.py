@@ -1,0 +1,1 @@
+"""NES Pascal compiler tests."""

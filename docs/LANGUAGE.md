@@ -1,48 +1,59 @@
-# LANGUAGE.md
+# NES Pascal language
 
-## Estado
+## Status
 
-Esta especificação descreve somente o marco inicial da linguagem.
+This specification describes only the currently implemented subset. The syntax
+is inspired by Pascal, but the language is not intended to be compatible with
+Pascal or Free Pascal.
 
-A sintaxe é inspirada em Pascal, mas a linguagem não pretende ser compatível com Pascal ou Free Pascal.
+## Minimal program structure
 
-## Estrutura mínima
+A program contains:
 
-Um programa contém:
+1. the `program` keyword;
+2. a program name;
+3. a semicolon;
+4. an optional `const` section;
+5. an optional `var` section;
+6. a block beginning with `begin`;
+7. a sequence of statements;
+8. the `end` keyword;
+9. a final period.
 
-1. a palavra-chave `program`;
-2. o nome do programa;
-3. ponto e vírgula;
-4. um bloco iniciado por `begin`;
-5. uma sequência de comandos;
-6. a palavra-chave `end`;
-7. um ponto final.
-
-Exemplo:
+Example:
 
 ```pascal
 program Minimal;
 
+const
+    DefaultBackgroundColor: nes_color = $21;
+
+var
+    BackgroundColor: nes_color;
+    FrameCounter: byte;
+    RenderingEnabled: boolean;
+
 begin
-    nes.set_background_color($21);
+    BackgroundColor := DefaultBackgroundColor;
+    FrameCounter := $00;
+    RenderingEnabled := true;
+    nes.set_background_color(BackgroundColor);
     nes.run;
 end.
 ```
 
-## Identificadores
+## Identifiers
 
-Identificadores:
+Identifiers:
 
-* começam com letra;
-* podem conter letras, números e `_`;
-* não diferenciam maiúsculas e minúsculas no primeiro protótipo;
-* devem preservar a grafia original para mensagens de erro.
+- begin with a letter;
+- may contain letters, digits, and `_`;
+- are case-insensitive in the current prototype;
+- preserve their original spelling for diagnostics.
 
-## Literais hexadecimais
+## Hexadecimal literals
 
-Valores hexadecimais utilizam o prefixo `$`.
-
-Exemplos:
+Hexadecimal values use the `$` prefix:
 
 ```pascal
 $00
@@ -50,77 +61,187 @@ $21
 $FF
 ```
 
-No marco inicial, `nes.set_background_color` aceita somente valores constantes de `$00` a `$3F`.
+Hexadecimal literals initialize `nes_color` and `byte` values. Boolean values
+use the `true` and `false` keywords.
 
-Valores fora desse intervalo devem produzir erro de compilação.
+## Constants
 
-## Comandos iniciais
+A constant declaration has this grammar:
+
+```text
+Identifier : Type = HexLiteral ;
+```
+
+Declarations appear in a `const` section between the program header and the
+main block:
+
+```pascal
+const
+    BackgroundColor: nes_color = $21;
+```
+
+Every constant requires an explicit type. `nes_color` and `byte` constants use
+hexadecimal initializers; `boolean` constants use `true` or `false`. There is
+no type inference.
+Constant names are resolved case-insensitively, and duplicate declarations are
+errors.
+
+## Built-in types
+
+### `nes_color`
+
+`nes_color` occupies one byte and represents an NES palette value. Its allowed
+range is `$00..$3F`.
+
+Valid:
+
+```pascal
+const
+    BackgroundColor: nes_color = $21;
+```
+
+Invalid:
+
+```pascal
+const
+    BackgroundColor: nes_color = $80;
+```
+
+Expected diagnostic:
+
+```text
+E4002 path/to/source.nsp:4:34
+
+Value $80 is not valid for type nes_color.
+
+Allowed range: $00..$3F.
+```
+
+### `byte`
+
+`byte` occupies one byte and accepts hexadecimal values from `$00` through
+`$FF`.
+
+```pascal
+const
+    Maximum: byte = $FF;
+```
+
+A larger value produces `E4003`.
+
+### `boolean`
+
+`boolean` occupies one byte. `false` is represented by zero and `true` by one.
+No hexadecimal-to-boolean conversion is allowed.
+
+```pascal
+const
+    RenderingEnabled: boolean = true;
+```
+
+## Variables
+
+Variable declarations appear after the optional `const` section and before
+`begin`:
+
+```pascal
+var
+    BackgroundColor: nes_color;
+    Counter: byte;
+    Enabled: boolean;
+```
+
+Each declaration contains exactly one identifier and an explicit built-in
+type. Variable and constant names share one case-insensitive namespace.
+Variables are allocated as one-byte values in regular CPU RAM. Zero-page
+allocation is not part of this milestone.
+
+## Assignment
+
+Assignment uses `:=`:
+
+```pascal
+BackgroundColor := $21;
+Counter := $FF;
+Enabled := true;
+```
+
+The right-hand side may be:
+
+- a hexadecimal literal;
+- `true` or `false`;
+- a constant reference;
+- a previously assigned variable reference.
+
+Both sides must have exactly the same type. There are no implicit conversions.
+Reading a variable before an earlier assignment is a compilation error.
+Constants cannot be assignment targets.
+
+Assignment diagnostics preserve the earliest primary error:
+
+- E4002 reports a `nes_color` value outside `$00..$3F`;
+- E4004 reports incompatible source and target types, including hexadecimal
+  literals assigned to `boolean`;
+- E3008 reports a variable read before assignment.
+
+Whole-program checks such as E3003 run only after statement-level semantic
+analysis succeeds. See [DIAGNOSTICS.md](DIAGNOSTICS.md) for the complete
+diagnostic reference and examples.
+
+## Initial commands
 
 ### `nes.set_background_color`
 
-Configura a cor universal de fundo da paleta do NES.
+Sets the universal NES background palette color.
 
-Sintaxe:
+Syntax with a constant reference:
 
 ```pascal
-nes.set_background_color(valor);
+nes.set_background_color(BackgroundColor);
 ```
 
-O valor deve ser um literal hexadecimal entre `$00` e `$3F`.
-
-Exemplo válido:
+Direct hexadecimal literals remain supported:
 
 ```pascal
 nes.set_background_color($21);
 ```
 
-Exemplo inválido:
+The argument must resolve to a valid `nes_color`. It may also be a previously
+assigned `nes_color` variable:
 
 ```pascal
-nes.set_background_color($80);
-```
-
-Diagnóstico esperado:
-
-```text
-E2001: a cor de paleta $80 está fora do intervalo permitido.
-
-Uma cor de paleta do NES deve estar entre $00 e $3F.
+BackgroundColor := $21;
+nes.set_background_color(BackgroundColor);
 ```
 
 ### `nes.run`
 
-Finaliza a configuração inicial e mantém o programa em execução.
-
-Sintaxe:
+Completes initial configuration and keeps the program running.
 
 ```pascal
 nes.run;
 ```
 
-No marco inicial:
+In the current milestone it:
 
-* deve aparecer exatamente uma vez;
-* deve ser o último comando do bloco;
-* comandos depois de `nes.run` devem gerar erro.
+- must appear exactly once;
+- must be the final command in the block;
+- causes commands after it to be rejected.
 
-## Recursos ainda não suportados
+## Unsupported features
 
-O primeiro marco não aceita:
+The current milestone does not support:
 
-* declarações `var`;
-* declarações `const`;
-* declarações `type`;
-* procedimentos;
-* funções;
-* parâmetros definidos pelo usuário;
-* expressões aritméticas;
-* `if`;
-* `while`;
-* `for`;
-* `case`;
-* arrays;
-* records;
-* código Assembly embutido.
+- `type` declarations;
+- procedures;
+- functions;
+- user-defined parameters;
+- arithmetic expressions;
+- type inference;
+- implicit conversions;
+- `if`, `while`, `for`, or `case`;
+- arrays or records;
+- inline Assembly;
+- sprites, controller input, or audio.
 
-Esses recursos serão adicionados incrementalmente.
+These features must be added only in explicitly requested milestones.

@@ -1,0 +1,12 @@
+program InvalidTypeAssignment;
+
+var
+    Counter: byte;
+    Active: boolean;
+
+begin
+    Active := true;
+    Counter := Active;
+    nes.set_background_color($21);
+    nes.run;
+end.

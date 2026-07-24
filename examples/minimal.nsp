@@ -1,0 +1,17 @@
+program Minimal;
+
+const
+    DefaultBackgroundColor: nes_color = $21;
+
+var
+    BackgroundColor: nes_color;
+    FrameCounter: byte;
+    RenderingEnabled: boolean;
+
+begin
+    BackgroundColor := DefaultBackgroundColor;
+    FrameCounter := $00;
+    RenderingEnabled := true;
+    nes.set_background_color(BackgroundColor);
+    nes.run;
+end.

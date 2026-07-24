@@ -1,0 +1,10 @@
+program InvalidBooleanAssignment;
+
+var
+    Active: boolean;
+
+begin
+    Active := $01;
+    nes.set_background_color($21);
+    nes.run;
+end.

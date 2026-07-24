@@ -1,0 +1,10 @@
+program InvalidColorAssignment;
+
+var
+    BackgroundColor: nes_color;
+
+begin
+    BackgroundColor := $80;
+    nes.set_background_color(BackgroundColor);
+    nes.run;
+end.
