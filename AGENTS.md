@@ -292,9 +292,9 @@ When implementing a new feature, always update every affected document.
 
 This may include:
 
-- README.md
-- ROADMAP.md
-- LANGUAGE.md
+- [README.md](README.md)
+- [roadmap index](roadmap/README.md)
+- [language guide](docs/language/index.md)
 - compiler architecture documentation
 - runtime documentation
 - backend documentation
@@ -312,11 +312,21 @@ Examples must compile successfully and remain synchronized with the compiler beh
 
 ### Roadmap
 
+Before starting milestone work:
+
+1. read the [roadmap index](roadmap/README.md);
+2. use the index to identify the explicit current and next milestone;
+3. open the relevant major-version roadmap file;
+4. implement only the requested milestone.
+
 When a milestone is completed:
 
-- mark it as completed in ROADMAP.md;
-- add the next planned milestone if appropriate;
-- keep the roadmap aligned with the current implementation.
+- update its checklist and status in the relevant major-version roadmap file;
+- update the current release, last completed milestone, and next milestone in
+  the [roadmap index](roadmap/README.md);
+- keep the roadmap aligned with the current implementation;
+- never silently change future roadmap scope;
+- propose missing roadmap work separately when implementation reveals it.
 
 ### Consistency
 
@@ -384,7 +394,7 @@ I1000-I1999  Informational Messages
 Never emit a diagnostic outside these ranges, assign one code to multiple
 diagnostics, or reuse a retired code for a different meaning. Register new
 errors in `nes_pascal/diagnostics.py` and document them in
-`docs/DIAGNOSTICS.md`.
+the [diagnostics reference](docs/reference/diagnostics/index.md).
 
 ## Diagnostics Validation
 
@@ -434,7 +444,28 @@ A milestone is only considered complete when all of the following are satisfied:
 - example programs compile successfully;
 - documentation is updated;
 - diagnostics are documented;
-- ROADMAP.md reflects the current state.
+- the [roadmap index](roadmap/README.md) and relevant major-version roadmap
+  file reflect the current state.
+
+When completing a milestone, never silently introduce new scope into later
+milestones or remove existing roadmap items. If a milestone reveals missing
+work, propose roadmap changes separately instead of modifying future planning
+without explanation.
+
+## Milestone Identifiers
+
+Milestone numbering is scoped to a release and may be reorganized while the
+release is still planned.
+
+- Treat the milestone title and anchor as the stable identity.
+- Use the [roadmap index](roadmap/README.md) to determine the current and next
+  milestone.
+- Do not select the next milestone by numeric inference alone.
+- Do not rely on historical milestone numbers.
+- Planned milestones may be renumbered within the same release when necessary.
+- A completed milestone is considered stable history and must not be
+  renumbered, reordered, or have its scope changed without explicit user
+  approval.
 
 ## Regression Policy
 
@@ -453,10 +484,12 @@ Every reported bug should become a permanent automated test whenever practical.
 Before writing code:
 
 1. read this file;
-2. read relevant documents under `docs/`;
-3. inspect the existing structure;
-4. present a short plan;
-5. implement only the requested milestone.
+2. read the [roadmap index](roadmap/README.md);
+3. open the relevant major-version roadmap file when doing milestone work;
+4. read relevant documents under `docs/`;
+5. inspect the existing structure;
+6. present a short plan;
+7. implement only the requested milestone.
 
 When choosing between a generic solution and a small predictable solution,
 choose the small predictable solution.
