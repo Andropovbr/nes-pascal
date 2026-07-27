@@ -1,0 +1,8 @@
+program ArgumentCount;
+procedure Initialize(Value: byte);
+begin
+end;
+begin
+    Initialize;
+    nes.run;
+end.

@@ -166,6 +166,36 @@ class DiagnosticPrecedenceTests(unittest.TestCase):
             "    ^^^^^^^",
         )
 
+    def test_procedure_argument_count_is_preserved(self) -> None:
+        self.assert_primary_diagnostic(
+            "procedure_argument_count.nsp",
+            "E3016",
+            6,
+            5,
+            "Procedure Initialize expects 1 argument(s), but 0 were provided.",
+            "    ^^^^^^^^^^",
+        )
+
+    def test_unsupported_parameter_type_is_preserved(self) -> None:
+        self.assert_primary_diagnostic(
+            "unsupported_parameter_type.nsp",
+            "E4005",
+            2,
+            27,
+            "Type nes_color is not supported for procedure parameters.",
+            "                          ^^^^^^^^^",
+        )
+
+    def test_procedure_argument_type_is_preserved(self) -> None:
+        self.assert_primary_diagnostic(
+            "procedure_argument_type.nsp",
+            "E4004",
+            6,
+            16,
+            "A hexadecimal literal is not valid for type boolean.",
+            "               ^^^",
+        )
+
     def test_assignment_error_precedes_missing_background_color(self) -> None:
         source = """program InvalidPrecedence;
 var

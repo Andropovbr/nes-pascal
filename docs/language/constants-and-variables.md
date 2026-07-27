@@ -45,5 +45,9 @@ Constant, variable, and procedure names share one case-insensitive namespace.
 Duplicate declarations are errors. Original spelling is retained for
 diagnostics.
 
+Procedure parameters use a local namespace. Their names must be unique within
+the declaration and cannot shadow a global symbol. Different procedures may
+reuse the same parameter name.
+
 Variables receive values through [assignments](assignments.md) or other
 supported update statements; a declaration does not initialize its variable.

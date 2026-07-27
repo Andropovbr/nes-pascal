@@ -25,6 +25,7 @@ from .ast import (
     ProcedureCall,
     ProcedureDeclaration,
     RepeatStatement,
+    ResolvedArgument,
     ResolvedAssignment,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
@@ -69,6 +70,7 @@ class TypedConstant:
 class ProcedureSymbol:
     declaration: ProcedureDeclaration
     label: str
+    parameters: tuple[ResolvedVariable, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,8 +132,46 @@ class SemanticAnalyzer:
             procedures[normalized_name] = ProcedureSymbol(
                 declaration,
                 f"procedure_{declaration.name}",
+                (),
             )
             declared_names.add(normalized_name)
+
+        for declaration in program.procedures:
+            normalized_name = declaration.name.lower()
+            parameter_names: set[str] = set()
+            resolved_parameters: list[ResolvedVariable] = []
+            for parameter in declaration.parameters:
+                if parameter.type not in (
+                    BuiltInType.BYTE,
+                    BuiltInType.BOOLEAN,
+                ):
+                    self._error(
+                        parameter.type_position or parameter.position,
+                        DiagnosticCode.UNSUPPORTED_PARAMETER_TYPE,
+                        f"Type {parameter.type.value} is not supported for "
+                        "procedure parameters.",
+                        "Use byte or boolean for a value parameter.",
+                        len(parameter.type.value),
+                    )
+                self._ensure_unique_name(
+                    parameter.name,
+                    parameter.position,
+                    declared_names | parameter_names,
+                )
+                parameter_names.add(parameter.name.lower())
+                resolved_parameters.append(
+                    ResolvedVariable(
+                        parameter.name,
+                        parameter.type,
+                        f"parameter_{declaration.name}_{parameter.name}",
+                    )
+                )
+            symbol = procedures[normalized_name]
+            procedures[normalized_name] = ProcedureSymbol(
+                symbol.declaration,
+                symbol.label,
+                tuple(resolved_parameters),
+            )
 
         procedure_order = self._procedure_resolution_order(
             program.procedures,
@@ -145,11 +185,16 @@ class SemanticAnalyzer:
         for normalized_name in procedure_order:
             symbol = procedures[normalized_name]
             self.required_variables = set()
+            procedure_variables = dict(variables)
+            procedure_variables.update(
+                (parameter.name.lower(), parameter)
+                for parameter in symbol.parameters
+            )
             body, assigned_variables = self._resolve_statements(
                 symbol.declaration.body,
                 constants,
-                variables,
-                set(),
+                procedure_variables,
+                {parameter.name.lower() for parameter in symbol.parameters},
                 inside_conditional=False,
                 loop_depth=0,
                 protected_control_variables=frozenset(),
@@ -160,10 +205,14 @@ class SemanticAnalyzer:
                 symbol.declaration.name,
                 symbol.label,
                 body,
+                symbol.parameters,
             )
             self.procedure_summaries[normalized_name] = ProcedureSummary(
                 required_variables,
-                frozenset(assigned_variables | required_variables),
+                frozenset(
+                    (assigned_variables | required_variables)
+                    & variables.keys()
+                ),
                 resolved_procedure,
             )
             resolved_procedures[normalized_name] = resolved_procedure
@@ -405,6 +454,36 @@ class SemanticAnalyzer:
                 current_assignments.add(normalized_target)
             elif isinstance(statement, ProcedureCall):
                 summary = self.procedure_summaries[statement.name.lower()]
+                parameters = summary.procedure.parameters
+                if len(statement.arguments) != len(parameters):
+                    expected_count = len(parameters)
+                    actual_count = len(statement.arguments)
+                    self._error(
+                        statement.position,
+                        DiagnosticCode.PROCEDURE_ARGUMENT_COUNT,
+                        f"Procedure {statement.name} expects "
+                        f"{expected_count} argument(s), but {actual_count} "
+                        "were provided.",
+                        f"Pass exactly {expected_count} argument(s) to "
+                        f"{statement.name}.",
+                        len(statement.name),
+                    )
+                resolved_arguments = tuple(
+                    ResolvedArgument(
+                        parameter,
+                        self._resolve_value(
+                            argument,
+                            parameter.type,
+                            constants,
+                            variables,
+                            current_assignments,
+                        ),
+                    )
+                    for argument, parameter in zip(
+                        statement.arguments,
+                        parameters,
+                    )
+                )
                 missing_variables = (
                     summary.required_variables - current_assignments
                 )
@@ -428,6 +507,7 @@ class SemanticAnalyzer:
                     ResolvedProcedureCall(
                         summary.procedure.name,
                         summary.procedure.label,
+                        resolved_arguments,
                     )
                 )
             elif isinstance(statement, (BreakStatement, ContinueStatement)):
@@ -628,7 +708,7 @@ class SemanticAnalyzer:
             position,
             DiagnosticCode.DUPLICATE_SYMBOL,
             f"Symbol {name} is already declared.",
-            "Use a unique name for every constant and variable.",
+            "Use a unique name in the current scope.",
         )
 
     def _reject_control_variable_modification(

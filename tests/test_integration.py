@@ -62,6 +62,9 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_procedure_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("procedures")
 
+    def test_procedure_parameter_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("procedure_parameters")
+
     def test_conditional_branch_larger_than_relative_branch_range(self) -> None:
         assignments = "\n".join(
             "        Counter := Counter + $01;" for _ in range(80)
@@ -155,6 +158,12 @@ class MesenIntegrationTests(unittest.TestCase):
         self._run_mesen_test(
             "procedures",
             "verify_procedures.lua",
+        )
+
+    def test_procedure_parameters_reach_expected_runtime_state(self) -> None:
+        self._run_mesen_test(
+            "procedure_parameters",
+            "verify_procedure_parameters.lua",
         )
 
 

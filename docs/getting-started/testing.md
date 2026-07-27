@@ -18,8 +18,9 @@ explicit message when `ca65` or `ld65` is unavailable.
 
 To include the optional headless Mesen behavior test, point `MESEN_PATH` to
 the emulator executable before running the suite. The test compiles the
-behavior examples, executes their ROMs, and verifies final variables and the
-universal background color:
+behavior examples, executes their ROMs, and verifies final variables,
+procedure-parameter storage when applicable, and the universal background
+color:
 
 ```powershell
 $env:MESEN_PATH = "C:\path\to\Mesen.exe"

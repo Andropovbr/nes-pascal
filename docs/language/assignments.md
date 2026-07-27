@@ -21,6 +21,10 @@ Both sides must have exactly the same type. There are no implicit conversions.
 Reading a variable before an earlier assignment is a compilation error.
 Constants cannot be assignment targets.
 
+Value parameters are initialized local copies and may also be assignment
+targets inside their declaring procedure. Assigning a parameter does not
+modify the caller's argument.
+
 Definite-assignment analysis follows structured control flow. The detailed
 rules for branches, loops, and procedure calls are documented with those
 constructs.

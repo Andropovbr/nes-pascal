@@ -33,10 +33,12 @@ class DiagnosticCode(StrEnum):
     UNKNOWN_PROCEDURE = "E3013"
     RECURSIVE_PROCEDURE_CALL = "E3014"
     PROCEDURE_RUNTIME_COMMAND = "E3015"
+    PROCEDURE_ARGUMENT_COUNT = "E3016"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
     INCOMPATIBLE_TYPES = "E4004"
+    UNSUPPORTED_PARAMETER_TYPE = "E4005"
     MISSING_TOOLCHAIN = "E5001"
     TOOLCHAIN_FAILURE = "E5002"
     FILE_ACCESS_FAILURE = "E6001"
@@ -106,6 +108,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     DiagnosticCode.PROCEDURE_RUNTIME_COMMAND: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Runtime command inside procedure"
     ),
+    DiagnosticCode.PROCEDURE_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Incorrect procedure argument count"
+    ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"
     ),
@@ -117,6 +122,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INCOMPATIBLE_TYPES: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Incompatible types"
+    ),
+    DiagnosticCode.UNSUPPORTED_PARAMETER_TYPE: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Unsupported parameter type"
     ),
     DiagnosticCode.MISSING_TOOLCHAIN: DiagnosticDefinition(
         DiagnosticCategory.CODE_GENERATION, "Missing toolchain"

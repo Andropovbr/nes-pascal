@@ -1,0 +1,7 @@
+program UnsupportedParameter;
+procedure SetColor(Color: nes_color);
+begin
+end;
+begin
+    nes.run;
+end.

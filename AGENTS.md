@@ -73,19 +73,23 @@ var
     RenderingEnabled: boolean;
     WithinLimit: boolean;
 
-procedure InitializeCounters;
+procedure InitializeCounters(
+    Start: byte;
+    Increment: byte;
+    EnabledValue: boolean
+);
 begin
-    FrameCounter := $00;
-    NextFrameCounter := FrameCounter + $01;
+    FrameCounter := Start;
+    NextFrameCounter := FrameCounter + Increment;
+    RenderingEnabled := EnabledValue;
 end;
 
 begin
     BackgroundColor := DefaultBackgroundColor;
-    InitializeCounters;
+    InitializeCounters($00, $01, true);
     inc(NextFrameCounter);
     for FrameCounter := $00 to MaximumFrameCounter do
         inc(NextFrameCounter);
-    RenderingEnabled := true;
     WithinLimit := RenderingEnabled and
         (NextFrameCounter <= MaximumFrameCounter);
     if WithinLimit then
@@ -107,8 +111,9 @@ matches. A direct hexadecimal literal remains valid as the argument to
 Conditional statements support `if`, optional `else`, nested conditionals,
 and compound `begin`/`end` branches. Loops support `while`, `repeat`/`until`,
 `for` with `to` or `downto`, nesting, `break`, and `continue`. Initialized
-`byte` variables support `inc` and `dec` with optional amounts. Parameterless
-procedures support forward and nested acyclic calls through global state.
+`byte` variables support `inc` and `dec` with optional amounts. Procedures
+support forward and nested acyclic calls, plus `byte` and `boolean` value
+parameters stored in procedure-specific RAM slots.
 
 The compiler must generate ca65 Assembly, assemble it, and link a valid `.nes`
 ROM. When opened in an emulator, the NES must:
@@ -119,8 +124,8 @@ ROM. When opened in an emulator, the NES must:
 4. enable rendering;
 5. remain in a stable loop.
 
-Do not implement multiplication, division, procedure parameters, recursion,
-sprites, controller input, or audio yet.
+Do not implement multiplication, division, reference parameters, return
+values, recursion, sprites, controller input, or audio yet.
 
 ## Expected pipeline
 
@@ -207,11 +212,13 @@ Currently supported:
 - nested loops, `break`, and `continue`;
 - `inc` and `dec` operations for initialized `byte` variables;
 - ascending and descending `for` loops with `byte` control variables;
-- parameterless procedures and acyclic procedure calls;
+- procedures with optional `byte` and `boolean` value parameters;
+- forward and nested acyclic procedure calls;
 - parentheses in expressions.
 
 Do not implement type inference, implicit conversions, user-defined types,
-procedure parameters, recursion, multiplication, or division yet.
+reference parameters, return values, recursion, multiplication, or division
+yet.
 
 ## Diagnostics
 

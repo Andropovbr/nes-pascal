@@ -23,6 +23,7 @@ from nes_pascal.ast import (
     IncrementStatement,
     ProcedureCall,
     ProcedureDeclaration,
+    ProcedureParameter,
     RepeatStatement,
     Run,
     SetBackgroundColor,
@@ -514,7 +515,52 @@ end.
         self.assertIsInstance(first.body[0], ProcedureCall)
         self.assertIsInstance(program.statements[0], ProcedureCall)
 
-    def test_rejects_procedure_parameters_in_current_milestone(self) -> None:
+    def test_parses_typed_parameters_and_call_arguments(self) -> None:
+        source = """program Parameters;
+var
+    Counter: byte;
+procedure Initialize(Start: byte; Enabled: boolean);
+begin
+    if Enabled then
+        Counter := Start;
+end;
+begin
+    Initialize($01 + $02, true);
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        program = parse(source)
+        procedure = program.procedures[0]
+        self.assertEqual(
+            procedure.parameters,
+            (
+                ProcedureParameter(
+                    "Start",
+                    BuiltInType.BYTE,
+                    procedure.parameters[0].position,
+                ),
+                ProcedureParameter(
+                    "Enabled",
+                    BuiltInType.BOOLEAN,
+                    procedure.parameters[1].position,
+                ),
+            ),
+        )
+        conditional = procedure.body[0]
+        assert isinstance(conditional, IfStatement)
+        self.assertIsInstance(conditional.condition, VariableReference)
+        assignment = conditional.then_branch[0]
+        assert isinstance(assignment, Assignment)
+        self.assertIsInstance(assignment.value, VariableReference)
+        call = program.statements[0]
+        self.assertIsInstance(call, ProcedureCall)
+        assert isinstance(call, ProcedureCall)
+        self.assertEqual(len(call.arguments), 2)
+        self.assertIsInstance(call.arguments[0], BinaryExpression)
+        self.assertIsInstance(call.arguments[1], BooleanLiteral)
+
+    def test_rejects_empty_procedure_parameter_lists(self) -> None:
         source = """program Parameters;
 procedure Initialize();
 begin
@@ -528,7 +574,26 @@ end.
             parse(source)
         self.assertEqual(context.exception.code, "E2102")
         self.assertIn(
-            "Expected ';' after the procedure name.",
+            "A parameter list cannot be empty.",
+            str(context.exception),
+        )
+
+    def test_rejects_empty_procedure_call_argument_lists(self) -> None:
+        source = """program Parameters;
+procedure Initialize;
+begin
+end;
+begin
+    Initialize();
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            parse(source)
+        self.assertEqual(context.exception.code, "E2102")
+        self.assertIn(
+            "A procedure call argument list cannot be empty.",
             str(context.exception),
         )
 

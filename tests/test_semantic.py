@@ -1126,6 +1126,245 @@ end.
             str(context.exception),
         )
 
+    def test_resolves_byte_and_boolean_value_parameters(self) -> None:
+        source = """program Parameters;
+var
+    Counter: byte;
+    Active: boolean;
+procedure Initialize(Value: byte; Enabled: boolean);
+begin
+    Counter := Value;
+    Active := Enabled;
+end;
+begin
+    Initialize($01 + $02, true);
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        procedure = resolved.procedures[0]
+        self.assertEqual(
+            [(parameter.name, parameter.type) for parameter in procedure.parameters],
+            [
+                ("Value", BuiltInType.BYTE),
+                ("Enabled", BuiltInType.BOOLEAN),
+            ],
+        )
+        self.assertEqual(
+            [parameter.label for parameter in procedure.parameters],
+            [
+                "parameter_Initialize_Value",
+                "parameter_Initialize_Enabled",
+            ],
+        )
+        call = resolved.statements[0]
+        self.assertIsInstance(call, ResolvedProcedureCall)
+        assert isinstance(call, ResolvedProcedureCall)
+        self.assertEqual(len(call.arguments), 2)
+        self.assertIsInstance(call.arguments[0].value, ResolvedBinaryExpression)
+        self.assertEqual(
+            call.arguments[1].value,
+            ImmediateValue(1, BuiltInType.BOOLEAN),
+        )
+
+    def test_value_parameters_are_initialized_mutable_local_copies(self) -> None:
+        source = """program MutableParameter;
+var
+    Result: byte;
+procedure StoreIncremented(Value: byte);
+begin
+    inc(Value);
+    Result := Value;
+end;
+begin
+    StoreIncremented($02);
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        procedure = resolved.procedures[0]
+        increment = procedure.body[0]
+        assignment = procedure.body[1]
+        self.assertIsInstance(increment, ResolvedIncrementStatement)
+        self.assertIsInstance(assignment, ResolvedAssignment)
+        assert isinstance(increment, ResolvedIncrementStatement)
+        assert isinstance(assignment, ResolvedAssignment)
+        self.assertEqual(
+            increment.target.label,
+            "parameter_StoreIncremented_Value",
+        )
+        self.assertIsInstance(assignment.value, VariableValue)
+
+    def test_resolves_parameterized_forward_and_nested_calls(self) -> None:
+        source = """program NestedParameters;
+var
+    Result: byte;
+procedure Start(Value: byte);
+begin
+    Finish(Value + $01, true);
+end;
+procedure Finish(Value: byte; Store: boolean);
+begin
+    if Store then
+        Result := Value;
+end;
+begin
+    Start($02);
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        resolved = analyze_source(source)
+        nested_call = resolved.procedures[0].body[0]
+        self.assertIsInstance(nested_call, ResolvedProcedureCall)
+        assert isinstance(nested_call, ResolvedProcedureCall)
+        self.assertEqual(len(nested_call.arguments), 2)
+        self.assertEqual(
+            nested_call.arguments[0].parameter.label,
+            "parameter_Finish_Value",
+        )
+
+    def test_rejects_incorrect_procedure_argument_count(self) -> None:
+        calls = ("Initialize;", "Initialize($01, true);")
+        for call in calls:
+            with self.subTest(call=call):
+                source = f"""program ArgumentCount;
+procedure Initialize(Value: byte);
+begin
+end;
+begin
+    {call}
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+                with self.assertRaises(CompilerError) as context:
+                    analyze_source(source)
+                self.assertEqual(context.exception.code, "E3016")
+                self.assertIn(
+                    "Procedure Initialize expects 1 argument(s)",
+                    str(context.exception),
+                )
+
+    def test_rejects_incompatible_procedure_argument_type(self) -> None:
+        source = """program ArgumentType;
+procedure SetEnabled(Enabled: boolean);
+begin
+end;
+begin
+    SetEnabled($01);
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E4004")
+        self.assertIn(
+            "A hexadecimal literal is not valid for type boolean.",
+            str(context.exception),
+        )
+
+    def test_rejects_unsupported_nes_color_parameter(self) -> None:
+        source = """program UnsupportedParameter;
+procedure SetColor(Color: nes_color);
+begin
+end;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E4005")
+        self.assertIn(
+            "Type nes_color is not supported for procedure parameters.",
+            str(context.exception),
+        )
+
+    def test_rejects_duplicate_parameter_names(self) -> None:
+        source = """program DuplicateParameter;
+procedure Initialize(Value: byte; VALUE: boolean);
+begin
+end;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3004")
+
+    def test_rejects_parameter_name_collision_with_global_symbol(self) -> None:
+        source = """program ParameterCollision;
+var
+    Value: byte;
+procedure Initialize(VALUE: byte);
+begin
+end;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3004")
+
+    def test_rejects_uninitialized_variable_used_as_argument(self) -> None:
+        source = """program UninitializedArgument;
+var
+    Value: byte;
+procedure Consume(Input: byte);
+begin
+end;
+begin
+    Consume(Value);
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+        self.assertEqual(context.exception.code, "E3008")
+
+    def test_parameterized_recursion_remains_rejected(self) -> None:
+        sources = (
+            """program ParameterRecursion;
+procedure Again(Value: byte);
+begin
+    Again(Value);
+end;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+""",
+            """program IndirectParameterRecursion;
+procedure First(Value: byte);
+begin
+    Second(Value);
+end;
+procedure Second(Value: byte);
+begin
+    First(Value);
+end;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+""",
+        )
+        for source in sources:
+            with self.subTest(program=source.splitlines()[0]):
+                with self.assertRaises(CompilerError) as context:
+                    analyze_source(source)
+                self.assertEqual(context.exception.code, "E3014")
+
 
 if __name__ == "__main__":
     unittest.main()

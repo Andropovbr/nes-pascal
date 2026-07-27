@@ -1,0 +1,8 @@
+program ArgumentType;
+procedure SetEnabled(Enabled: boolean);
+begin
+end;
+begin
+    SetEnabled($01);
+    nes.run;
+end.

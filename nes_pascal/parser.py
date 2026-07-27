@@ -25,6 +25,7 @@ from .ast import (
     Program,
     ProcedureCall,
     ProcedureDeclaration,
+    ProcedureParameter,
     RepeatStatement,
     Run,
     SetBackgroundColor,
@@ -51,6 +52,7 @@ class Parser:
         self.position = 0
         self.constant_names: set[str] = set()
         self.variable_names: set[str] = set()
+        self.parameter_names: set[str] = set()
 
     def parse(self) -> Program:
         self._expect(TokenKind.PROGRAM, "Expected 'program' at the start of the file.")
@@ -175,15 +177,19 @@ class Parser:
                 TokenKind.IDENTIFIER,
                 "Expected a procedure name after 'procedure'.",
             )
+            parameters = self._parse_procedure_parameters()
             self._expect(
                 TokenKind.SEMICOLON,
-                "Expected ';' after the procedure name.",
+                "Expected ';' after the procedure declaration.",
             )
             self._expect(
                 TokenKind.BEGIN,
                 "Expected 'begin' to start the procedure body.",
             )
             body: list[Statement] = []
+            self.parameter_names = {
+                parameter.name.lower() for parameter in parameters
+            }
             while not self._check(TokenKind.END):
                 if self._check(TokenKind.EOF):
                     self._error(
@@ -193,6 +199,7 @@ class Parser:
                         "Finish the procedure with 'end;'.",
                     )
                 body.append(self._parse_statement())
+            self.parameter_names = set()
             self._expect(
                 TokenKind.END,
                 "Expected 'end' after the procedure body.",
@@ -206,9 +213,46 @@ class Parser:
                     name.text,
                     tuple(body),
                     SourcePosition(procedure_token.line, procedure_token.column),
+                    tuple(parameters),
                 )
             )
         return declarations
+
+    def _parse_procedure_parameters(self) -> list[ProcedureParameter]:
+        if not self._match(TokenKind.LEFT_PAREN):
+            return []
+        if self._check(TokenKind.RIGHT_PAREN):
+            self._error(
+                self._current(),
+                DiagnosticCode.INVALID_SYNTAX,
+                "A parameter list cannot be empty.",
+                "Omit the parentheses for a parameterless procedure.",
+            )
+
+        parameters: list[ProcedureParameter] = []
+        while True:
+            name = self._expect(
+                TokenKind.IDENTIFIER,
+                "Expected a parameter name.",
+            )
+            self._expect(TokenKind.COLON, "Expected ':' after the parameter name.")
+            type_token = self._current()
+            declared_type = self._parse_type()
+            parameters.append(
+                ProcedureParameter(
+                    name.text,
+                    declared_type,
+                    SourcePosition(name.line, name.column),
+                    SourcePosition(type_token.line, type_token.column),
+                )
+            )
+            if not self._match(TokenKind.SEMICOLON):
+                break
+        self._expect(
+            TokenKind.RIGHT_PAREN,
+            "Expected ')' after the parameter list.",
+        )
+        return parameters
 
     def _parse_literal(self, description: str) -> Literal:
         token = self._current()
@@ -259,9 +303,9 @@ class Parser:
             )
         if self._check(TokenKind.IDENTIFIER) and self._peek_kind() is TokenKind.ASSIGN:
             return self._parse_assignment(consume_terminator)
-        if (
-            self._check(TokenKind.IDENTIFIER)
-            and self._peek_kind() is TokenKind.SEMICOLON
+        if self._check(TokenKind.IDENTIFIER) and self._peek_kind() in (
+            TokenKind.LEFT_PAREN,
+            TokenKind.SEMICOLON,
         ):
             return self._parse_procedure_call(consume_terminator)
 
@@ -309,6 +353,23 @@ class Parser:
             TokenKind.IDENTIFIER,
             "Expected a procedure name.",
         )
+        arguments: list[ValueExpression] = []
+        if self._match(TokenKind.LEFT_PAREN):
+            if self._check(TokenKind.RIGHT_PAREN):
+                self._error(
+                    self._current(),
+                    DiagnosticCode.INVALID_SYNTAX,
+                    "A procedure call argument list cannot be empty.",
+                    "Omit the parentheses when calling a parameterless procedure.",
+                )
+            while True:
+                arguments.append(self._parse_expression())
+                if not self._match(TokenKind.COMMA):
+                    break
+            self._expect(
+                TokenKind.RIGHT_PAREN,
+                "Expected ')' after the procedure arguments.",
+            )
         if consume_terminator:
             self._expect(
                 TokenKind.SEMICOLON,
@@ -317,6 +378,7 @@ class Parser:
         return ProcedureCall(
             name.text,
             SourcePosition(name.line, name.column),
+            tuple(arguments),
         )
 
     def _parse_background_color(
@@ -628,7 +690,9 @@ class Parser:
             return self._parse_literal("value")
         if self._match(TokenKind.IDENTIFIER):
             position = SourcePosition(token.line, token.column)
-            if token.text.lower() in self.variable_names:
+            if token.text.lower() in (
+                self.variable_names | self.parameter_names
+            ):
                 return VariableReference(token.text, position)
             return ConstantReference(token.text, position)
         if self._match(TokenKind.LEFT_PAREN):

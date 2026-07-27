@@ -23,5 +23,8 @@ The target must already be assigned because an update reads its previous
 value. The target and optional amount must have type `byte`; incompatible uses
 produce E4004.
 
+An initialized `byte` value parameter may be used as the target. The update
+changes only the procedure's local parameter copy.
+
 A `for` loop's control variable cannot be changed with `inc` or `dec` inside
 that loop body. See [`for` loops](loops.md#for).

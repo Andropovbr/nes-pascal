@@ -29,10 +29,12 @@ diagnostics section.
 | E3013 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E3014 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E3015 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3016 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E4001 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4002 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4003 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4004 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4005 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E5001 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5002 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E6001 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |

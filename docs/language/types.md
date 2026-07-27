@@ -56,3 +56,7 @@ const
 
 Assignments and operator operands must obey the exact type rules described in
 [Assignments](assignments.md) and [Expressions](expressions.md).
+
+Procedure value parameters currently support only `byte` and `boolean`.
+`nes_color` remains valid for constants and global variables but produces
+E4005 when used as a parameter type.

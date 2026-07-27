@@ -26,10 +26,15 @@ var
     FrameCounter: byte;
     RenderingEnabled: boolean;
 
+procedure Initialize(Start: byte; Enabled: boolean);
+begin
+    FrameCounter := Start;
+    RenderingEnabled := Enabled;
+end;
+
 begin
     BackgroundColor := DefaultBackgroundColor;
-    FrameCounter := $00;
-    RenderingEnabled := true;
+    Initialize($00, true);
     nes.set_background_color(BackgroundColor);
     nes.run;
 end.

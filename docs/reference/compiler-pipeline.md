@@ -22,7 +22,8 @@ The compiler pipeline is deliberately separated:
 - `semantic.py` validates declarations, resolves references and procedure
   calls, checks exact types, and enforces interprocedural definite assignment;
 - `backend_ca65.py` generates readable, commented Assembly from resolved
-  values and allocates variables in regular CPU RAM;
+  values, allocates variables and value-parameter slots in regular CPU RAM,
+  and emits left-to-right argument copies before procedure calls;
 - `cli.py` writes Assembly and coordinates ca65 and ld65;
 - `nrom.cfg` defines the 32 KiB PRG and 8 KiB CHR NROM layout.
 

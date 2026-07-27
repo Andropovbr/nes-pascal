@@ -75,7 +75,8 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 
 - **Category:** Semantic Analysis
 - **Explanation:** Constants, variables, and procedures share a
-  case-insensitive namespace.
+  case-insensitive namespace. Parameter names are case-insensitive within a
+  procedure and cannot shadow a global symbol.
 - **Trigger:**
 
   ```pascal
@@ -92,8 +93,8 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
   Symbol COLOR is already declared.
   ```
 
-- **Suggested fix:** Give every constant, variable, and procedure a unique
-  name.
+- **Suggested fix:** Use a unique name in the current scope. Rename a
+  parameter if it duplicates another parameter or a global symbol.
 
 ## E3005 - Unknown identifier
 
@@ -354,3 +355,32 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
   ```
 
 - **Suggested fix:** Move the runtime command to the main program block.
+
+## E3016 - Incorrect procedure argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** Every procedure call must provide exactly one argument for
+  each declared value parameter. Parameterless procedures continue to use a
+  bare call without parentheses.
+- **Trigger:**
+
+  ```pascal
+  procedure Initialize(Value: byte);
+  begin
+  end;
+
+  begin
+      Initialize;
+  end.
+  ```
+
+- **Expected compiler output:**
+
+  ```text
+  E3016 demo.nsp:7:5
+
+  Procedure Initialize expects 1 argument(s), but 0 were provided.
+  ```
+
+- **Suggested fix:** Pass exactly the declared number of arguments, in the
+  same order as the parameters.

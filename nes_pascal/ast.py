@@ -75,6 +75,14 @@ class VariableDeclaration:
 
 
 @dataclass(frozen=True, slots=True)
+class ProcedureParameter:
+    name: str
+    type: BuiltInType
+    position: SourcePosition
+    type_position: SourcePosition | None = field(default=None, compare=False)
+
+
+@dataclass(frozen=True, slots=True)
 class ConstantReference:
     name: str
     position: SourcePosition
@@ -222,6 +230,7 @@ class ForStatement:
 class ProcedureCall:
     name: str
     position: SourcePosition
+    arguments: tuple[ValueExpression, ...] = ()
 
 
 Statement = (
@@ -245,6 +254,7 @@ class ProcedureDeclaration:
     name: str
     body: tuple[Statement, ...]
     position: SourcePosition
+    parameters: tuple[ProcedureParameter, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -380,9 +390,16 @@ class ResolvedForStatement:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedArgument:
+    parameter: ResolvedVariable
+    value: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedProcedureCall:
     name: str
     label: str
+    arguments: tuple[ResolvedArgument, ...] = ()
 
 
 ResolvedStatement = (
@@ -406,6 +423,7 @@ class ResolvedProcedure:
     name: str
     label: str
     body: tuple[ResolvedStatement, ...]
+    parameters: tuple[ResolvedVariable, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

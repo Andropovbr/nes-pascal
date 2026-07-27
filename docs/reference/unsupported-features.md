@@ -20,7 +20,9 @@ the supported language.
 - Boolean expressions support only `not`, `and`, and `or`.
 - `case`, arrays, records, functions, runtime strings, and inline Assembly are
   not supported.
-- Procedures have no parameters, return values, or local variables.
+- Procedure parameters are limited to `byte` and `boolean` values. There are
+  no reference parameters, default values, return values, or general local
+  variables.
 - Procedure calls may be nested but cannot be recursive.
 - Dynamic memory and object orientation are not supported.
 

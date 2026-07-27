@@ -137,11 +137,15 @@ class LexerTests(unittest.TestCase):
 
     def test_tokenizes_procedure_declaration_and_call(self) -> None:
         tokens = tokenize(
-            "procedure Initialize; begin ResetState; end;"
+            "procedure Initialize(Start: byte; Enabled: boolean); "
+            "begin Apply(Start, Enabled); end;"
         )
         kinds = [token.kind for token in tokens]
         self.assertEqual(kinds.count(TokenKind.PROCEDURE), 1)
-        self.assertEqual(kinds.count(TokenKind.IDENTIFIER), 2)
+        self.assertEqual(kinds.count(TokenKind.LEFT_PAREN), 2)
+        self.assertEqual(kinds.count(TokenKind.RIGHT_PAREN), 2)
+        self.assertEqual(kinds.count(TokenKind.COLON), 2)
+        self.assertEqual(kinds.count(TokenKind.COMMA), 1)
 
 
 if __name__ == "__main__":

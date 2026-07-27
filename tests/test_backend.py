@@ -163,6 +163,28 @@ end.
         self.assertIn("@if_then_", actual)
         self.assertEqual(actual.count("    rts"), 5)
 
+    def test_procedure_parameter_program_matches_golden_assembly(self) -> None:
+        source_path = ROOT / "examples" / "procedure_parameters.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        actual = generate(analyze(parse(source, filename), source, filename))
+        expected = (
+            ROOT / "tests" / "golden" / "procedure_parameters.asm"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(actual, expected)
+        self.assertIn("parameter_Initialize_Start: .res 1", actual)
+        self.assertIn("sta parameter_Initialize_Start", actual)
+        self.assertIn("lda parameter_Initialize_Start", actual)
+        self.assertIn("jsr procedure_ApplyStep", actual)
+        self.assertLess(
+            actual.index("sta parameter_Initialize_Start"),
+            actual.index("sta parameter_Initialize_Step"),
+        )
+        self.assertLess(
+            actual.index("sta parameter_Initialize_Step"),
+            actual.index("sta parameter_Initialize_EnabledValue"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

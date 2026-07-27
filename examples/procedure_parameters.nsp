@@ -1,0 +1,35 @@
+program ProcedureParameters;
+
+var
+    Counter: byte;
+    Enabled: boolean;
+    BackgroundColor: nes_color;
+
+procedure Initialize(Start: byte; Step: byte; EnabledValue: boolean);
+begin
+    Counter := Start;
+    Enabled := EnabledValue;
+    Step := Step + $01;
+    ApplyStep(Step, EnabledValue);
+end;
+
+procedure ApplyStep(Amount: byte; ShouldApply: boolean);
+begin
+    if ShouldApply then
+        inc(Counter, Amount);
+end;
+
+procedure SelectColor(Matches: boolean);
+begin
+    if Matches then
+        BackgroundColor := $21
+    else
+        BackgroundColor := $0F;
+end;
+
+begin
+    Initialize($02, $03, true);
+    SelectColor(Enabled and (Counter = $06));
+    nes.set_background_color(BackgroundColor);
+    nes.run;
+end.

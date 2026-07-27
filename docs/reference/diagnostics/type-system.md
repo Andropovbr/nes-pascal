@@ -78,6 +78,8 @@ Type-system diagnostics use the E4000-E4999 range.
   operands must follow the comparison operator's type rules, and Boolean
   operators require `boolean` operands. Increment/decrement targets and
   amounts, plus `for` control variables and bounds, must have type `byte`.
+  Procedure arguments must exactly match their corresponding `byte` or
+  `boolean` parameter types.
 - **Trigger:**
 
   ```pascal
@@ -98,3 +100,28 @@ Type-system diagnostics use the E4000-E4999 range.
   `true` or `false` for a boolean literal, and use arithmetic only with `byte`
   values. Compare matching types, and use `not`, `and`, and `or` only with
   `boolean` values.
+
+## E4005 - Unsupported parameter type
+
+- **Category:** Type System
+- **Explanation:** The current value-parameter calling convention supports
+  only `byte` and `boolean`. Although `nes_color` remains a valid type for
+  constants and global variables, it cannot be used for a parameter yet.
+- **Trigger:**
+
+  ```pascal
+  procedure SetColor(Color: nes_color);
+  begin
+  end;
+  ```
+
+- **Expected compiler output:**
+
+  ```text
+  E4005 demo.nsp:1:27
+
+  Type nes_color is not supported for procedure parameters.
+  ```
+
+- **Suggested fix:** Declare the value parameter as `byte` or `boolean`, or
+  keep an `nes_color` value in global state.

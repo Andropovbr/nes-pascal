@@ -49,6 +49,12 @@ def generate(program: ResolvedProgram) -> str:
         f"{variable.label}: .res 1       ; {variable.name}: {variable.type.value}"
         for variable in program.variables
     ]
+    variable_lines.extend(
+        f"{parameter.label}: .res 1      ; {parameter.name}: "
+        f"{parameter.type.value} parameter for {procedure.name}"
+        for procedure in program.procedures
+        for parameter in procedure.parameters
+    )
     all_statements = [
         *program.statements,
         *(
@@ -94,6 +100,11 @@ def generate(program: ResolvedProgram) -> str:
     )
 
     variables = "\n".join(variable_lines)
+    storage_description = (
+        "variable and parameter declarations"
+        if any(procedure.parameters for procedure in program.procedures)
+        else "variable declarations"
+    )
     statements = "\n".join(statement_lines)
     procedures = (
         "\n\n; Source: procedure declarations\n"
@@ -113,7 +124,7 @@ def generate(program: ResolvedProgram) -> str:
     .byte $00, $00, $00, $00, $00, $00, $00, $00
 
 .segment "BSS"
-; Source: variable declarations in regular CPU RAM
+; Source: {storage_description} in regular CPU RAM
 {variables}
 
 .segment "CODE"
@@ -362,13 +373,16 @@ def _generate_statements(
                 ]
             )
         elif isinstance(statement, ResolvedProcedureCall):
-            statement_lines.extend(
-                [
-                    "",
-                    f"; Source: {statement.name}",
-                    f"    jsr {statement.label}",
-                ]
-            )
+            statement_lines.extend(["", f"; Source: {statement.name}"])
+            for index, argument in enumerate(statement.arguments, start=1):
+                statement_lines.extend(
+                    [
+                        f"    ; argument {index}: {argument.parameter.name}",
+                        *_load_value(argument.value, label_counter),
+                        f"    sta {argument.parameter.label}",
+                    ]
+                )
+            statement_lines.append(f"    jsr {statement.label}")
         elif isinstance(statement, ResolvedBreakStatement):
             assert loop_targets
             break_label, _ = loop_targets[-1]
@@ -712,6 +726,14 @@ def _statement_expression_depth(statement: ResolvedStatement) -> int:
                 _expression_depth(statement.final),
                 *body_depths,
             ],
+        )
+    if isinstance(statement, ResolvedProcedureCall):
+        return max(
+            (
+                _expression_depth(argument.value)
+                for argument in statement.arguments
+            ),
+            default=0,
         )
     return 0
 
