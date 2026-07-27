@@ -250,7 +250,9 @@ Before completing a task:
    features make one possible;
 6. report the commands run;
 7. describe known limitations;
-8. never alter golden tests merely to hide a failure.
+8. never alter golden tests merely to hide a failure;
+9. Every new language feature must extend the automated test suite;
+10. A feature is not considered complete if its behavior is validated only manually.
 
 ## Tests
 
@@ -271,6 +273,13 @@ Whenever practical, complement unit, golden, and structural ROM tests with a
 small behavior-oriented example based on a realistic NES use case. If the
 current language or runtime cannot express the scenario yet, document the
 missing capabilities instead of claiming that the behavior was validated.
+
+Every new feature should include:
+
+- positive tests;
+- negative tests when applicable;
+- edge-case tests;
+- regression tests whenever a bug is fixed.
 
 ## Documentation
 
@@ -304,6 +313,8 @@ This may include:
 
 If a document does not exist yet and would improve the project, create it.
 
+Prefer extending existing documents before creating new ones.
+
 ### Examples
 
 Every user-visible language feature should include at least one working example.
@@ -333,6 +344,8 @@ When a milestone is completed:
 Never leave documentation behind the implementation.
 
 Code, tests, examples, and documentation must evolve together.
+
+Documentation changes should be part of the same commit whenever practical.
 
 ## Project Evolution
 
@@ -451,6 +464,10 @@ When completing a milestone, never silently introduce new scope into later
 milestones or remove existing roadmap items. If a milestone reveals missing
 work, propose roadmap changes separately instead of modifying future planning
 without explanation.
+
+Passing the existing test suite is necessary but not sufficient.
+Every new capability must be accompanied by the tests, documentation,
+diagnostics, and examples required to validate that capability.
 
 ## Milestone Identifiers
 
