@@ -9,6 +9,7 @@ The compiler pipeline is deliberately separated:
   -> AST
   -> semantic validation, name resolution, and type checking
   -> resolved AST
+  -> validated CPU memory layout
   -> ca65 backend
   -> ca65
   -> ld65
@@ -21,11 +22,17 @@ The compiler pipeline is deliberately separated:
 - `parser.py` validates grammar and builds the parsed AST in `ast.py`;
 - `semantic.py` validates declarations, resolves references and procedure
   calls, checks exact types, and enforces interprocedural definite assignment;
+- `memory_layout.py` owns physical RAM ranges, allocation, bounds and overlap
+  checks, ld65 configuration generation, and the human-readable memory map;
 - `backend_ca65.py` generates readable, commented Assembly from resolved
-  values, allocates variables and value-parameter slots in regular CPU RAM,
-  and emits left-to-right argument copies before procedure calls;
-- `cli.py` writes Assembly and coordinates ca65 and ld65;
-- `nrom.cfg` defines the 32 KiB PRG and 8 KiB CHR NROM layout.
+  values using the already allocated runtime, temporary, and user symbols, and
+  emits left-to-right argument copies before procedure calls;
+- `cli.py` writes Assembly, the generated `.cfg` linker configuration, and the
+  `.map` CPU memory report before coordinating ca65 and ld65.
+
+The linker configuration is generated from the same immutable layout object
+used by the backend and map writer. There is no separately maintained static
+NROM linker file or duplicate RAM-address calculation.
 
 Source text is not translated directly to Assembly with string replacement.
 The compiler uses explicit parsed and resolved AST nodes between parsing and

@@ -116,6 +116,7 @@ class SemanticAnalyzer:
                 declaration.name,
                 declaration.type,
                 f"variable_{declaration.name}",
+                declaration.position,
             )
             variables[normalized_name] = variable
             resolved_variables.append(variable)
@@ -164,6 +165,7 @@ class SemanticAnalyzer:
                         parameter.name,
                         parameter.type,
                         f"parameter_{declaration.name}_{parameter.name}",
+                        parameter.position,
                     )
                 )
             symbol = procedures[normalized_name]

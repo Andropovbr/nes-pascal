@@ -3,17 +3,28 @@
 
 .segment "HEADER"
     .byte "NES", $1A
-    .byte 2                  ; 2 x 16 KiB PRG-ROM
-    .byte 1                  ; 1 x 8 KiB CHR-ROM
-    .byte $00                ; mapper 0, horizontal mirroring
-    .byte $00                ; mapper 0
+    .byte 2                  ; PRG-ROM banks, 16 KiB each
+    .byte 1                  ; CHR-ROM banks, 8 KiB each
+    .byte $00                ; mapper and mirroring flags
+    .byte $00                ; mapper upper bits
     .byte $00, $00, $00, $00, $00, $00, $00, $00
 
-.segment "BSS"
-; Source: variable declarations in regular CPU RAM
-variable_BackgroundColor: .res 1       ; BackgroundColor: nes_color
-variable_FrameCounter: .res 1       ; FrameCounter: byte
-variable_RenderingEnabled: .res 1       ; RenderingEnabled: boolean
+.segment "OAM_SHADOW"
+; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
+runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by future sprite runtime support
+
+.segment "RUNTIME_DATA"
+; Runtime: no scalar RAM symbols are required in milestone 0.3.1
+
+.segment "TEMPORARIES"
+; Compiler: reusable expression and loop storage in regular CPU RAM
+    ; no compiler temporaries required
+
+.segment "USER_VARIABLES"
+; Source: variable and parameter declarations in regular CPU RAM
+variable_BackgroundColor: .res 1 ; $0310: BackgroundColor: nes_color
+variable_FrameCounter: .res 1 ; $0311: FrameCounter: byte
+variable_RenderingEnabled: .res 1 ; $0312: RenderingEnabled: boolean
 
 .segment "CODE"
 

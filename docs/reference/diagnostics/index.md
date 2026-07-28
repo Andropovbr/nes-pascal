@@ -48,6 +48,10 @@ the range reserved for their category.
 | [E4005](type-system.md) | Type System | Unsupported parameter type |
 | [E5001](code-generation.md) | Code Generation | Missing toolchain |
 | [E5002](code-generation.md) | Code Generation | Toolchain failure |
+| [E5003](code-generation.md) | Code Generation | User RAM exhausted |
+| [E5004](code-generation.md) | Code Generation | Temporary RAM exhausted |
+| [E5005](code-generation.md) | Code Generation | Invalid memory layout |
+| [E5006](code-generation.md) | Code Generation | RAM segment overflow |
 | [E6001](runtime-validation.md) | Runtime Validation | File access failure |
 
 ## Warnings

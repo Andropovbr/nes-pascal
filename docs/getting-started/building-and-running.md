@@ -19,6 +19,7 @@ python -m nes_pascal.cli examples/loops.nsp -o build/loops.nes
 python -m nes_pascal.cli examples/counting.nsp -o build/counting.nes
 python -m nes_pascal.cli examples/procedures.nsp -o build/procedures.nes
 python -m nes_pascal.cli examples/procedure_parameters.nsp -o build/procedure_parameters.nes
+python -m nes_pascal.cli examples/memory_layout.nsp -o build/memory_layout.nes
 ```
 
 The examples demonstrate:
@@ -32,7 +33,9 @@ The examples demonstrate:
 - `procedures.nsp`: forward procedure resolution, nested calls, shared global
   state, `JSR`/`RTS`, and a conditional inside a procedure;
 - `procedure_parameters.nsp`: typed value parameters, left-to-right argument
-  copies, mutable local parameter values, and nested parameterized calls.
+  copies, mutable local parameter values, and nested parameterized calls;
+- `memory_layout.nsp`: globals, procedure parameters, expressions, and a
+  for-loop allocated through the deterministic runtime memory layout.
 
 The loop, counting, and procedure-parameter examples select background color
 `$21` only when their expected final states are reached.
@@ -45,6 +48,11 @@ make rom
 
 Generated ROMs use the format described in
 [Target platform](../runtime/target-platform.md).
+
+Each command also writes a generated ld65 configuration beside the ROM using
+the `.cfg` suffix and a human-readable CPU RAM report using `.map`. The map
+lists reserved, runtime, compiler, user, and free regions plus the address of
+every source variable and value parameter. See [CPU memory](../runtime/cpu-memory.md).
 
 ## Running in Mesen
 

@@ -6,9 +6,9 @@ progression. Do not infer the current or next milestone from numbering alone.
 ## Current roadmap state
 
 - **Current release:** Release 0.3 — NES Runtime
-- **Last completed milestone:** [`0.2.6 — Procedure Parameters`](0.md#procedure-parameters)
-- **Next milestone:** [`0.3.1 — Runtime Memory Layout`](0.md#runtime-memory-layout)
-- **Next milestone file:** [Version 0 roadmap](0.md#runtime-memory-layout)
+- **Last completed milestone:** [`0.3.1 — Runtime Memory Layout`](0.md#runtime-memory-layout)
+- **Next milestone:** [`0.3.2 — Zero-Page Allocation`](0.md#zero-page-allocation)
+- **Next milestone file:** [Version 0 roadmap](0.md#zero-page-allocation)
 
 ## Philosophy
 

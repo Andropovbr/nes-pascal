@@ -3,29 +3,39 @@
 
 .segment "HEADER"
     .byte "NES", $1A
-    .byte 2                  ; 2 x 16 KiB PRG-ROM
-    .byte 1                  ; 1 x 8 KiB CHR-ROM
-    .byte $00                ; mapper 0, horizontal mirroring
-    .byte $00                ; mapper 0
+    .byte 2                  ; PRG-ROM banks, 16 KiB each
+    .byte 1                  ; CHR-ROM banks, 8 KiB each
+    .byte $00                ; mapper and mirroring flags
+    .byte $00                ; mapper upper bits
     .byte $00, $00, $00, $00, $00, $00, $00, $00
 
-.segment "BSS"
-; Source: variable declarations in regular CPU RAM
-variable_Counter: .res 1       ; Counter: byte
-variable_Sum: .res 1       ; Sum: byte
-variable_Index: .res 1       ; Index: byte
-variable_Reverse: .res 1       ; Reverse: byte
-variable_Edge: .res 1       ; Edge: byte
-variable_Outer: .res 1       ; Outer: byte
-variable_Inner: .res 1       ; Inner: byte
-variable_BackgroundColor: .res 1       ; BackgroundColor: nes_color
-expression_temporary_0: .res 1 ; expression temporary
-for_limit_0: .res 1        ; cached for-loop final value
-for_limit_1: .res 1        ; cached for-loop final value
-for_limit_2: .res 1        ; cached for-loop final value
-for_limit_3: .res 1        ; cached for-loop final value
-for_limit_4: .res 1        ; cached for-loop final value
-for_limit_5: .res 1        ; cached for-loop final value
+.segment "OAM_SHADOW"
+; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
+runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by future sprite runtime support
+
+.segment "RUNTIME_DATA"
+; Runtime: no scalar RAM symbols are required in milestone 0.3.1
+
+.segment "TEMPORARIES"
+; Compiler: reusable expression and loop storage in regular CPU RAM
+expression_temporary_0: .res 1 ; $0300: reusable expression evaluation byte
+for_limit_0: .res 1 ; $0301: cached for-loop final value
+for_limit_1: .res 1 ; $0302: cached for-loop final value
+for_limit_2: .res 1 ; $0303: cached for-loop final value
+for_limit_3: .res 1 ; $0304: cached for-loop final value
+for_limit_4: .res 1 ; $0305: cached for-loop final value
+for_limit_5: .res 1 ; $0306: cached for-loop final value
+
+.segment "USER_VARIABLES"
+; Source: variable and parameter declarations in regular CPU RAM
+variable_Counter: .res 1 ; $0310: Counter: byte
+variable_Sum: .res 1 ; $0311: Sum: byte
+variable_Index: .res 1 ; $0312: Index: byte
+variable_Reverse: .res 1 ; $0313: Reverse: byte
+variable_Edge: .res 1 ; $0314: Edge: byte
+variable_Outer: .res 1 ; $0315: Outer: byte
+variable_Inner: .res 1 ; $0316: Inner: byte
+variable_BackgroundColor: .res 1 ; $0317: BackgroundColor: nes_color
 
 .segment "CODE"
 

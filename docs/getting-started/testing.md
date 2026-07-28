@@ -13,14 +13,17 @@ make test
 ```
 
 The integration test assembles and links the ROM, then validates its header,
-mapper, banks, vectors, CHR data, and final size. It is skipped with an
-explicit message when `ca65` or `ld65` is unavailable.
+mapper, banks, vectors, CHR data, final size, generated linker configuration,
+and CPU memory map. Focused memory-layout tests cover physical boundaries,
+reserved regions, deterministic allocation, exhaustion, malformed internal
+settings, and segment capacity. Toolchain tests are skipped with an explicit
+message when `ca65` or `ld65` is unavailable.
 
 To include the optional headless Mesen behavior test, point `MESEN_PATH` to
 the emulator executable before running the suite. The test compiles the
 behavior examples, executes their ROMs, and verifies final variables,
-procedure-parameter storage when applicable, and the universal background
-color:
+procedure-parameter storage, deterministic `$0310` user addresses where
+applicable, and the universal background color:
 
 ```powershell
 $env:MESEN_PATH = "C:\path\to\Mesen.exe"

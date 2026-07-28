@@ -27,21 +27,21 @@ local function validateCountingResult()
         return
     end
 
-    if not expectByte(0x0300, 0xFD, "Counter") then
+    if not expectByte(0x0310, 0xFD, "Counter") then
         return
-    elseif not expectByte(0x0301, 0x10, "Sum") then
+    elseif not expectByte(0x0311, 0x10, "Sum") then
         return
-    elseif not expectByte(0x0302, 0x03, "Index") then
+    elseif not expectByte(0x0312, 0x03, "Index") then
         return
-    elseif not expectByte(0x0303, 0x00, "Reverse") then
+    elseif not expectByte(0x0313, 0x00, "Reverse") then
         return
-    elseif not expectByte(0x0304, 0x00, "Edge") then
+    elseif not expectByte(0x0314, 0x00, "Edge") then
         return
-    elseif not expectByte(0x0305, 0x01, "Outer") then
+    elseif not expectByte(0x0315, 0x01, "Outer") then
         return
-    elseif not expectByte(0x0306, 0x01, "Inner") then
+    elseif not expectByte(0x0316, 0x01, "Inner") then
         return
-    elseif not expectByte(0x0307, 0x21, "BackgroundColor") then
+    elseif not expectByte(0x0317, 0x21, "BackgroundColor") then
         return
     end
 

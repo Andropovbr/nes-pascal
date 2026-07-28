@@ -40,8 +40,10 @@ Compile the minimal example from the repository root:
 python -m nes_pascal.cli examples/minimal.nsp -o build/minimal.nes
 ```
 
-The command generates `build/minimal.asm`, `build/minimal.o`, and
-`build/minimal.nes`. The complete walkthrough is in
+The command generates `build/minimal.asm`, `build/minimal.cfg`,
+`build/minimal.map`, `build/minimal.o`, and `build/minimal.nes`. The `.cfg`
+file is the generated ld65 configuration and `.map` is the human-readable CPU
+RAM map. The complete walkthrough is in
 [Your first program](docs/getting-started/first-program.md); commands for every
 example and Mesen instructions are in
 [Building and running programs](docs/getting-started/building-and-running.md).
@@ -64,7 +66,9 @@ commands.
 The [compiler pipeline](docs/reference/compiler-pipeline.md) documents the
 lexer, parser, AST, semantic analysis, ca65 backend, assembler, and linker
 stages. The [target-platform reference](docs/runtime/target-platform.md)
-documents the generated ROM and NES startup behavior.
+documents the generated ROM and NES startup behavior. The
+[CPU memory map](docs/runtime/cpu-memory.md) documents the deterministic 2 KiB
+internal RAM layout and generated map artifact.
 
 See [Unsupported features](docs/reference/unsupported-features.md) for the
 explicit language, runtime, and platform limitations.

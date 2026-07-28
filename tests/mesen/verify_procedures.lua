@@ -27,11 +27,11 @@ local function validateProcedureResult()
         return
     end
 
-    if not expectByte(0x0300, 0x03, "Counter") then
+    if not expectByte(0x0310, 0x03, "Counter") then
         return
-    elseif not expectByte(0x0301, 0x01, "CallCount") then
+    elseif not expectByte(0x0311, 0x01, "CallCount") then
         return
-    elseif not expectByte(0x0302, 0x21, "BackgroundColor") then
+    elseif not expectByte(0x0312, 0x21, "BackgroundColor") then
         return
     end
 

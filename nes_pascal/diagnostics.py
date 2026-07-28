@@ -41,6 +41,10 @@ class DiagnosticCode(StrEnum):
     UNSUPPORTED_PARAMETER_TYPE = "E4005"
     MISSING_TOOLCHAIN = "E5001"
     TOOLCHAIN_FAILURE = "E5002"
+    USER_RAM_EXHAUSTED = "E5003"
+    TEMPORARY_RAM_EXHAUSTED = "E5004"
+    INVALID_MEMORY_LAYOUT = "E5005"
+    RAM_SEGMENT_OVERFLOW = "E5006"
     FILE_ACCESS_FAILURE = "E6001"
 
 
@@ -131,6 +135,18 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.TOOLCHAIN_FAILURE: DiagnosticDefinition(
         DiagnosticCategory.CODE_GENERATION, "Toolchain failure"
+    ),
+    DiagnosticCode.USER_RAM_EXHAUSTED: DiagnosticDefinition(
+        DiagnosticCategory.CODE_GENERATION, "User RAM exhausted"
+    ),
+    DiagnosticCode.TEMPORARY_RAM_EXHAUSTED: DiagnosticDefinition(
+        DiagnosticCategory.CODE_GENERATION, "Temporary RAM exhausted"
+    ),
+    DiagnosticCode.INVALID_MEMORY_LAYOUT: DiagnosticDefinition(
+        DiagnosticCategory.CODE_GENERATION, "Invalid memory layout"
+    ),
+    DiagnosticCode.RAM_SEGMENT_OVERFLOW: DiagnosticDefinition(
+        DiagnosticCategory.CODE_GENERATION, "RAM segment overflow"
     ),
     DiagnosticCode.FILE_ACCESS_FAILURE: DiagnosticDefinition(
         DiagnosticCategory.RUNTIME, "File access failure"

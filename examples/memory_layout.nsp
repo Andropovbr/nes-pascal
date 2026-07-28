@@ -1,0 +1,39 @@
+program MemoryLayout;
+
+const
+    DefaultBackgroundColor: nes_color = $21;
+    MaximumFrameCounter: byte = $03;
+
+var
+    BackgroundColor: nes_color;
+    FrameCounter: byte;
+    NextFrameCounter: byte;
+    RenderingEnabled: boolean;
+    ExpectedState: boolean;
+
+procedure InitializeCounters(
+    Start: byte;
+    Increment: byte;
+    EnabledValue: boolean
+);
+begin
+    FrameCounter := Start;
+    NextFrameCounter := FrameCounter + Increment;
+    RenderingEnabled := EnabledValue;
+end;
+
+begin
+    BackgroundColor := DefaultBackgroundColor;
+    InitializeCounters($00, $01, true);
+    inc(NextFrameCounter);
+    for FrameCounter := $00 to MaximumFrameCounter do
+        inc(NextFrameCounter);
+    ExpectedState := RenderingEnabled and
+        (NextFrameCounter > MaximumFrameCounter);
+    if ExpectedState then
+        BackgroundColor := DefaultBackgroundColor
+    else
+        BackgroundColor := $0F;
+    nes.set_background_color(BackgroundColor);
+    nes.run;
+end.

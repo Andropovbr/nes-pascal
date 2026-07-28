@@ -12,4 +12,6 @@ inside conditionals, loops, or procedures because initialization commands must
 execute in a predictable sequence.
 
 See [Target platform](target-platform.md) for the generated ROM format and
-hardware initialization behavior.
+hardware initialization behavior. See [CPU memory](cpu-memory.md) for the
+physical RAM limit, reserved regions, user capacity, and generated memory-map
+artifact.

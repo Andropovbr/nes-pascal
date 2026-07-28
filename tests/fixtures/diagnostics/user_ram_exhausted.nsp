@@ -1,0 +1,11 @@
+program UserRamExhausted;
+
+var
+    First: byte;
+    Second: byte;
+
+begin
+    First := $00;
+    nes.set_background_color($21);
+    nes.run;
+end.

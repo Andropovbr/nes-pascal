@@ -65,6 +65,30 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_procedure_parameter_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("procedure_parameters")
 
+    def test_memory_layout_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("memory_layout")
+
+    def test_generated_memory_artifacts_are_complete_and_reproducible(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            first_rom = directory / "first.nes"
+            second_rom = directory / "second.nes"
+            source_path = ROOT / "examples" / "memory_layout.nsp"
+
+            compile_source(source_path, first_rom)
+            compile_source(source_path, second_rom)
+
+            first_config = first_rom.with_suffix(".cfg").read_text(encoding="utf-8")
+            second_config = second_rom.with_suffix(".cfg").read_text(encoding="utf-8")
+            first_map = first_rom.with_suffix(".map").read_text(encoding="utf-8")
+            second_map = second_rom.with_suffix(".map").read_text(encoding="utf-8")
+
+        self.assertEqual(first_config, second_config)
+        self.assertEqual(first_map, second_map)
+        self.assertIn("OAM:     start = $0200, size = $0100", first_config)
+        self.assertIn("runtime_oam_shadow", first_map)
+        self.assertIn("variable_BackgroundColor", first_map)
+
     def test_conditional_branch_larger_than_relative_branch_range(self) -> None:
         assignments = "\n".join(
             "        Counter := Counter + $01;" for _ in range(80)
@@ -165,6 +189,9 @@ class MesenIntegrationTests(unittest.TestCase):
             "procedure_parameters",
             "verify_procedure_parameters.lua",
         )
+
+    def test_memory_layout_example_reaches_expected_runtime_state(self) -> None:
+        self._run_mesen_test("memory_layout", "verify_memory_layout.lua")
 
 
 if __name__ == "__main__":

@@ -11,9 +11,9 @@ local function validateLoopResult()
         return
     end
 
-    local counter = emu.read(0x0300, emu.memType.nesDebug)
-    local innerCounter = emu.read(0x0301, emu.memType.nesDebug)
-    local backgroundColor = emu.read(0x0302, emu.memType.nesDebug)
+    local counter = emu.read(0x0310, emu.memType.nesDebug)
+    local innerCounter = emu.read(0x0311, emu.memType.nesDebug)
+    local backgroundColor = emu.read(0x0312, emu.memType.nesDebug)
     local paletteColor = emu.read(0x3F00, emu.memType.nesPpuDebug)
 
     if counter ~= 0x05 then

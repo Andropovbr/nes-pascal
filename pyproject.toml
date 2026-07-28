@@ -7,6 +7,3 @@ name = "nes-pascal"
 version = "0.2.0a1"
 description = "Prototype Pascal compiler specialized for the NES"
 requires-python = ">=3.11"
-
-[tool.setuptools.package-data]
-nes_pascal = ["nrom.cfg"]
