@@ -27,17 +27,17 @@ local function validateProcedureParameters()
         return
     end
 
-    if not expectByte(0x0310, 0x06, "Counter") then
+    if not expectByte(0x0080, 0x06, "Counter") then
         return
-    elseif not expectByte(0x0311, 0x01, "Enabled") then
+    elseif not expectByte(0x0300, 0x01, "Enabled") then
         return
-    elseif not expectByte(0x0312, 0x21, "BackgroundColor") then
+    elseif not expectByte(0x0081, 0x21, "BackgroundColor") then
         return
-    elseif not expectByte(0x0314, 0x04, "Initialize.Step") then
+    elseif not expectByte(0x0302, 0x04, "Initialize.Step") then
         return
-    elseif not expectByte(0x0316, 0x04, "ApplyStep.Amount") then
+    elseif not expectByte(0x0304, 0x04, "ApplyStep.Amount") then
         return
-    elseif not expectByte(0x0318, 0x01, "SelectColor.Matches") then
+    elseif not expectByte(0x0306, 0x01, "SelectColor.Matches") then
         return
     end
 

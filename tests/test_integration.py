@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from nes_pascal.cli import compile_source
+from nes_pascal.memory_layout import MemoryLayoutSettings
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,6 +68,64 @@ class ToolchainIntegrationTests(unittest.TestCase):
 
     def test_memory_layout_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("memory_layout")
+
+    def test_zero_page_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("zero_page")
+
+    def test_optional_promotion_fallback_builds_the_same_valid_rom_format(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            rom_path = Path(temporary_directory) / "zero_page_fallback.nes"
+            compile_source(
+                ROOT / "examples" / "zero_page.nsp",
+                rom_path,
+                MemoryLayoutSettings(zero_page_automatic_size=0),
+            )
+            rom = rom_path.read_bytes()
+            memory_map = rom_path.with_suffix(".map").read_text(encoding="utf-8")
+
+        self.assertEqual(rom[:4], b"NES\x1a")
+        self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
+        self.assertNotIn("Zero Page   byte       Counter", memory_map)
+        self.assertIn("Regular RAM byte       Counter", memory_map)
+
+    def test_ca65_uses_zero_page_opcodes_for_selected_symbols(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            rom_path = directory / "memory_layout.nes"
+            assembly_path, _ = compile_source(
+                ROOT / "examples" / "memory_layout.nsp",
+                rom_path,
+            )
+            listing_path = directory / "memory_layout.lst"
+            listing_object = directory / "memory_layout_listing.o"
+            result = subprocess.run(
+                [
+                    str(shutil.which("ca65")),
+                    str(assembly_path),
+                    "-o",
+                    str(listing_object),
+                    "-l",
+                    str(listing_path),
+                ],
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            listing = listing_path.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(
+            listing,
+            r"85 rr\s+sta expression_temporary_0",
+        )
+        self.assertRegex(
+            listing,
+            r"A5 rr\s+lda variable_BackgroundColor",
+        )
+        self.assertRegex(
+            listing,
+            r"AD rr rr\s+lda variable_RenderingEnabled",
+        )
 
     def test_generated_memory_artifacts_are_complete_and_reproducible(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -146,10 +205,19 @@ end.
     "emulator integration skipped: ca65, ld65, and MESEN_PATH are required",
 )
 class MesenIntegrationTests(unittest.TestCase):
-    def _run_mesen_test(self, example_name: str, script_name: str) -> None:
+    def _run_mesen_test(
+        self,
+        example_name: str,
+        script_name: str,
+        memory_settings: MemoryLayoutSettings | None = None,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             rom_path = Path(temporary_directory) / f"{example_name}.nes"
-            compile_source(ROOT / "examples" / f"{example_name}.nsp", rom_path)
+            source_path = ROOT / "examples" / f"{example_name}.nsp"
+            if memory_settings is None:
+                compile_source(source_path, rom_path)
+            else:
+                compile_source(source_path, rom_path, memory_settings)
             result = subprocess.run(
                 [
                     str(MESEN_PATH),
@@ -192,6 +260,16 @@ class MesenIntegrationTests(unittest.TestCase):
 
     def test_memory_layout_example_reaches_expected_runtime_state(self) -> None:
         self._run_mesen_test("memory_layout", "verify_memory_layout.lua")
+
+    def test_zero_page_example_reaches_expected_runtime_state(self) -> None:
+        self._run_mesen_test("zero_page", "verify_zero_page.lua")
+
+    def test_zero_page_fallback_preserves_runtime_state(self) -> None:
+        self._run_mesen_test(
+            "zero_page",
+            "verify_zero_page_fallback.lua",
+            MemoryLayoutSettings(zero_page_automatic_size=0),
+        )
 
 
 if __name__ == "__main__":

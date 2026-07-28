@@ -50,8 +50,8 @@ Code-generation diagnostics use the E5000-E5999 range.
 - **Explanation:** A global variable or procedure value-parameter slot cannot
   fit in the user RAM region. The diagnostic identifies the symbol, requested
   byte count, available byte count, and source declaration.
-- **Trigger:** Declare enough one-byte variables and parameters to exceed the
-  `$0310-$07FF` user region. The focused regression source is
+- **Trigger:** Declare enough non-promoted one-byte variables and parameters to
+  exceed the `$0300-$07FF` regular user region. The focused regression source is
   `tests/fixtures/diagnostics/user_ram_exhausted.nsp`, used with a deliberately
   constrained internal test layout.
 - **Expected compiler output:**
@@ -62,14 +62,15 @@ Code-generation diagnostics use the E5000-E5999 range.
   User RAM cannot allocate Second: requested 1 byte, but 0 bytes remain in User RAM.
   ```
 
-- **Suggested fix:** Reduce the number of variables or parameters. Zero Page is
-  intentionally unavailable until milestone 0.3.2.
+- **Suggested fix:** Reduce the number of variables or parameters. Automatic
+  promotion is optional and cannot be forced to hide regular-RAM exhaustion.
 
 ## E5004 - Temporary RAM exhausted
 
 - **Category:** Code Generation
 - **Explanation:** Expression evaluation and cached for-loop limits require
-  more bytes than the fixed 16-byte compiler temporary pool.
+  more bytes than the mandatory 16-byte Zero Page compiler pool. Mandatory
+  storage never borrows from optional automatic-promotion space.
 - **Trigger:** Compile
   `tests/fixtures/diagnostics/temporary_ram_exhausted.nsp`, whose nested
   expression needs 17 temporary bytes.
@@ -78,18 +79,19 @@ Code-generation diagnostics use the E5000-E5999 range.
   ```text
   E5004 temporary_ram_exhausted.nsp:1:1
 
-  Expression and loop code requires 17 temporary bytes, but the Expression temporaries region has only 16 bytes available.
+  Expression and loop code requires 17 temporary bytes, but the Zero Page temporaries region has only 16 bytes available.
   ```
 
-- **Suggested fix:** Simplify nested expressions or loops. Do not rely on Zero
-  Page temporaries before milestone 0.3.2.
+- **Suggested fix:** Simplify nested expressions or loops. Optional promotion
+  space cannot satisfy mandatory compiler allocations.
 
 ## E5005 - Invalid memory layout
 
 - **Category:** Code Generation
 - **Explanation:** Internal compiler settings describe an impossible or
-  unsupported RAM layout, such as overlapping reservations, a region beyond
-  `$07FF`, or a non-page-aligned OAM shadow.
+  unsupported RAM layout, such as Zero Page partitions exceeding `$00FF`,
+  overlapping reservations, a region beyond `$07FF`, or a non-page-aligned
+  OAM shadow.
 - **Trigger:** This is an internal-configuration diagnostic. Tests construct
   malformed `MemoryLayoutSettings`; no public CLI option changes these values.
 - **Expected compiler output:**
@@ -100,7 +102,7 @@ Code-generation diagnostics use the E5000-E5999 range.
   The OAM shadow region must start on a 256-byte page boundary.
   ```
 
-- **Suggested fix:** Restore the supported milestone 0.3.1 NROM defaults.
+- **Suggested fix:** Restore the supported milestone 0.3.2 NROM defaults.
 
 ## E5006 - RAM segment overflow
 
@@ -114,7 +116,7 @@ Code-generation diagnostics use the E5000-E5999 range.
   ```text
   E5006 <input>:1:1
 
-  Generated segment for User RAM requires 1265 bytes, but its RAM region contains 1264 bytes.
+  Generated segment for User RAM requires 1281 bytes, but its RAM region contains 1280 bytes.
   ```
 
 - **Suggested fix:** Correct the compiler's allocation or segment generation;

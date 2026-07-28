@@ -20,6 +20,7 @@ python -m nes_pascal.cli examples/counting.nsp -o build/counting.nes
 python -m nes_pascal.cli examples/procedures.nsp -o build/procedures.nes
 python -m nes_pascal.cli examples/procedure_parameters.nsp -o build/procedure_parameters.nes
 python -m nes_pascal.cli examples/memory_layout.nsp -o build/memory_layout.nes
+python -m nes_pascal.cli examples/zero_page.nsp -o build/zero_page.nes
 ```
 
 The examples demonstrate:
@@ -35,7 +36,9 @@ The examples demonstrate:
 - `procedure_parameters.nsp`: typed value parameters, left-to-right argument
   copies, mutable local parameter values, and nested parameterized calls;
 - `memory_layout.nsp`: globals, procedure parameters, expressions, and a
-  for-loop allocated through the deterministic runtime memory layout.
+  for-loop allocated through the deterministic runtime memory layout;
+- `zero_page.nsp`: mandatory Zero Page temporaries, promoted globals, and a
+  non-promoted regular-RAM fallback variable.
 
 The loop, counting, and procedure-parameter examples select background color
 `$21` only when their expected final states are reached.

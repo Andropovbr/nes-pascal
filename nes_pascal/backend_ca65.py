@@ -55,10 +55,15 @@ def generate(
         f" ; ${symbol.address:04X}: {symbol.purpose}"
         for symbol in layout.temporary_symbols
     ] or ["    ; no compiler temporaries required"]
-    user_lines = [
+    promoted_user_lines = [
         f"{symbol.assembly_symbol}: .res {symbol.size}"
         f" ; ${symbol.address:04X}: {symbol.source_name}: {symbol.type_name}"
-        for symbol in layout.user_symbols
+        for symbol in layout.promoted_user_symbols
+    ] or ["    ; no globals selected for automatic promotion"]
+    regular_user_lines = [
+        f"{symbol.assembly_symbol}: .res {symbol.size}"
+        f" ; ${symbol.address:04X}: {symbol.source_name}: {symbol.type_name}"
+        for symbol in layout.regular_user_symbols
     ] or ["    ; no user variables"]
     oam_symbol = next(
         symbol
@@ -85,7 +90,8 @@ def generate(
     )
 
     temporaries = "\n".join(temporary_lines)
-    user_storage = "\n".join(user_lines)
+    promoted_user_storage = "\n".join(promoted_user_lines)
+    regular_user_storage = "\n".join(regular_user_lines)
     statements = "\n".join(statement_lines)
     procedures = (
         "\n\n; Source: procedure declarations\n"
@@ -117,20 +123,27 @@ def generate(
     .byte ${flags_7:02X}                ; mapper upper bits
     .byte $00, $00, $00, $00, $00, $00, $00, $00
 
+.segment "ZERO_PAGE_RUNTIME": zeropage
+; Runtime: mandatory Zero Page reservation; no symbols required yet
+
+.segment "ZERO_PAGE_TEMPORARIES": zeropage
+; Compiler: mandatory expression and loop storage in Zero Page
+{temporaries}
+
+.segment "ZERO_PAGE_VARIABLES": zeropage
+; Source: optional global-variable promotion with regular-RAM fallback
+{promoted_user_storage}
+
 .segment "OAM_SHADOW"
 ; Runtime: page-aligned OAM DMA shadow at ${layout.oam_shadow.start:04X}-${layout.oam_shadow.end:04X}
 {oam_declaration}
 
 .segment "RUNTIME_DATA"
-; Runtime: no scalar RAM symbols are required in milestone 0.3.1
-
-.segment "TEMPORARIES"
-; Compiler: reusable expression and loop storage in regular CPU RAM
-{temporaries}
+; Runtime: no scalar regular-RAM symbols are required in milestone 0.3.2
 
 .segment "USER_VARIABLES"
-; Source: variable and parameter declarations in regular CPU RAM
-{user_storage}
+; Source: non-promoted variables and all parameters in regular CPU RAM
+{regular_user_storage}
 
 .segment "CODE"
 

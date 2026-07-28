@@ -36,10 +36,12 @@ var
 ```
 
 Each declaration contains exactly one identifier and an explicit built-in
-type. Variables are allocated in declaration order as one-byte values in the
-user region of regular CPU RAM. Procedure value-parameter slots follow global
-variables. The compiler reports an error before linking if these allocations
-exhaust physical RAM. Zero-page allocation is not implemented; see the
+type. Storage is deterministic. A global referenced by at least three source
+operations is eligible for automatic Zero Page promotion in declaration
+order. If optional promotion space is unavailable, it falls back to regular
+RAM without changing its symbol or behavior. Other globals and every procedure
+value parameter use regular RAM. The compiler reports an error before linking
+if mandatory temporaries or regular RAM are exhausted. See the
 [CPU memory reference](../runtime/cpu-memory.md).
 
 ## Names and duplicate declarations

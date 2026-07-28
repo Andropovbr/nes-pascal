@@ -29,14 +29,14 @@ management, controller input, or audio.
 ## Memory
 
 The NES exposes 2 KiB of physical internal CPU RAM at `$0000-$07FF`.
-`$0800-$1FFF` contains mirrors, not additional storage. The compiler reserves
-Zero Page, the hardware stack, a page-aligned OAM shadow, and a 16-byte
-temporary pool before allocating globals and value parameters in declaration
-order. See [CPU memory](cpu-memory.md) for the complete layout.
+`$0800-$1FFF` contains mirrors, not additional storage. Zero Page has separate
+runtime, compiler-temporary, future-explicit, and automatic-promotion regions.
+Frequently referenced globals may be promoted conservatively; parameters and
+fallback variables use regular RAM. See [CPU memory](cpu-memory.md) for the
+complete deterministic policy.
 
-The compiler does not allocate user variables or expression temporaries in
-Zero Page. CHR-ROM is empty, so the runtime does not provide game graphics or
-an asset pipeline.
+CHR-ROM is empty, so the runtime does not provide game graphics or an asset
+pipeline.
 
 The generated Assembly is intentionally readable and includes comments that
 identify the source of generated blocks. The backend is not a generic game

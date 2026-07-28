@@ -1,7 +1,7 @@
 local frameCount = 0
 
 local function fail(message)
-    emu.log("Memory-layout validation failed: " .. message)
+    emu.log("Zero Page fallback validation failed: " .. message)
     emu.stop(1)
 end
 
@@ -22,27 +22,17 @@ local function expectByte(address, expected, name)
     return true
 end
 
-local function validateMemoryLayout()
+local function validateFallback()
     frameCount = frameCount + 1
     if frameCount < 3 then
         return
     end
 
-    if not expectByte(0x0080, 0x21, "BackgroundColor") then
+    if not expectByte(0x0300, 0x01, "Counter") then
         return
-    elseif not expectByte(0x0081, 0x03, "FrameCounter") then
+    elseif not expectByte(0x0301, 0x21, "BackgroundColor") then
         return
-    elseif not expectByte(0x0082, 0x06, "NextFrameCounter") then
-        return
-    elseif not expectByte(0x0300, 0x01, "RenderingEnabled") then
-        return
-    elseif not expectByte(0x0301, 0x01, "ExpectedState") then
-        return
-    elseif not expectByte(0x0302, 0x00, "InitializeCounters.Start") then
-        return
-    elseif not expectByte(0x0303, 0x01, "InitializeCounters.Increment") then
-        return
-    elseif not expectByte(0x0304, 0x01, "InitializeCounters.EnabledValue") then
+    elseif not expectByte(0x0302, 0x01, "Matches") then
         return
     end
 
@@ -55,12 +45,12 @@ local function validateMemoryLayout()
             )
         )
     else
-        emu.log("Memory-layout validation passed.")
+        emu.log("Zero Page fallback validation passed.")
         emu.stop(0)
     end
 end
 
 emu.addEventCallback(
-    validateMemoryLayout,
+    validateFallback,
     emu.eventType.endFrame
 )

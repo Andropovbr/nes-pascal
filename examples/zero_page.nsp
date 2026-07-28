@@ -1,0 +1,18 @@
+program ZeroPage;
+
+var
+    Counter: byte;
+    BackgroundColor: nes_color;
+    Matches: boolean;
+
+begin
+    Counter := $00;
+    inc(Counter);
+    Matches := Counter = $01;
+    if Matches then
+        BackgroundColor := $21
+    else
+        BackgroundColor := $0F;
+    nes.set_background_color(BackgroundColor);
+    nes.run;
+end.
