@@ -10,6 +10,7 @@ from .ast import (
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
+    ResolvedComparisonExpression,
     ResolvedDecrementStatement,
     ResolvedForStatement,
     ResolvedIfStatement,
@@ -23,8 +24,8 @@ from .ast import (
     ResolvedValue,
     ResolvedVariable,
     ResolvedWhileStatement,
-    ResolvedComparisonExpression,
     SourcePosition,
+    VariableValue,
 )
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
 
@@ -85,19 +86,23 @@ class MemorySymbol:
 
 @dataclass(frozen=True, slots=True)
 class MemoryLayoutSettings:
-    """Internal NROM memory defaults for milestone 0.3.1."""
+    """Internal NROM memory defaults for milestone 0.3.2."""
 
     physical_ram_start: int = 0x0000
     physical_ram_size: int = 0x0800
     zero_page_start: int = 0x0000
     zero_page_size: int = 0x0100
+    zero_page_runtime_size: int = 0x0010
+    temporary_storage_size: int = 0x0010
+    zero_page_explicit_reserve_size: int = 0x0060
+    zero_page_automatic_size: int = 0x0080
+    automatic_promotion_min_references: int = 3
     hardware_stack_start: int = 0x0100
     hardware_stack_size: int = 0x0100
     oam_shadow_start: int = 0x0200
     oam_shadow_size: int = 0x0100
     general_ram_start: int = 0x0300
     runtime_data_size: int = 0
-    temporary_storage_size: int = 16
     mapper_number: int = 0
     horizontal_mirroring: bool = True
     prg_rom_banks: int = 2
@@ -124,10 +129,14 @@ class ProgramMemoryLayout:
     settings: MemoryLayoutSettings
     physical_ram: MemoryRange
     zero_page: MemoryRange
+    zero_page_runtime: MemoryRange
+    temporary_storage: MemoryRange
+    zero_page_explicit_reserve: MemoryRange
+    zero_page_automatic: MemoryRange
+    zero_page_unallocated: MemoryRange
     hardware_stack: MemoryRange
     oam_shadow: MemoryRange
     runtime_data: MemoryRange
-    temporary_storage: MemoryRange
     user_capacity: MemoryRange
     runtime_symbols: tuple[MemorySymbol, ...]
     temporary_symbols: tuple[MemorySymbol, ...]
@@ -135,18 +144,35 @@ class ProgramMemoryLayout:
 
     @property
     def user_variables(self) -> MemoryRange:
+        regular_symbols = self.regular_user_symbols
         return MemoryRange(
-            "User variables",
+            "Regular user variables",
             self.user_capacity.start,
-            sum(symbol.size for symbol in self.user_symbols),
+            sum(symbol.size for symbol in regular_symbols),
             RegionKind.USER,
+        )
+
+    @property
+    def promoted_user_symbols(self) -> tuple[MemorySymbol, ...]:
+        return tuple(
+            symbol
+            for symbol in self.user_symbols
+            if symbol.region_name == self.zero_page_automatic.name
+        )
+
+    @property
+    def regular_user_symbols(self) -> tuple[MemorySymbol, ...]:
+        return tuple(
+            symbol
+            for symbol in self.user_symbols
+            if symbol.region_name == self.user_capacity.name
         )
 
     @property
     def free_ram(self) -> MemoryRange:
         used = self.user_variables.size
         return MemoryRange(
-            "Free RAM",
+            "General free RAM",
             self.user_capacity.start + used,
             self.user_capacity.size - used,
             RegionKind.FREE,
@@ -154,14 +180,22 @@ class ProgramMemoryLayout:
 
     @property
     def display_regions(self) -> tuple[MemoryRange, ...]:
-        return (
-            self.zero_page,
+        regions = (
+            self.zero_page_runtime,
+            self.temporary_storage,
+            self.zero_page_explicit_reserve,
+            self.zero_page_automatic,
+            self.zero_page_unallocated,
             self.hardware_stack,
             self.oam_shadow,
             self.runtime_data,
-            self.temporary_storage,
             self.user_variables,
             self.free_ram,
+        )
+        return tuple(
+            region
+            for region in regions
+            if region.size or region == self.runtime_data
         )
 
     @property
@@ -170,7 +204,22 @@ class ProgramMemoryLayout:
 
     @property
     def reserved_or_used_bytes(self) -> int:
-        return self.physical_ram.size - self.free_ram.size
+        return self.physical_ram.size - self.available_bytes
+
+    @property
+    def promoted_bytes_used(self) -> int:
+        return sum(symbol.size for symbol in self.promoted_user_symbols)
+
+    @property
+    def available_bytes(self) -> int:
+        automatic_available = (
+            self.zero_page_automatic.size - self.promoted_bytes_used
+        )
+        return (
+            self.free_ram.size
+            + automatic_available
+            + self.zero_page_unallocated.size
+        )
 
 
 def build_memory_layout(
@@ -186,10 +235,14 @@ def build_memory_layout(
     (
         physical_ram,
         zero_page,
+        zero_page_runtime,
+        temporary_storage,
+        zero_page_explicit_reserve,
+        zero_page_automatic,
+        zero_page_unallocated,
         hardware_stack,
         oam_shadow,
         runtime_data,
-        temporary_storage,
         user_capacity,
     ) = regions
 
@@ -204,8 +257,8 @@ def build_memory_layout(
             filename,
             source,
             suggestion=(
-                "Simplify nested expressions or loops, or increase the internal "
-                "temporary-storage setting."
+                "Simplify nested expressions or loops. Mandatory temporary "
+                "allocations cannot borrow optional promotion space."
             ),
         )
 
@@ -235,9 +288,42 @@ def build_memory_layout(
         for index, name in enumerate(temporary_names)
     )
 
+    reference_counts = _global_variable_reference_counts(program)
+    promoted_labels = {
+        variable.label
+        for variable in program.variables
+        if reference_counts.get(variable.label, 0)
+        >= settings.automatic_promotion_min_references
+    }
+
     user_symbols: list[MemorySymbol] = []
+    next_zero_page_address = zero_page_automatic.start
     next_user_address = user_capacity.start
-    for source_name, variable, purpose in _user_variables(program):
+    for source_name, variable, purpose, promotion_allowed in _user_variables(program):
+        promote = (
+            promotion_allowed
+            and variable.label in promoted_labels
+            and next_zero_page_address
+            < zero_page_automatic.start + zero_page_automatic.size
+        )
+        if promote:
+            user_symbols.append(
+                MemorySymbol(
+                    variable.label,
+                    next_zero_page_address,
+                    1,
+                    SymbolKind.USER,
+                    zero_page_automatic.name,
+                    f"{purpose}; automatically promoted after "
+                    f"{reference_counts[variable.label]} source references",
+                    source_name,
+                    variable.type.value,
+                    variable.position,
+                )
+            )
+            next_zero_page_address += 1
+            continue
+
         available = user_capacity.start + user_capacity.size - next_user_address
         if available < 1:
             _raise_error(
@@ -270,10 +356,14 @@ def build_memory_layout(
         settings,
         physical_ram,
         zero_page,
+        zero_page_runtime,
+        temporary_storage,
+        zero_page_explicit_reserve,
+        zero_page_automatic,
+        zero_page_unallocated,
         hardware_stack,
         oam_shadow,
         runtime_data,
-        temporary_storage,
         user_capacity,
         runtime_symbols,
         temporary_symbols,
@@ -297,9 +387,11 @@ def validate_segment_capacities(
         *layout.user_symbols,
     )
     checked_regions = (
+        layout.zero_page_runtime,
+        layout.temporary_storage,
+        layout.zero_page_automatic,
         layout.oam_shadow,
         layout.runtime_data,
-        layout.temporary_storage,
         layout.user_capacity,
     )
     known_region_names = {region.name for region in checked_regions}
@@ -361,14 +453,20 @@ def generate_linker_config(layout: ProgramMemoryLayout) -> str:
     validate_segment_capacities(layout)
     settings = layout.settings
     memory_lines = [
-        _linker_memory_line("ZEROPAGE", layout.zero_page),
+        _linker_memory_line("ZP_RUNTIME", layout.zero_page_runtime),
+        _linker_memory_line("ZP_TEMP", layout.temporary_storage),
+        _linker_memory_line("ZP_EXPLICIT", layout.zero_page_explicit_reserve),
+        _linker_memory_line("ZP_AUTO", layout.zero_page_automatic),
         _linker_memory_line("STACK", layout.hardware_stack),
         _linker_memory_line("OAM", layout.oam_shadow),
         _linker_memory_line("RUNTIME", layout.runtime_data),
     ]
+    if layout.zero_page_unallocated.size:
+        memory_lines.append(
+            _linker_memory_line("ZP_FREE", layout.zero_page_unallocated)
+        )
     memory_lines.extend(
         [
-            _linker_memory_line("TEMP", layout.temporary_storage),
             _linker_memory_line("USER", layout.user_capacity),
             "    HEADER: start = $0000, size = $0010, file = %O, fill = yes;",
             f"    PRG:    start = ${settings.prg_rom_start:04X}, "
@@ -380,12 +478,14 @@ def generate_linker_config(layout: ProgramMemoryLayout) -> str:
         ]
     )
     segment_lines = [
+        "    ZERO_PAGE_RUNTIME:     load = ZP_RUNTIME, type = zp;",
+        "    ZERO_PAGE_TEMPORARIES: load = ZP_TEMP,    type = zp;",
+        "    ZERO_PAGE_VARIABLES:   load = ZP_AUTO,    type = zp;",
         "    OAM_SHADOW:          load = OAM,    type = bss;",
         "    RUNTIME_DATA:        load = RUNTIME, type = bss;",
     ]
     segment_lines.extend(
         [
-            "    TEMPORARIES:         load = TEMP,   type = bss;",
             "    USER_VARIABLES:      load = USER,   type = bss;",
             "    HEADER:               load = HEADER, type = ro;",
             "    CODE:                 load = PRG,    type = ro;",
@@ -420,6 +520,7 @@ def generate_memory_map(layout: ProgramMemoryLayout) -> str:
         f"Physical CPU RAM: ${layout.physical_ram.start:04X}-"
         f"${physical_end:04X} ({layout.physical_ram.size} bytes)",
         "Mirrors: $0800-$1FFF mirror $0000-$07FF and are not allocatable.",
+        "Zero Page: $0000-$00FF (256 bytes)",
         "",
         "Regions",
         "-------",
@@ -428,10 +529,19 @@ def generate_memory_map(layout: ProgramMemoryLayout) -> str:
     ]
     temporary_detail = (
         f" ({layout.temporary_bytes_used} used, "
-        f"{layout.temporary_storage.size - layout.temporary_bytes_used} available)"
+        f"{layout.temporary_storage.size - layout.temporary_bytes_used} reserved)"
+    )
+    promotion_detail = (
+        f" ({layout.promoted_bytes_used} used, "
+        f"{layout.zero_page_automatic.size - layout.promoted_bytes_used} available)"
     )
     for region in layout.display_regions:
-        detail = temporary_detail if region == layout.temporary_storage else ""
+        if region == layout.temporary_storage:
+            detail = temporary_detail
+        elif region == layout.zero_page_automatic:
+            detail = promotion_detail
+        else:
+            detail = ""
         end = f"${region.end:04X}" if region.end is not None else "----"
         lines.append(
             f"${region.start:04X}  {end:5}  {region.size:4}  "
@@ -441,18 +551,25 @@ def generate_memory_map(layout: ProgramMemoryLayout) -> str:
         [
             "",
             f"Reserved or used: {layout.reserved_or_used_bytes} bytes",
-            f"Available:        {layout.free_ram.size} bytes",
+            f"Available:        {layout.available_bytes} bytes",
             "",
             "User Symbols",
             "------------",
             "",
-            "Address  Size  Type       Source name                 Assembly symbol",
+            "Address  Size  Storage     Type       "
+            "Source name                 Assembly symbol",
         ]
     )
     if layout.user_symbols:
         for symbol in layout.user_symbols:
+            storage = (
+                "Zero Page"
+                if symbol.region_name == layout.zero_page_automatic.name
+                else "Regular RAM"
+            )
             lines.append(
                 f"${symbol.address:04X}    {symbol.size:4}  "
+                f"{storage:11} "
                 f"{(symbol.type_name or '-'):10} "
                 f"{(symbol.source_name or '-'):27} {symbol.assembly_symbol}"
             )
@@ -551,8 +668,27 @@ def _validated_regions(
         _invalid_layout(
             "General compiler-managed RAM must begin at $0300.", source, filename
         )
-    if settings.runtime_data_size < 0 or settings.temporary_storage_size < 0:
+    zero_page_sizes = (
+        settings.zero_page_runtime_size,
+        settings.temporary_storage_size,
+        settings.zero_page_explicit_reserve_size,
+        settings.zero_page_automatic_size,
+    )
+    if settings.runtime_data_size < 0 or any(size < 0 for size in zero_page_sizes):
         _invalid_layout("RAM region sizes cannot be negative.", source, filename)
+    if settings.automatic_promotion_min_references < 1:
+        _invalid_layout(
+            "The automatic-promotion reference threshold must be at least 1.",
+            source,
+            filename,
+        )
+    if sum(zero_page_sizes) > settings.zero_page_size:
+        _invalid_layout(
+            "Zero Page runtime, temporary, explicit-reserve, and automatic "
+            "regions exceed $0000-$00FF.",
+            source,
+            filename,
+        )
 
     physical = MemoryRange(
         "Physical CPU RAM",
@@ -565,6 +701,41 @@ def _validated_regions(
         settings.zero_page_start,
         settings.zero_page_size,
         RegionKind.RESERVED,
+    )
+    zero_page_runtime = MemoryRange(
+        "Zero Page runtime",
+        zero_page.start,
+        settings.zero_page_runtime_size,
+        RegionKind.RUNTIME,
+    )
+    temporary = MemoryRange(
+        "Zero Page temporaries",
+        zero_page_runtime.start + zero_page_runtime.size,
+        settings.temporary_storage_size,
+        RegionKind.COMPILER,
+    )
+    zero_page_explicit_reserve = MemoryRange(
+        "Future explicit Zero Page",
+        temporary.start + temporary.size,
+        settings.zero_page_explicit_reserve_size,
+        RegionKind.RESERVED,
+    )
+    zero_page_automatic = MemoryRange(
+        "Automatic Zero Page variables",
+        zero_page_explicit_reserve.start + zero_page_explicit_reserve.size,
+        settings.zero_page_automatic_size,
+        RegionKind.USER,
+    )
+    zero_page_end = zero_page.end
+    assert zero_page_end is not None
+    zero_page_unallocated_start = (
+        zero_page_automatic.start + zero_page_automatic.size
+    )
+    zero_page_unallocated = MemoryRange(
+        "Unallocated Zero Page",
+        zero_page_unallocated_start,
+        zero_page_end + 1 - zero_page_unallocated_start,
+        RegionKind.FREE,
     )
     stack = MemoryRange(
         "6502 hardware stack",
@@ -598,19 +769,12 @@ def _validated_regions(
         settings.runtime_data_size,
         RegionKind.RUNTIME,
     )
-    temporary = MemoryRange(
-        "Expression temporaries",
-        runtime.start + runtime.size,
-        settings.temporary_storage_size,
-        RegionKind.COMPILER,
-    )
-    user_start = temporary.start + temporary.size
+    user_start = runtime.start + runtime.size
     physical_end = physical.end
     assert physical_end is not None
     if user_start > physical_end + 1:
         _invalid_layout(
-            "Runtime data and temporary storage extend beyond physical RAM at "
-            "$07FF.",
+            "Runtime data extends beyond physical RAM at $07FF.",
             source,
             filename,
         )
@@ -620,7 +784,19 @@ def _validated_regions(
         physical_end + 1 - user_start,
         RegionKind.USER,
     )
-    return physical, zero_page, stack, oam, runtime, temporary, user
+    return (
+        physical,
+        zero_page,
+        zero_page_runtime,
+        temporary,
+        zero_page_explicit_reserve,
+        zero_page_automatic,
+        zero_page_unallocated,
+        stack,
+        oam,
+        runtime,
+        user,
+    )
 
 
 def _within(region: MemoryRange, container: MemoryRange) -> bool:
@@ -637,7 +813,7 @@ def _invalid_layout(message: str, source: str, filename: str) -> None:
         message,
         filename,
         source,
-        suggestion="Use the supported milestone 0.3.1 NROM memory settings.",
+        suggestion="Use the supported milestone 0.3.2 NROM memory settings.",
     )
 
 
@@ -676,9 +852,9 @@ def _linker_memory_line(name: str, region: MemoryRange) -> str:
 
 def _user_variables(
     program: ResolvedProgram,
-) -> tuple[tuple[str, ResolvedVariable, str], ...]:
+) -> tuple[tuple[str, ResolvedVariable, str, bool], ...]:
     variables = [
-        (variable.name, variable, "source variable")
+        (variable.name, variable, "source variable", True)
         for variable in program.variables
     ]
     variables.extend(
@@ -686,11 +862,92 @@ def _user_variables(
             f"{procedure.name}.{parameter.name}",
             parameter,
             f"value parameter for {procedure.name}",
+            False,
         )
         for procedure in program.procedures
         for parameter in procedure.parameters
     )
     return tuple(variables)
+
+
+def _global_variable_reference_counts(program: ResolvedProgram) -> dict[str, int]:
+    """Count static source operations without estimating runtime frequency."""
+
+    counts = {variable.label: 0 for variable in program.variables}
+    statements = (
+        *program.statements,
+        *(
+            statement
+            for procedure in program.procedures
+            for statement in procedure.body
+        ),
+    )
+    for statement in statements:
+        _count_statement_variable_references(statement, counts)
+    return counts
+
+
+def _count_statement_variable_references(
+    statement: ResolvedStatement,
+    counts: dict[str, int],
+) -> None:
+    if isinstance(statement, ResolvedAssignment):
+        _count_variable(statement.target, counts)
+        _count_value_variable_references(statement.value, counts)
+    elif isinstance(statement, ResolvedSetBackgroundColor):
+        _count_value_variable_references(statement.argument, counts)
+    elif isinstance(
+        statement,
+        (ResolvedIncrementStatement, ResolvedDecrementStatement),
+    ):
+        _count_variable(statement.target, counts)
+        if statement.amount is not None:
+            _count_value_variable_references(statement.amount, counts)
+    elif isinstance(statement, ResolvedIfStatement):
+        _count_value_variable_references(statement.condition, counts)
+        for item in statement.then_branch:
+            _count_statement_variable_references(item, counts)
+        if statement.else_branch is not None:
+            for item in statement.else_branch:
+                _count_statement_variable_references(item, counts)
+    elif isinstance(statement, (ResolvedWhileStatement, ResolvedRepeatStatement)):
+        _count_value_variable_references(statement.condition, counts)
+        for item in statement.body:
+            _count_statement_variable_references(item, counts)
+    elif isinstance(statement, ResolvedForStatement):
+        _count_variable(statement.target, counts)
+        _count_value_variable_references(statement.initial, counts)
+        _count_value_variable_references(statement.final, counts)
+        for item in statement.body:
+            _count_statement_variable_references(item, counts)
+    elif isinstance(statement, ResolvedProcedureCall):
+        for argument in statement.arguments:
+            _count_value_variable_references(argument.value, counts)
+
+
+def _count_value_variable_references(
+    value: ResolvedValue,
+    counts: dict[str, int],
+) -> None:
+    if isinstance(value, VariableValue):
+        _count_variable(value.variable, counts)
+    elif isinstance(value, (ResolvedUnaryExpression, ResolvedBooleanNotExpression)):
+        _count_value_variable_references(value.operand, counts)
+    elif isinstance(
+        value,
+        (
+            ResolvedBinaryExpression,
+            ResolvedComparisonExpression,
+            ResolvedBooleanBinaryExpression,
+        ),
+    ):
+        _count_value_variable_references(value.left, counts)
+        _count_value_variable_references(value.right, counts)
+
+
+def _count_variable(variable: ResolvedVariable, counts: dict[str, int]) -> None:
+    if variable.label in counts:
+        counts[variable.label] += 1
 
 
 def _temporary_symbol_names(program: ResolvedProgram) -> tuple[str, ...]:

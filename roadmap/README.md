@@ -6,9 +6,9 @@ progression. Do not infer the current or next milestone from numbering alone.
 ## Current roadmap state
 
 - **Current release:** Release 0.3 — NES Runtime
-- **Last completed milestone:** [`0.3.1 — Runtime Memory Layout`](0.md#runtime-memory-layout)
-- **Next milestone:** [`0.3.2 — Zero-Page Allocation`](0.md#zero-page-allocation)
-- **Next milestone file:** [Version 0 roadmap](0.md#zero-page-allocation)
+- **Last completed milestone:** [`0.3.2 — Zero-Page Allocation`](0.md#zero-page-allocation)
+- **Next milestone:** [`0.3.3 — NMI and Frame Synchronization`](0.md#nmi-and-frame-synchronization)
+- **Next milestone file:** [Version 0 roadmap](0.md#nmi-and-frame-synchronization)
 
 ## Philosophy
 

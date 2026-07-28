@@ -9,9 +9,10 @@ The compiler currently supports explicitly typed constants and global
 variables, exact-type assignments, one-byte arithmetic, comparisons,
 short-circuit Boolean expressions, structured conditionals and loops,
 increment and decrement operations, and acyclic procedures with `byte` and
-`boolean` value parameters. Its
-runtime sets the universal background color, enables rendering, and enters a
-stable loop.
+`boolean` value parameters. The deterministic memory layout places mandatory
+compiler temporaries in Zero Page and conservatively promotes frequently
+referenced globals with safe regular-RAM fallback. Its runtime sets the
+universal background color, enables rendering, and enters a stable loop.
 
 ## Documentation
 

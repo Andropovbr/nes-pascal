@@ -40,9 +40,11 @@ the supported language.
 
 ## Runtime and target limitations
 
-- Variables use regular CPU RAM; zero-page allocation is not implemented.
+- Automatic Zero Page promotion is limited to the deterministic global-variable
+  policy. Explicit Zero Page declarations are not implemented.
 - Only NTSC NES, mapper 0, 32 KiB PRG-ROM, and 8 KiB CHR-ROM are supported.
 - CHR-ROM is empty.
 - Sprites, controller input, audio, graphics assets, and frame callbacks are
   not supported.
-- The compiler does not provide a game engine or a general optimization pass.
+- The compiler does not provide a game engine or a general optimization pass;
+  Zero Page promotion is a fixed allocation policy, not a hotness optimizer.

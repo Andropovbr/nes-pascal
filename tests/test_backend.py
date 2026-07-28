@@ -20,13 +20,15 @@ class BackendGoldenTests(unittest.TestCase):
         )
         self.assertEqual(actual, expected)
 
-    def test_variables_use_regular_ram_and_runtime_loads(self) -> None:
+    def test_memory_segments_and_variable_loads_are_emitted(self) -> None:
         source_path = ROOT / "examples" / "minimal.nsp"
         source = source_path.read_text(encoding="utf-8")
         filename = str(source_path)
         assembly = generate(analyze(parse(source, filename), source, filename))
         self.assertIn('.segment "OAM_SHADOW"', assembly)
-        self.assertIn('.segment "TEMPORARIES"', assembly)
+        self.assertIn('.segment "ZERO_PAGE_RUNTIME": zeropage', assembly)
+        self.assertIn('.segment "ZERO_PAGE_TEMPORARIES": zeropage', assembly)
+        self.assertIn('.segment "ZERO_PAGE_VARIABLES": zeropage', assembly)
         self.assertIn('.segment "USER_VARIABLES"', assembly)
         self.assertIn("runtime_oam_shadow: .res 256", assembly)
         self.assertIn("variable_BackgroundColor: .res 1", assembly)
@@ -198,8 +200,21 @@ end.
         )
         self.assertEqual(actual, expected)
         self.assertIn("runtime_oam_shadow: .res 256", actual)
-        self.assertIn("; $0300: reusable expression evaluation byte", actual)
-        self.assertIn("; $0310: BackgroundColor: nes_color", actual)
+        self.assertIn("; $0010: reusable expression evaluation byte", actual)
+        self.assertIn("; $0080: BackgroundColor: nes_color", actual)
+
+    def test_zero_page_program_matches_golden_assembly(self) -> None:
+        source_path = ROOT / "examples" / "zero_page.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        actual = generate(analyze(parse(source, filename), source, filename))
+        expected = (ROOT / "tests" / "golden" / "zero_page.asm").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(actual, expected)
+        self.assertIn("; $0080: Counter: byte", actual)
+        self.assertIn("; $0081: BackgroundColor: nes_color", actual)
+        self.assertIn("; $0300: Matches: boolean", actual)
 
 
 if __name__ == "__main__":

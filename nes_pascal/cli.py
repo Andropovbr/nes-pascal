@@ -9,6 +9,8 @@ import sys
 from .backend_ca65 import generate
 from .diagnostics import CompilerError, DiagnosticCode
 from .memory_layout import (
+    DEFAULT_MEMORY_LAYOUT_SETTINGS,
+    MemoryLayoutSettings,
     build_memory_layout,
     generate_linker_config,
     generate_memory_map,
@@ -21,7 +23,11 @@ class ToolchainError(Exception):
     pass
 
 
-def compile_source(source_path: Path, output_path: Path) -> tuple[Path, Path]:
+def compile_source(
+    source_path: Path,
+    output_path: Path,
+    memory_settings: MemoryLayoutSettings = DEFAULT_MEMORY_LAYOUT_SETTINGS,
+) -> tuple[Path, Path]:
     source_path = source_path.resolve()
     output_path = output_path.resolve()
     source = source_path.read_text(encoding="utf-8")
@@ -29,6 +35,7 @@ def compile_source(source_path: Path, output_path: Path) -> tuple[Path, Path]:
     resolved_program = analyze(program, source, str(source_path))
     layout = build_memory_layout(
         resolved_program,
+        memory_settings,
         source=source,
         filename=str(source_path),
     )

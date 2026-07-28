@@ -9,33 +9,39 @@
     .byte $00                ; mapper upper bits
     .byte $00, $00, $00, $00, $00, $00, $00, $00
 
+.segment "ZERO_PAGE_RUNTIME": zeropage
+; Runtime: mandatory Zero Page reservation; no symbols required yet
+
+.segment "ZERO_PAGE_TEMPORARIES": zeropage
+; Compiler: mandatory expression and loop storage in Zero Page
+expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
+for_limit_0: .res 1 ; $0011: cached for-loop final value
+for_limit_1: .res 1 ; $0012: cached for-loop final value
+for_limit_2: .res 1 ; $0013: cached for-loop final value
+for_limit_3: .res 1 ; $0014: cached for-loop final value
+for_limit_4: .res 1 ; $0015: cached for-loop final value
+for_limit_5: .res 1 ; $0016: cached for-loop final value
+
+.segment "ZERO_PAGE_VARIABLES": zeropage
+; Source: optional global-variable promotion with regular-RAM fallback
+variable_Counter: .res 1 ; $0080: Counter: byte
+variable_Sum: .res 1 ; $0081: Sum: byte
+variable_BackgroundColor: .res 1 ; $0082: BackgroundColor: nes_color
+
 .segment "OAM_SHADOW"
 ; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
 runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by future sprite runtime support
 
 .segment "RUNTIME_DATA"
-; Runtime: no scalar RAM symbols are required in milestone 0.3.1
-
-.segment "TEMPORARIES"
-; Compiler: reusable expression and loop storage in regular CPU RAM
-expression_temporary_0: .res 1 ; $0300: reusable expression evaluation byte
-for_limit_0: .res 1 ; $0301: cached for-loop final value
-for_limit_1: .res 1 ; $0302: cached for-loop final value
-for_limit_2: .res 1 ; $0303: cached for-loop final value
-for_limit_3: .res 1 ; $0304: cached for-loop final value
-for_limit_4: .res 1 ; $0305: cached for-loop final value
-for_limit_5: .res 1 ; $0306: cached for-loop final value
+; Runtime: no scalar regular-RAM symbols are required in milestone 0.3.2
 
 .segment "USER_VARIABLES"
-; Source: variable and parameter declarations in regular CPU RAM
-variable_Counter: .res 1 ; $0310: Counter: byte
-variable_Sum: .res 1 ; $0311: Sum: byte
-variable_Index: .res 1 ; $0312: Index: byte
-variable_Reverse: .res 1 ; $0313: Reverse: byte
-variable_Edge: .res 1 ; $0314: Edge: byte
-variable_Outer: .res 1 ; $0315: Outer: byte
-variable_Inner: .res 1 ; $0316: Inner: byte
-variable_BackgroundColor: .res 1 ; $0317: BackgroundColor: nes_color
+; Source: non-promoted variables and all parameters in regular CPU RAM
+variable_Index: .res 1 ; $0300: Index: byte
+variable_Reverse: .res 1 ; $0301: Reverse: byte
+variable_Edge: .res 1 ; $0302: Edge: byte
+variable_Outer: .res 1 ; $0303: Outer: byte
+variable_Inner: .res 1 ; $0304: Inner: byte
 
 .segment "CODE"
 

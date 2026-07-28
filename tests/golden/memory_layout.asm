@@ -9,28 +9,34 @@
     .byte $00                ; mapper upper bits
     .byte $00, $00, $00, $00, $00, $00, $00, $00
 
+.segment "ZERO_PAGE_RUNTIME": zeropage
+; Runtime: mandatory Zero Page reservation; no symbols required yet
+
+.segment "ZERO_PAGE_TEMPORARIES": zeropage
+; Compiler: mandatory expression and loop storage in Zero Page
+expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
+for_limit_0: .res 1 ; $0011: cached for-loop final value
+
+.segment "ZERO_PAGE_VARIABLES": zeropage
+; Source: optional global-variable promotion with regular-RAM fallback
+variable_BackgroundColor: .res 1 ; $0080: BackgroundColor: nes_color
+variable_FrameCounter: .res 1 ; $0081: FrameCounter: byte
+variable_NextFrameCounter: .res 1 ; $0082: NextFrameCounter: byte
+
 .segment "OAM_SHADOW"
 ; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
 runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by future sprite runtime support
 
 .segment "RUNTIME_DATA"
-; Runtime: no scalar RAM symbols are required in milestone 0.3.1
-
-.segment "TEMPORARIES"
-; Compiler: reusable expression and loop storage in regular CPU RAM
-expression_temporary_0: .res 1 ; $0300: reusable expression evaluation byte
-for_limit_0: .res 1 ; $0301: cached for-loop final value
+; Runtime: no scalar regular-RAM symbols are required in milestone 0.3.2
 
 .segment "USER_VARIABLES"
-; Source: variable and parameter declarations in regular CPU RAM
-variable_BackgroundColor: .res 1 ; $0310: BackgroundColor: nes_color
-variable_FrameCounter: .res 1 ; $0311: FrameCounter: byte
-variable_NextFrameCounter: .res 1 ; $0312: NextFrameCounter: byte
-variable_RenderingEnabled: .res 1 ; $0313: RenderingEnabled: boolean
-variable_ExpectedState: .res 1 ; $0314: ExpectedState: boolean
-parameter_InitializeCounters_Start: .res 1 ; $0315: InitializeCounters.Start: byte
-parameter_InitializeCounters_Increment: .res 1 ; $0316: InitializeCounters.Increment: byte
-parameter_InitializeCounters_EnabledValue: .res 1 ; $0317: InitializeCounters.EnabledValue: boolean
+; Source: non-promoted variables and all parameters in regular CPU RAM
+variable_RenderingEnabled: .res 1 ; $0300: RenderingEnabled: boolean
+variable_ExpectedState: .res 1 ; $0301: ExpectedState: boolean
+parameter_InitializeCounters_Start: .res 1 ; $0302: InitializeCounters.Start: byte
+parameter_InitializeCounters_Increment: .res 1 ; $0303: InitializeCounters.Increment: byte
+parameter_InitializeCounters_EnabledValue: .res 1 ; $0304: InitializeCounters.EnabledValue: boolean
 
 .segment "CODE"
 

@@ -23,7 +23,9 @@ The compiler pipeline is deliberately separated:
 - `semantic.py` validates declarations, resolves references and procedure
   calls, checks exact types, and enforces interprocedural definite assignment;
 - `memory_layout.py` owns physical RAM ranges, allocation, bounds and overlap
-  checks, ld65 configuration generation, and the human-readable memory map;
+  checks, mandatory Zero Page storage, conservative optional promotion,
+  regular-RAM fallback, ld65 configuration generation, and the human-readable
+  memory map;
 - `backend_ca65.py` generates readable, commented Assembly from resolved
   values using the already allocated runtime, temporary, and user symbols, and
   emits left-to-right argument copies before procedure calls;
