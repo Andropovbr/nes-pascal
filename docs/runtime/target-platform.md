@@ -28,9 +28,15 @@ management, controller input, or audio.
 
 ## Memory
 
-Global variables occupy one byte each in regular CPU RAM. The compiler does
-not allocate user variables or expression temporaries in zero page. CHR-ROM is
-empty, so the runtime does not provide game graphics or an asset pipeline.
+The NES exposes 2 KiB of physical internal CPU RAM at `$0000-$07FF`.
+`$0800-$1FFF` contains mirrors, not additional storage. The compiler reserves
+Zero Page, the hardware stack, a page-aligned OAM shadow, and a 16-byte
+temporary pool before allocating globals and value parameters in declaration
+order. See [CPU memory](cpu-memory.md) for the complete layout.
+
+The compiler does not allocate user variables or expression temporaries in
+Zero Page. CHR-ROM is empty, so the runtime does not provide game graphics or
+an asset pipeline.
 
 The generated Assembly is intentionally readable and includes comments that
 identify the source of generated blocks. The backend is not a generic game

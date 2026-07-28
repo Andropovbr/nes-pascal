@@ -37,4 +37,8 @@ diagnostics section.
 | E4005 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E5001 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5002 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
+| E5003 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
+| E5004 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
+| E5005 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
+| E5006 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E6001 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |

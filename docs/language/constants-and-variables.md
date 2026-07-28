@@ -36,8 +36,11 @@ var
 ```
 
 Each declaration contains exactly one identifier and an explicit built-in
-type. Variables are allocated as one-byte values in regular CPU RAM. Zero-page
-allocation is not implemented.
+type. Variables are allocated in declaration order as one-byte values in the
+user region of regular CPU RAM. Procedure value-parameter slots follow global
+variables. The compiler reports an error before linking if these allocations
+exhaust physical RAM. Zero-page allocation is not implemented; see the
+[CPU memory reference](../runtime/cpu-memory.md).
 
 ## Names and duplicate declarations
 

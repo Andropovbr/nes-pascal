@@ -1,0 +1,12 @@
+program TemporaryRamExhausted;
+
+var
+    Result: byte;
+
+begin
+    Result := $01 + ($01 + ($01 + ($01 + ($01 + ($01 + ($01 + ($01 +
+        ($01 + ($01 + ($01 + ($01 + ($01 + ($01 + ($01 + ($01 +
+        ($01 + $01))))))))))))))));
+    nes.set_background_color($21);
+    nes.run;
+end.

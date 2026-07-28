@@ -8,6 +8,11 @@ import sys
 
 from .backend_ca65 import generate
 from .diagnostics import CompilerError, DiagnosticCode
+from .memory_layout import (
+    build_memory_layout,
+    generate_linker_config,
+    generate_memory_map,
+)
 from .parser import parse
 from .semantic import analyze
 
@@ -22,12 +27,23 @@ def compile_source(source_path: Path, output_path: Path) -> tuple[Path, Path]:
     source = source_path.read_text(encoding="utf-8")
     program = parse(source, str(source_path))
     resolved_program = analyze(program, source, str(source_path))
-    assembly = generate(resolved_program)
+    layout = build_memory_layout(
+        resolved_program,
+        source=source,
+        filename=str(source_path),
+    )
+    assembly = generate(resolved_program, layout)
+    linker_config = generate_linker_config(layout)
+    memory_map = generate_memory_map(layout)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     assembly_path = output_path.with_suffix(".asm")
+    config_path = output_path.with_suffix(".cfg")
+    memory_map_path = output_path.with_suffix(".map")
     object_path = output_path.with_suffix(".o")
     assembly_path.write_text(assembly, encoding="utf-8", newline="\n")
+    config_path.write_text(linker_config, encoding="utf-8", newline="\n")
+    memory_map_path.write_text(memory_map, encoding="utf-8", newline="\n")
 
     ca65 = shutil.which("ca65")
     ld65 = shutil.which("ld65")
@@ -40,7 +56,6 @@ def compile_source(source_path: Path, output_path: Path) -> tuple[Path, Path]:
             "Install the cc65 package and try again."
         )
 
-    config_path = Path(__file__).with_name("nrom.cfg")
     _run_tool([ca65, str(assembly_path), "-o", str(object_path)], "ca65")
     _run_tool(
         [
@@ -90,6 +105,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
     print(f"Assembly: {assembly_path}")
+    print(f"Linker configuration: {rom_path.with_suffix('.cfg')}")
+    print(f"Memory map: {rom_path.with_suffix('.map')}")
     print(f"ROM: {rom_path}")
     return 0
 

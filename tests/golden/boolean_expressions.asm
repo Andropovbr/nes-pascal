@@ -3,24 +3,34 @@
 
 .segment "HEADER"
     .byte "NES", $1A
-    .byte 2                  ; 2 x 16 KiB PRG-ROM
-    .byte 1                  ; 1 x 8 KiB CHR-ROM
-    .byte $00                ; mapper 0, horizontal mirroring
-    .byte $00                ; mapper 0
+    .byte 2                  ; PRG-ROM banks, 16 KiB each
+    .byte 1                  ; CHR-ROM banks, 8 KiB each
+    .byte $00                ; mapper and mirroring flags
+    .byte $00                ; mapper upper bits
     .byte $00, $00, $00, $00, $00, $00, $00, $00
 
-.segment "BSS"
-; Source: variable declarations in regular CPU RAM
-variable_Counter: .res 1       ; Counter: byte
-variable_Equal: .res 1       ; Equal: boolean
-variable_Different: .res 1       ; Different: boolean
-variable_Less: .res 1       ; Less: boolean
-variable_Greater: .res 1       ; Greater: boolean
-variable_LessOrEqual: .res 1       ; LessOrEqual: boolean
-variable_GreaterOrEqual: .res 1       ; GreaterOrEqual: boolean
-variable_Combined: .res 1       ; Combined: boolean
-variable_BackgroundColor: .res 1       ; BackgroundColor: nes_color
-expression_temporary_0: .res 1 ; expression temporary
+.segment "OAM_SHADOW"
+; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
+runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by future sprite runtime support
+
+.segment "RUNTIME_DATA"
+; Runtime: no scalar RAM symbols are required in milestone 0.3.1
+
+.segment "TEMPORARIES"
+; Compiler: reusable expression and loop storage in regular CPU RAM
+expression_temporary_0: .res 1 ; $0300: reusable expression evaluation byte
+
+.segment "USER_VARIABLES"
+; Source: variable and parameter declarations in regular CPU RAM
+variable_Counter: .res 1 ; $0310: Counter: byte
+variable_Equal: .res 1 ; $0311: Equal: boolean
+variable_Different: .res 1 ; $0312: Different: boolean
+variable_Less: .res 1 ; $0313: Less: boolean
+variable_Greater: .res 1 ; $0314: Greater: boolean
+variable_LessOrEqual: .res 1 ; $0315: LessOrEqual: boolean
+variable_GreaterOrEqual: .res 1 ; $0316: GreaterOrEqual: boolean
+variable_Combined: .res 1 ; $0317: Combined: boolean
+variable_BackgroundColor: .res 1 ; $0318: BackgroundColor: nes_color
 
 .segment "CODE"
 

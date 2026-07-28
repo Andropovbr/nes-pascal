@@ -25,7 +25,10 @@ class BackendGoldenTests(unittest.TestCase):
         source = source_path.read_text(encoding="utf-8")
         filename = str(source_path)
         assembly = generate(analyze(parse(source, filename), source, filename))
-        self.assertIn('.segment "BSS"', assembly)
+        self.assertIn('.segment "OAM_SHADOW"', assembly)
+        self.assertIn('.segment "TEMPORARIES"', assembly)
+        self.assertIn('.segment "USER_VARIABLES"', assembly)
+        self.assertIn("runtime_oam_shadow: .res 256", assembly)
         self.assertIn("variable_BackgroundColor: .res 1", assembly)
         self.assertIn("sta variable_BackgroundColor", assembly)
         self.assertIn("lda variable_BackgroundColor", assembly)
@@ -184,6 +187,19 @@ end.
             actual.index("sta parameter_Initialize_Step"),
             actual.index("sta parameter_Initialize_EnabledValue"),
         )
+
+    def test_memory_layout_program_matches_golden_assembly(self) -> None:
+        source_path = ROOT / "examples" / "memory_layout.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        actual = generate(analyze(parse(source, filename), source, filename))
+        expected = (ROOT / "tests" / "golden" / "memory_layout.asm").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(actual, expected)
+        self.assertIn("runtime_oam_shadow: .res 256", actual)
+        self.assertIn("; $0300: reusable expression evaluation byte", actual)
+        self.assertIn("; $0310: BackgroundColor: nes_color", actual)
 
 
 if __name__ == "__main__":

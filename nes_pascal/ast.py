@@ -272,6 +272,7 @@ class ResolvedVariable:
     name: str
     type: BuiltInType
     label: str
+    position: SourcePosition | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True, slots=True)
