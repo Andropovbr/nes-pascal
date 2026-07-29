@@ -21,6 +21,7 @@ python -m nes_pascal.cli examples/procedures.nsp -o build/procedures.nes
 python -m nes_pascal.cli examples/procedure_parameters.nsp -o build/procedure_parameters.nes
 python -m nes_pascal.cli examples/memory_layout.nsp -o build/memory_layout.nes
 python -m nes_pascal.cli examples/zero_page.nsp -o build/zero_page.nes
+python -m nes_pascal.cli examples/frame_synchronization.nsp -o build/frame_synchronization.nes
 ```
 
 The examples demonstrate:
@@ -38,7 +39,9 @@ The examples demonstrate:
 - `memory_layout.nsp`: globals, procedure parameters, expressions, and a
   for-loop allocated through the deterministic runtime memory layout;
 - `zero_page.nsp`: mandatory Zero Page temporaries, promoted globals, and a
-  non-promoted regular-RAM fallback variable.
+  non-promoted regular-RAM fallback variable;
+- `frame_synchronization.nsp`: runtime startup followed by a three-frame
+  main-thread loop synchronized with `nes.wait_frame`.
 
 The loop, counting, and procedure-parameter examples select background color
 `$21` only when their expected final states are reached.

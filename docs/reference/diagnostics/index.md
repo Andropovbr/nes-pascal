@@ -41,6 +41,7 @@ the range reserved for their category.
 | [E3014](semantic.md) | Semantic Analysis | Recursive procedure call |
 | [E3015](semantic.md) | Semantic Analysis | Runtime command inside procedure |
 | [E3016](semantic.md) | Semantic Analysis | Incorrect procedure argument count |
+| [E3017](semantic.md) | Semantic Analysis | Frame wait before runtime start |
 | [E4001](type-system.md) | Type System | Unknown type |
 | [E4002](type-system.md) | Type System | Invalid `nes_color` value |
 | [E4003](type-system.md) | Type System | Invalid `byte` value |

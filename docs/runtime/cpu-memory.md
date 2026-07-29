@@ -19,9 +19,11 @@ and are never treated as additional storage.
 
 The Zero Page partitions are fixed and non-overlapping. Runtime and compiler
 allocations are mandatory. They never borrow from optional promotion space.
-The runtime reservation currently has no scalar symbols, while the compiler
-places reusable expression slots and cached `for` limits in `$0010-$001F`.
-Needing more than 16 temporary bytes is a compilation error.
+The runtime owns `runtime_frame_counter` at `$0000` and
+`runtime_frame_ready` at `$0001`. These interrupt-visible bytes cannot overlap
+compiler storage. The compiler places reusable expression slots and cached
+`for` limits in `$0010-$001F`. Needing more than 16 temporary bytes is a
+compilation error.
 
 The future explicit range prevents later source syntax for explicit Zero Page
 variables from moving the automatic-promotion ABI. Explicit Zero Page syntax
@@ -74,3 +76,10 @@ $0301  $07FF  1279  Free      General free RAM
 
 The generated `.cfg`, Assembly segments, and `.map` report all use the same
 validated layout object, so their address calculations cannot drift.
+
+The runtime-symbol table also reports:
+
+```text
+$0000       1  runtime_frame_counter  volatile 8-bit NMI frame counter
+$0001       1  runtime_frame_ready    advisory frame-ready signal
+```

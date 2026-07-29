@@ -30,6 +30,7 @@ from .ast import (
     Run,
     UnaryOperator,
     VariableValue,
+    WaitFrame,
 )
 from .memory_layout import ProgramMemoryLayout, build_memory_layout
 
@@ -55,6 +56,12 @@ def generate(
         f" ; ${symbol.address:04X}: {symbol.purpose}"
         for symbol in layout.temporary_symbols
     ] or ["    ; no compiler temporaries required"]
+    runtime_zero_page_lines = [
+        f"{symbol.assembly_symbol}: .res {symbol.size}"
+        f" ; ${symbol.address:04X}: {symbol.purpose}"
+        for symbol in layout.runtime_symbols
+        if symbol.region_name == layout.zero_page_runtime.name
+    ]
     promoted_user_lines = [
         f"{symbol.assembly_symbol}: .res {symbol.size}"
         f" ; ${symbol.address:04X}: {symbol.source_name}: {symbol.type_name}"
@@ -90,6 +97,7 @@ def generate(
     )
 
     temporaries = "\n".join(temporary_lines)
+    runtime_zero_page_storage = "\n".join(runtime_zero_page_lines)
     promoted_user_storage = "\n".join(promoted_user_lines)
     regular_user_storage = "\n".join(regular_user_lines)
     statements = "\n".join(statement_lines)
@@ -124,7 +132,8 @@ def generate(
     .byte $00, $00, $00, $00, $00, $00, $00, $00
 
 .segment "ZERO_PAGE_RUNTIME": zeropage
-; Runtime: mandatory Zero Page reservation; no symbols required yet
+; Runtime: NMI-owned state, isolated from compiler expression temporaries
+{runtime_zero_page_storage}
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
@@ -139,7 +148,7 @@ def generate(
 {oam_declaration}
 
 .segment "RUNTIME_DATA"
-; Runtime: no scalar regular-RAM symbols are required in milestone 0.3.2
+; Runtime: no scalar regular-RAM symbols are required in milestone 0.3.3
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
@@ -149,6 +158,21 @@ def generate(
 
 ; Interrupt handlers
 NMI:
+    pha
+    txa
+    pha
+    tya
+    pha
+
+    inc runtime_frame_counter ; volatile 8-bit counter, wraps modulo 256
+    lda #$01
+    sta runtime_frame_ready   ; advisory; frame counter is authoritative
+
+    pla
+    tay
+    pla
+    tax
+    pla
     rti
 
 IRQ:
@@ -181,7 +205,12 @@ RESET:
 @wait_vblank_2:
     bit $2002
     bpl @wait_vblank_2
-{statements}{procedures}
+{statements}
+
+; Runtime: implicit stable loop after the main program finishes
+@runtime_idle_loop:
+    jmp @runtime_idle_loop
+{procedures}
 
 .segment "VECTORS"
     .word NMI
@@ -224,18 +253,40 @@ def _generate_statements(
                 ]
             )
         elif isinstance(statement, Run):
+            wait_vblank_label = _new_label(
+                label_counter,
+                "wait_render_vblank",
+            )
             statement_lines.extend(
                 [
                     "",
                     "; Source: nes.run",
+                    "; Runtime: defer rendering-sensitive setup to VBlank",
+                    f"{wait_vblank_label}:",
+                    "    bit $2002",
+                    f"    bpl {wait_vblank_label}",
                     "    lda #$00",
                     "    sta $2005               ; scroll X",
                     "    sta $2005               ; scroll Y",
+                    "    lda #$80",
+                    "    sta $2000               ; enable NMI after initialization",
                     "    lda #$08",
                     "    sta $2001               ; enable background rendering",
+                ]
+            )
+        elif isinstance(statement, WaitFrame):
+            wait_frame_label = _new_label(label_counter, "wait_frame")
+            statement_lines.extend(
+                [
                     "",
-                    "@main_loop:",
-                    "    jmp @main_loop",
+                    "; Source: nes.wait_frame",
+                    "; Runtime: wait for the volatile frame counter to change",
+                    "    lda runtime_frame_counter",
+                    f"{wait_frame_label}:",
+                    "    cmp runtime_frame_counter",
+                    f"    beq {wait_frame_label}",
+                    "    lda #$00",
+                    "    sta runtime_frame_ready ; consume advisory signal",
                 ]
             )
         elif isinstance(statement, ResolvedIfStatement):

@@ -6,6 +6,6 @@ This compatibility file preserves the previous `ROADMAP.md` path. Use the
 canonical index to identify the current release, last completed milestone,
 next milestone, and relevant major-version roadmap.
 
-Current snapshot: milestone 0.3.2, Zero-Page Allocation, is complete. The next
-milestone is 0.3.3, NMI and Frame Synchronization. See the canonical index for
-the authoritative status and links.
+Current snapshot: milestone 0.3.3, NMI and Frame Synchronization, is complete.
+The next milestone is 0.3.4, Frame Callbacks. See the canonical index for the
+authoritative status and links.

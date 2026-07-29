@@ -1,0 +1,6 @@
+program FrameWaitBeforeRun;
+begin
+    nes.set_background_color($21);
+    nes.wait_frame;
+    nes.run;
+end.

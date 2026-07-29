@@ -14,7 +14,24 @@ TOOLCHAIN_AVAILABLE = (
     shutil.which("ca65") is not None
     and shutil.which("ld65") is not None
 )
-MESEN_PATH = os.environ.get("MESEN_PATH")
+
+
+def _mesen_executable() -> Path | None:
+    configured = os.environ.get("MESEN_PATH")
+    if configured is None:
+        return None
+    path = Path(configured)
+    if path.is_file():
+        return path
+    if path.is_dir():
+        for name in ("Mesen.exe", "Mesen"):
+            candidate = path / name
+            if candidate.is_file():
+                return candidate
+    return None
+
+
+MESEN_EXECUTABLE = _mesen_executable()
 
 
 @unittest.skipUnless(
@@ -40,7 +57,7 @@ class ToolchainIntegrationTests(unittest.TestCase):
         nmi = int.from_bytes(rom[vector_offset : vector_offset + 2], "little")
         reset = int.from_bytes(rom[vector_offset + 2 : vector_offset + 4], "little")
         irq = int.from_bytes(rom[vector_offset + 4 : vector_offset + 6], "little")
-        self.assertEqual((nmi, reset, irq), (0x8000, 0x8002, 0x8001))
+        self.assertEqual((nmi, reset, irq), (0x8000, 0x8012, 0x8011))
 
     def test_builds_valid_minimal_nrom_image(self) -> None:
         self._assert_valid_nrom_image("minimal")
@@ -71,6 +88,9 @@ class ToolchainIntegrationTests(unittest.TestCase):
 
     def test_zero_page_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("zero_page")
+
+    def test_frame_synchronization_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("frame_synchronization")
 
     def test_optional_promotion_fallback_builds_the_same_valid_rom_format(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -125,6 +145,14 @@ class ToolchainIntegrationTests(unittest.TestCase):
         self.assertRegex(
             listing,
             r"AD rr rr\s+lda variable_RenderingEnabled",
+        )
+        self.assertRegex(
+            listing,
+            r"E6 rr\s+inc runtime_frame_counter",
+        )
+        self.assertRegex(
+            listing,
+            r"85 rr\s+sta runtime_frame_ready",
         )
 
     def test_generated_memory_artifacts_are_complete_and_reproducible(self) -> None:
@@ -201,8 +229,8 @@ end.
 
 
 @unittest.skipUnless(
-    TOOLCHAIN_AVAILABLE and MESEN_PATH is not None,
-    "emulator integration skipped: ca65, ld65, and MESEN_PATH are required",
+    TOOLCHAIN_AVAILABLE and MESEN_EXECUTABLE is not None,
+    "emulator integration skipped: ca65, ld65, and a valid MESEN_PATH are required",
 )
 class MesenIntegrationTests(unittest.TestCase):
     def _run_mesen_test(
@@ -220,7 +248,7 @@ class MesenIntegrationTests(unittest.TestCase):
                 compile_source(source_path, rom_path, memory_settings)
             result = subprocess.run(
                 [
-                    str(MESEN_PATH),
+                    str(MESEN_EXECUTABLE),
                     "--testRunner",
                     str(rom_path),
                     str(ROOT / "tests" / "mesen" / script_name),
@@ -269,6 +297,12 @@ class MesenIntegrationTests(unittest.TestCase):
             "zero_page",
             "verify_zero_page_fallback.lua",
             MemoryLayoutSettings(zero_page_automatic_size=0),
+        )
+
+    def test_frame_synchronization_waits_for_distinct_nmis(self) -> None:
+        self._run_mesen_test(
+            "frame_synchronization",
+            "verify_frame_synchronization.lua",
         )
 
 

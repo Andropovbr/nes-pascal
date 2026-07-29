@@ -32,6 +32,7 @@ from nes_pascal.ast import (
     UnaryOperator,
     VariableDeclaration,
     VariableReference,
+    WaitFrame,
     WhileStatement,
 )
 from nes_pascal.diagnostics import CompilerError
@@ -89,11 +90,33 @@ class ParserTests(unittest.TestCase):
         )
 
     def test_accepts_case_insensitive_commands(self) -> None:
-        program = parse(program_with("NES.SET_BACKGROUND_COLOR($0F);\nNES.RUN;"))
+        program = parse(
+            program_with(
+                "NES.SET_BACKGROUND_COLOR($0F);\n"
+                "NES.RUN;\n"
+                "NES.WAIT_FRAME;"
+            )
+        )
         statement = program.statements[0]
         self.assertIsInstance(statement, SetBackgroundColor)
         assert isinstance(statement, SetBackgroundColor)
         self.assertEqual(statement.argument.value, 0x0F)
+        self.assertIsInstance(program.statements[2], WaitFrame)
+
+    def test_parses_wait_frame_inside_main_loop(self) -> None:
+        program = parse(
+            program_with(
+                "nes.set_background_color($21);\n"
+                "nes.run;\n"
+                "while true do\n"
+                "    nes.wait_frame;"
+            )
+        )
+
+        loop = program.statements[2]
+        self.assertIsInstance(loop, WhileStatement)
+        assert isinstance(loop, WhileStatement)
+        self.assertEqual(loop.body, (WaitFrame(),))
 
     def test_rejects_color_outside_palette_range(self) -> None:
         source = program_with("nes.set_background_color($40);\nnes.run;")
@@ -104,7 +127,7 @@ class ParserTests(unittest.TestCase):
         self.assertIn("$00..$3F", str(error))
         self.assertEqual(error.location.filename, "invalid-color.nsp")
 
-    def test_rejects_statement_after_run(self) -> None:
+    def test_rejects_initialization_ppu_write_after_run(self) -> None:
         source = program_with(
             "nes.set_background_color($21);\n"
             "nes.run;\n"

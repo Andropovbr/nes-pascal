@@ -34,6 +34,7 @@ class DiagnosticCode(StrEnum):
     RECURSIVE_PROCEDURE_CALL = "E3014"
     PROCEDURE_RUNTIME_COMMAND = "E3015"
     PROCEDURE_ARGUMENT_COUNT = "E3016"
+    FRAME_WAIT_BEFORE_RUNTIME = "E3017"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -114,6 +115,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.PROCEDURE_ARGUMENT_COUNT: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Incorrect procedure argument count"
+    ),
+    DiagnosticCode.FRAME_WAIT_BEFORE_RUNTIME: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Frame wait before runtime start"
     ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"

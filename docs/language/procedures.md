@@ -102,4 +102,6 @@ return value exists.
 ## Runtime restrictions
 
 NES initialization commands remain exclusive to the main block. Using
-`nes.set_background_color` or `nes.run` inside a procedure produces E3015.
+`nes.set_background_color`, `nes.run`, or `nes.wait_frame` inside a procedure
+produces E3015. Frame callbacks are not implemented, so all synchronized user
+logic remains directly in the main block.

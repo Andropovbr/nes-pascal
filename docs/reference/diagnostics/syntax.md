@@ -20,8 +20,9 @@ Parser and syntax diagnostics use the E2000-E2999 range.
   Unknown command: nes.background.
   ```
 
-- **Suggested fix:** Use `nes.set_background_color(value);`, `nes.run;`, or an
-  assignment, update, or documented control-flow statement.
+- **Suggested fix:** Use `nes.set_background_color(value);`, `nes.run;`,
+  `nes.wait_frame;`, or an assignment, update, or documented control-flow
+  statement.
 
 ## E2102 - Invalid syntax
 

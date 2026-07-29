@@ -1,7 +1,7 @@
 # Your first program
 
-The minimal example exercises every built-in type and the two implemented NES
-runtime commands:
+The minimal example exercises every built-in type and the two initialization
+commands:
 
 ```pascal
 program Minimal;
@@ -25,7 +25,8 @@ end.
 
 The program declares one typed constant and three typed global variables. Its
 main block assigns every variable before use, sets the universal background
-color, enables rendering, and enters the runtime's stable loop.
+color, and starts the runtime. Because no statements follow `nes.run`, the
+compiler's implicit stable loop keeps the ROM running.
 
 Compile it from the repository root:
 

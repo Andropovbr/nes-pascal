@@ -37,6 +37,7 @@ Planned work is tracked separately in the
 - [Target platform](runtime/target-platform.md)
 - [`nes.set_background_color`](runtime/set-background-color.md)
 - [`nes.run`](runtime/run.md)
+- [`nes.wait_frame`](runtime/wait-frame.md)
 
 ## Reference
 

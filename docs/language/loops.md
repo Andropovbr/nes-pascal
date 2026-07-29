@@ -101,8 +101,20 @@ before the first range check.
 ## Runtime restrictions
 
 NES initialization commands cannot be placed inside loops. Doing so produces
-E3011. Loops execute only during startup before `nes.run`; they are not
-frame-based loops and cannot implement timed gameplay behavior.
+E3011. Loops may execute during initialization or after `nes.run`. A main-block
+loop can use `nes.wait_frame` to synchronize each iteration with a distinct
+NMI:
+
+```pascal
+nes.run;
+while Running do
+begin
+    nes.wait_frame;
+    inc(Frames);
+end;
+```
+
+The loop body remains ordinary main-thread code; NMI does not execute it.
 
 ## Generated control flow
 

@@ -40,5 +40,6 @@ begin
 end.
 ```
 
-The declaration sections must appear in this order. The main block completes
-the program and contains the top-level initialization sequence.
+The declaration sections must appear in this order. The main block contains
+the top-level initialization sequence and may continue with frame-synchronized
+main-thread logic after `nes.run`.

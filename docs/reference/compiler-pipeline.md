@@ -28,7 +28,9 @@ The compiler pipeline is deliberately separated:
   memory map;
 - `backend_ca65.py` generates readable, commented Assembly from resolved
   values using the already allocated runtime, temporary, and user symbols, and
-  emits left-to-right argument copies before procedure calls;
+  emits left-to-right argument copies before procedure calls. It also owns the
+  minimal NMI handler, VBlank-safe runtime transition, and frame-counter wait
+  sequence;
 - `cli.py` writes Assembly, the generated `.cfg` linker configuration, and the
   `.map` CPU memory report before coordinating ca65 and ld65.
 
