@@ -55,6 +55,7 @@ from .ast import (
     ValueExpression,
     VariableValue,
     VariableReference,
+    WaitFrame,
     WhileStatement,
 )
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
@@ -248,6 +249,7 @@ class SemanticAnalyzer:
             Assignment
             | SetBackgroundColor
             | Run
+            | WaitFrame
             | IfStatement
             | WhileStatement
             | RepeatStatement
@@ -552,6 +554,13 @@ class SemanticAnalyzer:
                         )
                     )
                 )
+            elif isinstance(statement, WaitFrame):
+                if inside_procedure:
+                    self._procedure_runtime_command_error(
+                        statement.position,
+                        "nes.wait_frame",
+                    )
+                resolved_statements.append(WaitFrame())
             else:
                 assert isinstance(statement, Run)
                 if inside_procedure:
@@ -1256,28 +1265,56 @@ class SemanticAnalyzer:
         )
 
     def _validate_program_structure(self, program: Program) -> None:
-        run_indices = [
-            index
+        run_commands = [
+            (index, statement)
             for index, statement in enumerate(program.statements)
             if isinstance(statement, Run)
         ]
-        if run_indices and run_indices[0] != len(program.statements) - 1:
-            offending_statement = program.statements[run_indices[0] + 1]
+        if not run_commands:
+            assert program.end_position is not None
             self._error(
-                self._statement_position(offending_statement, program),
+                program.end_position,
+                DiagnosticCode.MISSING_RUN,
+                "The program must start the runtime with nes.run.",
+                "Add one unconditional nes.run; call to the main program block.",
+            )
+        run_index, _ = run_commands[0]
+        if len(run_commands) > 1:
+            duplicate = run_commands[1][1]
+            assert duplicate.position is not None
+            self._error(
+                duplicate.position,
                 DiagnosticCode.STATEMENT_AFTER_RUN,
-                "No statement may appear after nes.run.",
-                "Move 'nes.run;' to the end of the program block.",
+                "nes.run may appear only once.",
+                "Remove the later nes.run; call.",
+                len("nes.run"),
             )
 
         color_commands = [
-            statement
-            for statement in program.statements
+            (index, statement)
+            for index, statement in enumerate(program.statements)
             if isinstance(statement, SetBackgroundColor)
         ]
+        late_color = next(
+            (
+                statement
+                for index, statement in color_commands
+                if index > run_index
+            ),
+            None,
+        )
+        if late_color is not None:
+            assert late_color.position is not None
+            self._error(
+                late_color.position,
+                DiagnosticCode.STATEMENT_AFTER_RUN,
+                "nes.set_background_color must execute before nes.run.",
+                "Move the initialization palette write before nes.run;.",
+                len("nes.set_background_color"),
+            )
         if len(color_commands) != 1:
             position = (
-                color_commands[1].position
+                color_commands[1][1].position
                 if len(color_commands) > 1
                 else program.end_position
             )
@@ -1288,15 +1325,40 @@ class SemanticAnalyzer:
                 "The program must set the background color exactly once.",
                 "Add one nes.set_background_color(value); call before nes.run.",
             )
-
-        if not run_indices:
-            assert program.end_position is not None
+        early_wait = self._first_wait_frame(program.statements[:run_index])
+        if early_wait is not None:
+            assert early_wait.position is not None
             self._error(
-                program.end_position,
-                DiagnosticCode.MISSING_RUN,
-                "The program must end with nes.run.",
-                "Add 'nes.run;' as the last statement in the block.",
+                early_wait.position,
+                DiagnosticCode.FRAME_WAIT_BEFORE_RUNTIME,
+                "nes.wait_frame cannot execute before nes.run starts NMI.",
+                "Move nes.wait_frame; and its containing frame loop after nes.run;.",
+                len("nes.wait_frame"),
             )
+
+    def _first_wait_frame(
+        self,
+        statements: tuple[Statement, ...],
+    ) -> WaitFrame | None:
+        for statement in statements:
+            if isinstance(statement, WaitFrame):
+                return statement
+            if isinstance(statement, IfStatement):
+                found = self._first_wait_frame(statement.then_branch)
+                if found is not None:
+                    return found
+                if statement.else_branch is not None:
+                    found = self._first_wait_frame(statement.else_branch)
+                    if found is not None:
+                        return found
+            elif isinstance(
+                statement,
+                (WhileStatement, RepeatStatement, ForStatement),
+            ):
+                found = self._first_wait_frame(statement.body)
+                if found is not None:
+                    return found
+        return None
 
     def _statement_position(
         self,
@@ -1304,6 +1366,7 @@ class SemanticAnalyzer:
             Assignment
             | SetBackgroundColor
             | Run
+            | WaitFrame
             | IfStatement
             | WhileStatement
             | RepeatStatement
@@ -1330,6 +1393,7 @@ class SemanticAnalyzer:
                 DecrementStatement,
                 ForStatement,
                 ProcedureCall,
+                WaitFrame,
             ),
         ):
             return statement.position

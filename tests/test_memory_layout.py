@@ -70,11 +70,53 @@ class MemoryLayoutTests(unittest.TestCase):
             [symbol.address for symbol in first.user_symbols],
             [0x0300, 0x0301, 0x0302],
         )
+        runtime_addresses = {
+            symbol.assembly_symbol: symbol.address
+            for symbol in first.runtime_symbols
+        }
+        self.assertEqual(runtime_addresses["runtime_frame_counter"], 0x0000)
+        self.assertEqual(runtime_addresses["runtime_frame_ready"], 0x0001)
+        self.assertEqual(runtime_addresses["runtime_oam_shadow"], 0x0200)
+
+    def test_nmi_state_is_isolated_from_expression_temporaries(self) -> None:
+        path = ROOT / "examples" / "frame_synchronization.nsp"
+        source = path.read_text(encoding="utf-8")
+        layout = build_memory_layout(resolved_program(source, str(path)))
+
+        interrupt_symbols = [
+            symbol
+            for symbol in layout.runtime_symbols
+            if symbol.region_name == layout.zero_page_runtime.name
+        ]
         self.assertEqual(
-            first.runtime_symbols[0].assembly_symbol,
-            "runtime_oam_shadow",
+            [
+                (symbol.assembly_symbol, symbol.address)
+                for symbol in interrupt_symbols
+            ],
+            [
+                ("runtime_frame_counter", 0x0000),
+                ("runtime_frame_ready", 0x0001),
+            ],
         )
-        self.assertEqual(first.runtime_symbols[0].address, 0x0200)
+        self.assertTrue(
+            all(symbol.address >= 0x0010 for symbol in layout.temporary_symbols)
+        )
+
+    def test_nmi_state_cannot_borrow_other_zero_page_regions(self) -> None:
+        source = small_program()
+
+        with self.assertRaises(CompilerError) as context:
+            build_memory_layout(
+                resolved_program(source),
+                MemoryLayoutSettings(zero_page_runtime_size=1),
+                source=source,
+            )
+
+        self.assertEqual(
+            context.exception.code,
+            DiagnosticCode.RAM_SEGMENT_OVERFLOW,
+        )
+        self.assertIn("Zero Page runtime", str(context.exception))
 
     def test_temporary_symbol_allocation_is_deterministic(self) -> None:
         path = ROOT / "examples" / "memory_layout.nsp"
@@ -223,6 +265,7 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertIn("RUNTIME: start = $0300, size = $0000", config)
         self.assertIn("USER:    start = $0300, size = $0500", config)
         self.assertIn("ZERO_PAGE_TEMPORARIES: load = ZP_TEMP", config)
+        self.assertIn("ZERO_PAGE_RUNTIME:     load = ZP_RUNTIME", config)
         self.assertIn("ZERO_PAGE_VARIABLES:   load = ZP_AUTO", config)
         self.assertIn("OAM_SHADOW:          load = OAM", config)
         self.assertIn("USER_VARIABLES:      load = USER", config)
@@ -252,6 +295,8 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertIn("Counter", report)
         self.assertIn("variable_Counter", report)
         self.assertIn("runtime_oam_shadow", report)
+        self.assertIn("runtime_frame_counter", report)
+        self.assertIn("runtime_frame_ready", report)
         self.assertIn("Available:", report)
 
     def test_linker_configuration_and_memory_map_are_reproducible(self) -> None:

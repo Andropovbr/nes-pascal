@@ -34,4 +34,6 @@ A valid program must call `nes.set_background_color` exactly once before
 inside a conditional, loop, or procedure.
 
 These restrictions keep the initialization sequence unconditional and ensure
-that the PPU palette write executes exactly once at a safe time.
+that the PPU palette write executes exactly once while rendering is disabled.
+The command cannot be used after `nes.run`; this milestone does not introduce
+a rendering-time PPU command queue.

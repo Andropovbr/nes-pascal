@@ -18,13 +18,16 @@ and 8 KiB of CHR-ROM.
 
 ## Startup behavior
 
-The RESET path disables interrupts, initializes the stack, and waits for the
-PPU to stabilize. PPU writes occur only at safe times during initialization.
-The program sets the universal background color, enables rendering, and then
-remains in a stable loop.
+The RESET path disables interrupts, initializes the stack and runtime-owned
+RAM, and waits for the PPU to stabilize. Initialization palette writes remain
+safe while rendering is disabled. `nes.run` waits for VBlank before enabling
+NMI and rendering.
 
-The runtime does not provide frame callbacks, a frame-based game loop, sprite
-management, controller input, or audio.
+Each NMI preserves A, X, Y, and stack balance, increments one volatile 8-bit
+frame counter, sets an advisory frame-ready byte, and returns. User logic runs
+only on the main thread. The runtime provides `nes.wait_frame`, but not frame
+callbacks, a generic PPU command queue, sprite management, controller input,
+or audio.
 
 ## Memory
 

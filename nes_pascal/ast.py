@@ -163,6 +163,11 @@ class Run:
 
 
 @dataclass(frozen=True, slots=True)
+class WaitFrame:
+    position: SourcePosition | None = field(default=None, compare=False)
+
+
+@dataclass(frozen=True, slots=True)
 class IfStatement:
     condition: ValueExpression
     then_branch: tuple[Statement, ...]
@@ -237,6 +242,7 @@ Statement = (
     Assignment
     | SetBackgroundColor
     | Run
+    | WaitFrame
     | IfStatement
     | WhileStatement
     | RepeatStatement
@@ -407,6 +413,7 @@ ResolvedStatement = (
     ResolvedAssignment
     | ResolvedSetBackgroundColor
     | Run
+    | WaitFrame
     | ResolvedIfStatement
     | ResolvedWhileStatement
     | ResolvedRepeatStatement

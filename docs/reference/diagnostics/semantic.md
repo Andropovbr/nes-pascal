@@ -5,8 +5,8 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 ## E3001 - Missing `nes.run`
 
 - **Category:** Semantic Analysis
-- **Explanation:** A valid program must finish with exactly one `nes.run`
-  statement.
+- **Explanation:** A valid program must start the runtime with exactly one
+  unconditional top-level `nes.run` statement.
 - **Trigger:**
 
   ```pascal
@@ -20,21 +20,22 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
   ```text
   E3001 demo.nsp:4:1
 
-  The program must end with nes.run.
+  The program must start the runtime with nes.run.
   ```
 
-- **Suggested fix:** Add `nes.run;` as the final statement.
+- **Suggested fix:** Add one top-level `nes.run;` after initialization and
+  before any `nes.wait_frame` statement.
 
 ## E3002 - Statement after `nes.run`
 
 - **Category:** Semantic Analysis
-- **Explanation:** `nes.run` transfers control to the stable main loop, so no
-  later statement can execute.
+- **Explanation:** Ordinary main-thread statements may follow `nes.run`, but
+  initialization-only PPU writes and additional `nes.run` calls may not.
 - **Trigger:**
 
   ```pascal
   nes.run;
-  Counter := $01;
+  nes.set_background_color($21);
   ```
 
 - **Expected compiler output:**
@@ -42,10 +43,11 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
   ```text
   E3002 demo.nsp:2:1
 
-  No statement may appear after nes.run.
+  nes.set_background_color must execute before nes.run.
   ```
 
-- **Suggested fix:** Move `nes.run;` to the end of the block.
+- **Suggested fix:** Move initialization-only commands before `nes.run`, or
+  remove a duplicate `nes.run` call.
 
 ## E3003 - Invalid background-color call count
 
@@ -335,14 +337,14 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 
 - **Category:** Semantic Analysis
 - **Explanation:** `nes.set_background_color` and `nes.run` belong to the main
-  initialization sequence and must execute exactly once. They cannot be hidden
-  behind a procedure call.
+  initialization sequence. `nes.wait_frame` depends on the main block's known
+  runtime phase. None of these commands may be hidden behind a procedure call.
 - **Trigger:**
 
   ```pascal
-  procedure StartRuntime;
+  procedure WaitInsideProcedure;
   begin
-      nes.run;
+      nes.wait_frame;
   end;
   ```
 
@@ -351,7 +353,7 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
   ```text
   E3015 demo.nsp:4:5
 
-  nes.run cannot appear inside a procedure.
+  nes.wait_frame cannot appear inside a procedure.
   ```
 
 - **Suggested fix:** Move the runtime command to the main program block.
@@ -384,3 +386,28 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 
 - **Suggested fix:** Pass exactly the declared number of arguments, in the
   same order as the parameters.
+
+## E3017 - Frame wait before runtime start
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.wait_frame` observes a counter changed by NMI. Before
+  `nes.run`, NMI is disabled and the wait could never complete.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/frame_wait_before_run.nsp`, or write:
+
+  ```pascal
+  nes.set_background_color($21);
+  nes.wait_frame;
+  nes.run;
+  ```
+
+- **Expected compiler output:**
+
+  ```text
+  E3017 frame_wait_before_run.nsp:4:5
+
+  nes.wait_frame cannot execute before nes.run starts NMI.
+  ```
+
+- **Suggested fix:** Move `nes.wait_frame` and its containing frame loop after
+  the unconditional top-level `nes.run` call.

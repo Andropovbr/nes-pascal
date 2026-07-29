@@ -30,11 +30,12 @@ the supported language.
 
 - Statements are limited to assignment, `inc` and `dec`, `if`/`else`,
   supported loops, `break`, `continue`, procedure calls,
-  `nes.set_background_color`, and `nes.run`.
+  `nes.set_background_color`, `nes.run`, and `nes.wait_frame`.
 - Conditional branches and loop bodies may contain supported statements, but
-  NES runtime commands remain top-level only.
-- `while`, `repeat`/`until`, and `for` loops execute only during initialization
-  before `nes.run`; they are not frame-based gameplay loops.
+  NES initialization commands remain top-level only. `nes.wait_frame` is the
+  sole runtime command allowed in main-block control flow.
+- Frame-synchronized loops run on the main thread. NMI cannot invoke user
+  procedures or statements.
 - `for` supports only `byte` control variables and bounds. A control variable
   cannot be modified inside its loop body.
 
@@ -46,5 +47,8 @@ the supported language.
 - CHR-ROM is empty.
 - Sprites, controller input, audio, graphics assets, and frame callbacks are
   not supported.
+- There is no generic PPU command queue. The current runtime exposes no
+  rendering-time PPU write command; initialization palette writes remain
+  restricted to the rendering-disabled phase.
 - The compiler does not provide a game engine or a general optimization pass;
   Zero Page promotion is a fixed allocation policy, not a hotness optimizer.

@@ -1,0 +1,19 @@
+program FrameSynchronization;
+
+var
+    Frames: byte;
+    Running: boolean;
+
+begin
+    Frames := $00;
+    Running := true;
+    nes.set_background_color($21);
+    nes.run;
+    while Running do
+    begin
+        nes.wait_frame;
+        inc(Frames);
+        if Frames = $03 then
+            Running := false;
+    end;
+end.

@@ -36,6 +36,7 @@ from .ast import (
     ValueExpression,
     VariableDeclaration,
     VariableReference,
+    WaitFrame,
     WhileStatement,
 )
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
@@ -312,7 +313,7 @@ class Parser:
         namespace = self._expect(
             TokenKind.IDENTIFIER,
             "Expected an assignment, update, control-flow statement, "
-            "nes.set_background_color, or nes.run.",
+            "nes.set_background_color, nes.wait_frame, or nes.run.",
         )
         self._expect(TokenKind.DOT, "Expected '.' after 'nes'.")
         command = self._expect(TokenKind.IDENTIFIER, "Expected a command name.")
@@ -330,6 +331,13 @@ class Parser:
             if consume_terminator:
                 self._expect(TokenKind.SEMICOLON, "Expected ';' after 'nes.run'.")
             return Run(SourcePosition(namespace.line, namespace.column))
+        if normalized == "nes.wait_frame":
+            if consume_terminator:
+                self._expect(
+                    TokenKind.SEMICOLON,
+                    "Expected ';' after 'nes.wait_frame'.",
+                )
+            return WaitFrame(SourcePosition(namespace.line, namespace.column))
         self._unknown_command(command, qualified_name)
         raise AssertionError("unreachable")
 
@@ -718,7 +726,7 @@ class Parser:
             f"Unknown command: {name}.",
             "Use an assignment, procedure call, inc/dec update, "
             "control-flow statement, "
-            "nes.set_background_color(value);, or nes.run;.",
+            "nes.set_background_color(value);, nes.wait_frame;, or nes.run;.",
         )
 
     def _match(self, kind: TokenKind) -> bool:

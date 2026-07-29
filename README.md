@@ -11,8 +11,9 @@ short-circuit Boolean expressions, structured conditionals and loops,
 increment and decrement operations, and acyclic procedures with `byte` and
 `boolean` value parameters. The deterministic memory layout places mandatory
 compiler temporaries in Zero Page and conservatively promotes frequently
-referenced globals with safe regular-RAM fallback. Its runtime sets the
-universal background color, enables rendering, and enters a stable loop.
+referenced globals with safe regular-RAM fallback. Its runtime installs a
+minimal register-safe NMI handler, maintains an 8-bit frame counter, and
+provides `nes.wait_frame` for deterministic main-thread frame loops.
 
 ## Documentation
 

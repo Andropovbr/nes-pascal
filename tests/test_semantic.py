@@ -1,3 +1,4 @@
+from pathlib import Path
 import unittest
 
 from nes_pascal.ast import (
@@ -23,10 +24,14 @@ from nes_pascal.ast import (
     ResolvedWhileStatement,
     Run,
     VariableValue,
+    WaitFrame,
 )
 from nes_pascal.diagnostics import CompilerError
 from nes_pascal.parser import parse
 from nes_pascal.semantic import analyze
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def analyze_source(source: str, filename: str = "semantic.nsp"):
@@ -34,6 +39,62 @@ def analyze_source(source: str, filename: str = "semantic.nsp"):
 
 
 class SemanticTests(unittest.TestCase):
+    def test_resolves_frame_wait_after_runtime_start(self) -> None:
+        source = """program FrameLoop;
+begin
+    nes.set_background_color($21);
+    nes.run;
+    while true do
+        nes.wait_frame;
+end.
+"""
+        resolved = analyze_source(source)
+
+        loop = resolved.statements[2]
+        self.assertIsInstance(loop, ResolvedWhileStatement)
+        assert isinstance(loop, ResolvedWhileStatement)
+        self.assertEqual(loop.body, (WaitFrame(),))
+
+    def test_rejects_frame_wait_before_runtime_start(self) -> None:
+        path = (
+            ROOT
+            / "tests"
+            / "fixtures"
+            / "diagnostics"
+            / "frame_wait_before_run.nsp"
+        )
+        source = path.read_text(encoding="utf-8")
+
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source, str(path))
+
+        self.assertEqual(context.exception.code, "E3017")
+        self.assertIn(
+            "cannot execute before nes.run starts NMI",
+            str(context.exception),
+        )
+        self.assertNotIn("E3001", str(context.exception))
+
+    def test_rejects_frame_wait_inside_procedure(self) -> None:
+        source = """program ProcedureWait;
+procedure WaitInsideProcedure;
+begin
+    nes.wait_frame;
+end;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze_source(source)
+
+        self.assertEqual(context.exception.code, "E3015")
+        self.assertIn(
+            "nes.wait_frame cannot appear inside a procedure",
+            str(context.exception),
+        )
+
     def test_resolves_valid_nes_color_constant(self) -> None:
         source = """program Minimal;
 const

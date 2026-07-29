@@ -31,6 +31,8 @@ class BackendGoldenTests(unittest.TestCase):
         self.assertIn('.segment "ZERO_PAGE_VARIABLES": zeropage', assembly)
         self.assertIn('.segment "USER_VARIABLES"', assembly)
         self.assertIn("runtime_oam_shadow: .res 256", assembly)
+        self.assertIn("runtime_frame_counter: .res 1", assembly)
+        self.assertIn("runtime_frame_ready: .res 1", assembly)
         self.assertIn("variable_BackgroundColor: .res 1", assembly)
         self.assertIn("sta variable_BackgroundColor", assembly)
         self.assertIn("lda variable_BackgroundColor", assembly)
@@ -215,6 +217,53 @@ end.
         self.assertIn("; $0080: Counter: byte", actual)
         self.assertIn("; $0081: BackgroundColor: nes_color", actual)
         self.assertIn("; $0300: Matches: boolean", actual)
+
+    def test_frame_synchronization_program_matches_golden_assembly(self) -> None:
+        source_path = ROOT / "examples" / "frame_synchronization.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        actual = generate(analyze(parse(source, filename), source, filename))
+        expected = (
+            ROOT / "tests" / "golden" / "frame_synchronization.asm"
+        ).read_text(encoding="utf-8")
+
+        self.assertEqual(actual, expected)
+        nmi_handler = actual.split("NMI:\n", 1)[1].split("IRQ:\n", 1)[0]
+        self.assertIn(
+            "    pha\n"
+            "    txa\n"
+            "    pha\n"
+            "    tya\n"
+            "    pha",
+            nmi_handler,
+        )
+        self.assertIn(
+            "    pla\n"
+            "    tay\n"
+            "    pla\n"
+            "    tax\n"
+            "    pla\n"
+            "    rti",
+            nmi_handler,
+        )
+        self.assertIn("inc runtime_frame_counter", nmi_handler)
+        self.assertIn("sta runtime_frame_ready", nmi_handler)
+        self.assertNotIn("jsr", nmi_handler)
+        self.assertNotIn("$200", nmi_handler)
+        self.assertNotIn("variable_", nmi_handler)
+        self.assertIn("cmp runtime_frame_counter", actual)
+        self.assertIn("beq @wait_frame_", actual)
+        self.assertIn("@runtime_idle_loop:", actual)
+        run_block = actual.split("; Source: nes.run\n", 1)[1].split(
+            "; Source: while condition do",
+            1,
+        )[0]
+        self.assertLess(run_block.index("bit $2002"), run_block.index("sta $2000"))
+        self.assertLess(run_block.index("sta $2000"), run_block.index("sta $2001"))
+        self.assertLess(
+            actual.index("sta $2007"),
+            actual.index("; Source: nes.run"),
+        )
 
 
 if __name__ == "__main__":

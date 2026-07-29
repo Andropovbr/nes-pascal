@@ -10,7 +10,9 @@
     .byte $00, $00, $00, $00, $00, $00, $00, $00
 
 .segment "ZERO_PAGE_RUNTIME": zeropage
-; Runtime: mandatory Zero Page reservation; no symbols required yet
+; Runtime: NMI-owned state, isolated from compiler expression temporaries
+runtime_frame_counter: .res 1 ; $0000: volatile 8-bit counter incremented once by each NMI
+runtime_frame_ready: .res 1 ; $0001: advisory frame-ready signal set by NMI and consumed by wait_frame
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
@@ -26,7 +28,7 @@ variable_BackgroundColor: .res 1 ; $0081: BackgroundColor: nes_color
 runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by future sprite runtime support
 
 .segment "RUNTIME_DATA"
-; Runtime: no scalar regular-RAM symbols are required in milestone 0.3.2
+; Runtime: no scalar regular-RAM symbols are required in milestone 0.3.3
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
@@ -42,6 +44,21 @@ parameter_SelectColor_Matches: .res 1 ; $0306: SelectColor.Matches: boolean
 
 ; Interrupt handlers
 NMI:
+    pha
+    txa
+    pha
+    tya
+    pha
+
+    inc runtime_frame_counter ; volatile 8-bit counter, wraps modulo 256
+    lda #$01
+    sta runtime_frame_ready   ; advisory; frame counter is authoritative
+
+    pla
+    tay
+    pla
+    tax
+    pla
     rti
 
 IRQ:
@@ -136,14 +153,22 @@ RESET:
     sta $2007
 
 ; Source: nes.run
+; Runtime: defer rendering-sensitive setup to VBlank
+@wait_render_vblank_7:
+    bit $2002
+    bpl @wait_render_vblank_7
     lda #$00
     sta $2005               ; scroll X
     sta $2005               ; scroll Y
+    lda #$80
+    sta $2000               ; enable NMI after initialization
     lda #$08
     sta $2001               ; enable background rendering
 
-@main_loop:
-    jmp @main_loop
+; Runtime: implicit stable loop after the main program finishes
+@runtime_idle_loop:
+    jmp @runtime_idle_loop
+
 
 ; Source: procedure declarations
 ; Procedure: Initialize
@@ -183,16 +208,16 @@ procedure_ApplyStep:
 ; Source: if condition then
     lda parameter_ApplyStep_ShouldApply
     cmp #$00
-    bne @if_then_7
-    jmp @if_end_8       ; long-branch-safe false path
-@if_then_7:
+    bne @if_then_8
+    jmp @if_end_9       ; long-branch-safe false path
+@if_then_8:
 
 ; Source: inc(Counter, amount)
     lda parameter_ApplyStep_Amount
     clc
     adc variable_Counter
     sta variable_Counter
-@if_end_8:
+@if_end_9:
     rts
 
 ; Procedure: SelectColor
@@ -201,20 +226,20 @@ procedure_SelectColor:
 ; Source: if condition then
     lda parameter_SelectColor_Matches
     cmp #$00
-    bne @if_then_9
-    jmp @if_else_11       ; long-branch-safe false path
-@if_then_9:
+    bne @if_then_10
+    jmp @if_else_12       ; long-branch-safe false path
+@if_then_10:
 
 ; Source: BackgroundColor := value
     lda #$21
     sta variable_BackgroundColor
-    jmp @if_end_10
-@if_else_11:
+    jmp @if_end_11
+@if_else_12:
 
 ; Source: BackgroundColor := value
     lda #$0F
     sta variable_BackgroundColor
-@if_end_10:
+@if_end_11:
     rts
 
 .segment "VECTORS"
