@@ -10,8 +10,9 @@ Generated programs target NTSC NES systems with mapper 0, NROM-256:
 
 - an explicit iNES header;
 - 32 KiB of PRG-ROM;
-- 8 KiB of CHR-ROM, empty except for two internal tiles when fixed sprite 0
-  support is used;
+- one 8 KiB CHR-ROM bank, containing a configured raw `.chr` file unchanged,
+  zero-filled by default, or containing two internal tiles when fixed sprite 0
+  support is used without a configured asset;
 - NMI, RESET, and IRQ vectors.
 
 The output image is 40,976 bytes: a 16-byte iNES header, 32 KiB of PRG-ROM,
@@ -44,8 +45,11 @@ Frequently referenced globals may be promoted conservatively; parameters and
 fallback variables use regular RAM. See [CPU memory](cpu-memory.md) for the
 complete deterministic policy.
 
-CHR-ROM is normally empty. The controller example conditionally embeds two
-internal 8x8 player tiles; there is still no user asset pipeline.
+CHR-ROM is normally empty. One exactly 8192-byte raw file can be selected with
+the compiler's `--chr` option; relative paths use the source file directory.
+The controller example conditionally embeds two internal 8x8 player tiles when
+no file is selected. Configured CHR bytes occupy the existing CHR segment once
+and are not converted or modified.
 
 The generated Assembly is intentionally readable and includes comments that
 identify the source of generated blocks. The backend is not a generic game

@@ -6,9 +6,9 @@ progression. Do not infer the current or next milestone from numbering alone.
 ## Current roadmap state
 
 - **Current release:** Release 0.4 — Background Graphics
-- **Last completed milestone:** [`0.3.5 — Controller Input`](0.md#controller-input)
-- **Next milestone:** [`0.4.1 — CHR-ROM Asset Inclusion`](0.md#chr-rom-asset-inclusion)
-- **Next milestone file:** [Version 0 roadmap](0.md#chr-rom-asset-inclusion)
+- **Last completed milestone:** [`0.4.1 — CHR-ROM Asset Inclusion`](0.md#chr-rom-asset-inclusion)
+- **Next milestone:** [`0.4.2 — Palette Support`](0.md#palette-support)
+- **Next milestone file:** [Version 0 roadmap](0.md#palette-support)
 
 ## Philosophy
 

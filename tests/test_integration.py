@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from nes_pascal.assets import NROM_CHR_ROM_SIZE
 from nes_pascal.cli import compile_source
 from nes_pascal.memory_layout import MemoryLayoutSettings
 
@@ -115,6 +116,69 @@ class ToolchainIntegrationTests(unittest.TestCase):
             expected_vectors=(0x8000, 0x803E, 0x803D),
             expected_empty_chr=False,
         )
+
+    def test_configured_chr_asset_is_included_unchanged_and_reproducibly(self) -> None:
+        source = """program ChrAsset;
+begin
+    nes.set_background_color($21);
+    nes.run;
+end.
+"""
+        expected_chr = bytes(range(256)) * 32
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            project = Path(temporary_directory) / "project"
+            source_directory = project / "source"
+            asset_directory = project / "assets"
+            output_directory = project / "build"
+            unrelated_cwd = Path(temporary_directory) / "unrelated"
+            source_directory.mkdir(parents=True)
+            asset_directory.mkdir()
+            unrelated_cwd.mkdir()
+            source_path = source_directory / "main.nsp"
+            source_path.write_text(source, encoding="utf-8")
+            (asset_directory / "tiles.chr").write_bytes(expected_chr)
+            first_rom = output_directory / "first.nes"
+            second_rom = output_directory / "second.nes"
+
+            previous_cwd = Path.cwd()
+            try:
+                os.chdir(unrelated_cwd)
+                compile_source(
+                    source_path,
+                    first_rom,
+                    chr_path="../assets/./tiles.chr",
+                )
+                compile_source(
+                    source_path,
+                    second_rom,
+                    chr_path="../assets/./tiles.chr",
+                )
+            finally:
+                os.chdir(previous_cwd)
+
+            first_bytes = first_rom.read_bytes()
+            second_bytes = second_rom.read_bytes()
+            first_config = first_rom.with_suffix(".cfg").read_bytes()
+            second_config = second_rom.with_suffix(".cfg").read_bytes()
+
+        self.assertEqual(first_bytes, second_bytes)
+        self.assertEqual(first_config, second_config)
+        self.assertEqual(first_bytes[5], 1)
+        self.assertEqual(first_bytes[-NROM_CHR_ROM_SIZE:], expected_chr)
+
+    def test_chr_asset_example_builds_with_its_project_relative_asset(self) -> None:
+        expected_chr = (ROOT / "examples" / "assets" / "chr_asset.chr").read_bytes()
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            rom_path = Path(temporary_directory) / "chr_asset.nes"
+            compile_source(
+                ROOT / "examples" / "chr_asset.nsp",
+                rom_path,
+                chr_path="assets/chr_asset.chr",
+            )
+            rom = rom_path.read_bytes()
+
+        self.assertEqual(len(expected_chr), NROM_CHR_ROM_SIZE)
+        self.assertEqual(rom[-NROM_CHR_ROM_SIZE:], expected_chr)
 
     def test_optional_promotion_fallback_builds_the_same_valid_rom_format(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

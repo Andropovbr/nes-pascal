@@ -30,6 +30,25 @@ class BackendGoldenTests(unittest.TestCase):
         )
         self.assertEqual(actual, expected)
 
+    def test_configured_chr_rom_is_emitted_once_without_default_storage(self) -> None:
+        source_path = ROOT / "examples" / "minimal.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        chr_rom = bytes(range(256)) * 32
+
+        assembly = generate(
+            analyze(parse(source, filename), source, filename),
+            chr_rom=chr_rom,
+        )
+
+        chr_segment = assembly.split('.segment "CHR"\n', 1)[1]
+        self.assertEqual(chr_segment.count("; Asset: configured CHR-ROM bytes"), 1)
+        self.assertEqual(chr_segment.count("    .byte "), 512)
+        self.assertNotIn("empty CHR-ROM", chr_segment)
+        self.assertNotIn("Runtime example asset", chr_segment)
+        self.assertIn("$00, $01, $02, $03", chr_segment)
+        self.assertTrue(chr_segment.rstrip().endswith("$FC, $FD, $FE, $FF"))
+
     def test_memory_segments_and_variable_loads_are_emitted(self) -> None:
         source_path = ROOT / "examples" / "minimal.nsp"
         source = source_path.read_text(encoding="utf-8")

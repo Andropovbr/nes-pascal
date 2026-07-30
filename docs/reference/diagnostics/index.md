@@ -68,6 +68,9 @@ the range reserved for their category.
 | [E5005](code-generation.md) | Code Generation | Invalid memory layout |
 | [E5006](code-generation.md) | Code Generation | RAM segment overflow |
 | [E6001](runtime-validation.md) | Runtime Validation | File access failure |
+| [E6002](runtime-validation.md) | Runtime Validation | CHR-ROM asset not found |
+| [E6003](runtime-validation.md) | Runtime Validation | CHR-ROM asset read failure |
+| [E6004](runtime-validation.md) | Runtime Validation | Invalid CHR-ROM size |
 
 ## Warnings
 

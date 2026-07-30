@@ -61,6 +61,9 @@ class DiagnosticCode(StrEnum):
     INVALID_MEMORY_LAYOUT = "E5005"
     RAM_SEGMENT_OVERFLOW = "E5006"
     FILE_ACCESS_FAILURE = "E6001"
+    CHR_ASSET_NOT_FOUND = "E6002"
+    CHR_ASSET_READ_FAILURE = "E6003"
+    INVALID_CHR_ROM_SIZE = "E6004"
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,6 +213,15 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.FILE_ACCESS_FAILURE: DiagnosticDefinition(
         DiagnosticCategory.RUNTIME, "File access failure"
+    ),
+    DiagnosticCode.CHR_ASSET_NOT_FOUND: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "CHR-ROM asset not found"
+    ),
+    DiagnosticCode.CHR_ASSET_READ_FAILURE: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "CHR-ROM asset read failure"
+    ),
+    DiagnosticCode.INVALID_CHR_ROM_SIZE: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Invalid CHR-ROM size"
     ),
 }
 

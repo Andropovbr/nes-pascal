@@ -57,3 +57,6 @@ diagnostics section.
 | E5005 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5006 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E6001 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6002 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6003 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6004 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
