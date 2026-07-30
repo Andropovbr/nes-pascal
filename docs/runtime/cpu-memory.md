@@ -20,10 +20,16 @@ and are never treated as additional storage.
 The Zero Page partitions are fixed and non-overlapping. Runtime and compiler
 allocations are mandatory. They never borrow from optional promotion space.
 The runtime owns `runtime_frame_counter` at `$0000` and
-`runtime_frame_ready` at `$0001`. These interrupt-visible bytes cannot overlap
+`runtime_frame_ready` at `$0001`. The update loop owns
+`runtime_last_processed_frame` at `$0002`. These runtime bytes cannot overlap
 compiler storage. The compiler places reusable expression slots and cached
 `for` limits in `$0010-$001F`. Needing more than 16 temporary bytes is a
 compilation error.
+
+VBlank callback validation rejects any reachable operation that uses those
+shared compiler temporaries. The interrupt path therefore uses runtime-owned
+Zero Page state plus callback variables, never main-context expression or
+cached-loop storage.
 
 The future explicit range prevents later source syntax for explicit Zero Page
 variables from moving the automatic-promotion ABI. Explicit Zero Page syntax
@@ -81,5 +87,6 @@ The runtime-symbol table also reports:
 
 ```text
 $0000       1  runtime_frame_counter  volatile 8-bit NMI frame counter
-$0001       1  runtime_frame_ready    advisory frame-ready signal
+$0001       1  runtime_frame_ready    best-effort advisory frame-ready latch
+$0002       1  runtime_last_processed_frame  persistent update-loop baseline
 ```

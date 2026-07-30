@@ -39,7 +39,11 @@ MESEN_EXECUTABLE = _mesen_executable()
     "integration skipped: ca65 and/or ld65 are not installed",
 )
 class ToolchainIntegrationTests(unittest.TestCase):
-    def _assert_valid_nrom_image(self, example_name: str) -> None:
+    def _assert_valid_nrom_image(
+        self,
+        example_name: str,
+        expected_vectors: tuple[int, int, int] = (0x8000, 0x8012, 0x8011),
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             rom_path = Path(temporary_directory) / f"{example_name}.nes"
             compile_source(ROOT / "examples" / f"{example_name}.nsp", rom_path)
@@ -57,7 +61,7 @@ class ToolchainIntegrationTests(unittest.TestCase):
         nmi = int.from_bytes(rom[vector_offset : vector_offset + 2], "little")
         reset = int.from_bytes(rom[vector_offset + 2 : vector_offset + 4], "little")
         irq = int.from_bytes(rom[vector_offset + 4 : vector_offset + 6], "little")
-        self.assertEqual((nmi, reset, irq), (0x8000, 0x8012, 0x8011))
+        self.assertEqual((nmi, reset, irq), expected_vectors)
 
     def test_builds_valid_minimal_nrom_image(self) -> None:
         self._assert_valid_nrom_image("minimal")
@@ -91,6 +95,15 @@ class ToolchainIntegrationTests(unittest.TestCase):
 
     def test_frame_synchronization_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("frame_synchronization")
+
+    def test_frame_callbacks_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image(
+            "frame_callbacks",
+            expected_vectors=(0x8000, 0x8015, 0x8014),
+        )
+
+    def test_slow_update_callback_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("slow_update_callback")
 
     def test_optional_promotion_fallback_builds_the_same_valid_rom_format(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -153,6 +166,41 @@ class ToolchainIntegrationTests(unittest.TestCase):
         self.assertRegex(
             listing,
             r"85 rr\s+sta runtime_frame_ready",
+        )
+
+    def test_update_frame_state_uses_zero_page_opcodes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            rom_path = directory / "frame_callbacks.nes"
+            assembly_path, _ = compile_source(
+                ROOT / "examples" / "frame_callbacks.nsp",
+                rom_path,
+            )
+            listing_path = directory / "frame_callbacks.lst"
+            listing_object = directory / "frame_callbacks_listing.o"
+            result = subprocess.run(
+                [
+                    str(shutil.which("ca65")),
+                    str(assembly_path),
+                    "-o",
+                    str(listing_object),
+                    "-l",
+                    str(listing_path),
+                ],
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            listing = listing_path.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(
+            listing,
+            r"85 rr\s+sta runtime_last_processed_frame",
+        )
+        self.assertRegex(
+            listing,
+            r"C5 rr\s+cmp runtime_last_processed_frame",
         )
 
     def test_generated_memory_artifacts_are_complete_and_reproducible(self) -> None:
@@ -303,6 +351,18 @@ class MesenIntegrationTests(unittest.TestCase):
         self._run_mesen_test(
             "frame_synchronization",
             "verify_frame_synchronization.lua",
+        )
+
+    def test_callbacks_advance_once_per_frame_across_counter_wrap(self) -> None:
+        self._run_mesen_test(
+            "frame_callbacks",
+            "verify_frame_callbacks.lua",
+        )
+
+    def test_slow_update_processes_newest_pending_frame_without_nesting(self) -> None:
+        self._run_mesen_test(
+            "slow_update_callback",
+            "verify_slow_update_callback.lua",
         )
 
 

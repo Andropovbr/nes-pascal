@@ -22,6 +22,8 @@ python -m nes_pascal.cli examples/procedure_parameters.nsp -o build/procedure_pa
 python -m nes_pascal.cli examples/memory_layout.nsp -o build/memory_layout.nes
 python -m nes_pascal.cli examples/zero_page.nsp -o build/zero_page.nes
 python -m nes_pascal.cli examples/frame_synchronization.nsp -o build/frame_synchronization.nes
+python -m nes_pascal.cli examples/frame_callbacks.nsp -o build/frame_callbacks.nes
+python -m nes_pascal.cli examples/slow_update_callback.nsp -o build/slow_update_callback.nes
 ```
 
 The examples demonstrate:
@@ -42,6 +44,10 @@ The examples demonstrate:
   non-promoted regular-RAM fallback variable;
 - `frame_synchronization.nsp`: runtime startup followed by a three-frame
   main-thread loop synchronized with `nes.wait_frame`.
+- `frame_callbacks.nsp`: one main-thread update counter and one NMI VBlank
+  counter, including a transitively validated VBlank-safe helper.
+- `slow_update_callback.nsp`: a deliberately long update that crosses NMIs and
+  demonstrates pending-frame coalescing without nested callbacks.
 
 The loop, counting, and procedure-parameter examples select background color
 `$21` only when their expected final states are reached.

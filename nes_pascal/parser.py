@@ -10,6 +10,8 @@ from .ast import (
     BooleanOperator,
     BreakStatement,
     BuiltInType,
+    CallbackKind,
+    CallbackRegistration,
     ConstantDeclaration,
     ConstantReference,
     ComparisonExpression,
@@ -313,7 +315,8 @@ class Parser:
         namespace = self._expect(
             TokenKind.IDENTIFIER,
             "Expected an assignment, update, control-flow statement, "
-            "nes.set_background_color, nes.wait_frame, or nes.run.",
+            "nes.set_background_color, callback registration, "
+            "nes.wait_frame, or nes.run.",
         )
         self._expect(TokenKind.DOT, "Expected '.' after 'nes'.")
         command = self._expect(TokenKind.IDENTIFIER, "Expected a command name.")
@@ -338,6 +341,17 @@ class Parser:
                     "Expected ';' after 'nes.wait_frame'.",
                 )
             return WaitFrame(SourcePosition(namespace.line, namespace.column))
+        if normalized in ("nes.on_update", "nes.on_vblank"):
+            kind = (
+                CallbackKind.UPDATE
+                if normalized == "nes.on_update"
+                else CallbackKind.VBLANK
+            )
+            return self._parse_callback_registration(
+                kind,
+                SourcePosition(namespace.line, namespace.column),
+                consume_terminator,
+            )
         self._unknown_command(command, qualified_name)
         raise AssertionError("unreachable")
 
@@ -409,6 +423,37 @@ class Parser:
                 "Expected ';' after 'nes.set_background_color(...)'.",
             )
         return SetBackgroundColor(argument, position)
+
+    def _parse_callback_registration(
+        self,
+        kind: CallbackKind,
+        position: SourcePosition,
+        consume_terminator: bool,
+    ) -> CallbackRegistration:
+        command = f"nes.on_{kind.value}"
+        self._expect(
+            TokenKind.LEFT_PAREN,
+            f"Expected '(' after '{command}'.",
+        )
+        procedure = self._expect(
+            TokenKind.IDENTIFIER,
+            f"Expected a direct procedure name in '{command}'.",
+        )
+        self._expect(
+            TokenKind.RIGHT_PAREN,
+            f"Expected ')' after the callback procedure name.",
+        )
+        if consume_terminator:
+            self._expect(
+                TokenKind.SEMICOLON,
+                f"Expected ';' after '{command}(...)'.",
+            )
+        return CallbackRegistration(
+            kind,
+            procedure.text,
+            position,
+            SourcePosition(procedure.line, procedure.column),
+        )
 
     def _parse_if_statement(self, consume_terminator: bool) -> IfStatement:
         if_token = self._expect(TokenKind.IF, "Expected 'if'.")
@@ -726,7 +771,8 @@ class Parser:
             f"Unknown command: {name}.",
             "Use an assignment, procedure call, inc/dec update, "
             "control-flow statement, "
-            "nes.set_background_color(value);, nes.wait_frame;, or nes.run;.",
+            "nes.set_background_color(value);, nes.on_update(Procedure);, "
+            "nes.on_vblank(Procedure);, nes.wait_frame;, or nes.run;.",
         )
 
     def _match(self, kind: TokenKind) -> bool:

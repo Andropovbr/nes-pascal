@@ -1,0 +1,13 @@
+program DuplicateUpdateCallback;
+procedure First;
+begin
+end;
+procedure Second;
+begin
+end;
+begin
+    nes.set_background_color($21);
+    nes.on_update(First);
+    nes.on_update(Second);
+    nes.run;
+end.

@@ -42,6 +42,14 @@ the range reserved for their category.
 | [E3015](semantic.md) | Semantic Analysis | Runtime command inside procedure |
 | [E3016](semantic.md) | Semantic Analysis | Incorrect procedure argument count |
 | [E3017](semantic.md) | Semantic Analysis | Frame wait before runtime start |
+| [E3018](semantic.md) | Semantic Analysis | Unknown callback procedure |
+| [E3019](semantic.md) | Semantic Analysis | Invalid callback signature |
+| [E3020](semantic.md) | Semantic Analysis | Duplicate update callback |
+| [E3021](semantic.md) | Semantic Analysis | Duplicate VBlank callback |
+| [E3022](semantic.md) | Semantic Analysis | Invalid callback registration context |
+| [E3023](semantic.md) | Semantic Analysis | VBlank-unsafe operation |
+| [E3024](semantic.md) | Semantic Analysis | Invalid callback call graph |
+| [E3025](semantic.md) | Semantic Analysis | Conflicting callback registration |
 | [E4001](type-system.md) | Type System | Unknown type |
 | [E4002](type-system.md) | Type System | Invalid `nes_color` value |
 | [E4003](type-system.md) | Type System | Invalid `byte` value |

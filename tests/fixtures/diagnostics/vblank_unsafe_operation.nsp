@@ -1,0 +1,14 @@
+program VBlankUnsafeOperation;
+var
+    Counter: byte;
+procedure VBlank;
+begin
+    while true do
+        inc(Counter);
+end;
+begin
+    Counter := $00;
+    nes.set_background_color($21);
+    nes.on_vblank(VBlank);
+    nes.run;
+end.

@@ -10,9 +10,10 @@
     .byte $00, $00, $00, $00, $00, $00, $00, $00
 
 .segment "ZERO_PAGE_RUNTIME": zeropage
-; Runtime: NMI-owned state, isolated from compiler expression temporaries
+; Runtime: frame synchronization state, isolated from compiler temporaries
 runtime_frame_counter: .res 1 ; $0000: volatile 8-bit counter incremented once by each NMI
-runtime_frame_ready: .res 1 ; $0001: advisory frame-ready signal set by NMI and consumed by wait_frame
+runtime_frame_ready: .res 1 ; $0001: advisory frame-ready signal consumed by main frame waits
+runtime_last_processed_frame: .res 1 ; $0002: persistent update-loop frame baseline
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
@@ -27,7 +28,7 @@ runtime_frame_ready: .res 1 ; $0001: advisory frame-ready signal set by NMI and 
 runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by future sprite runtime support
 
 .segment "RUNTIME_DATA"
-; Runtime: no scalar regular-RAM symbols are required in milestone 0.3.3
+; Runtime: no scalar regular-RAM symbols are currently required
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM

@@ -1,0 +1,10 @@
+program InvalidCallbackContext;
+procedure Update;
+begin
+end;
+begin
+    nes.set_background_color($21);
+    if true then
+        nes.on_update(Update);
+    nes.run;
+end.

@@ -38,6 +38,7 @@ Planned work is tracked separately in the
 - [`nes.set_background_color`](runtime/set-background-color.md)
 - [`nes.run`](runtime/run.md)
 - [`nes.wait_frame`](runtime/wait-frame.md)
+- [Frame callbacks](runtime/frame-callbacks.md)
 
 ## Reference
 

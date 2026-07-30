@@ -1,0 +1,29 @@
+program FrameCallbacks;
+
+var
+    UpdateFrames: byte;
+    VBlankFrames: byte;
+
+procedure Update;
+begin
+    inc(UpdateFrames);
+end;
+
+procedure IncrementVBlankFrames;
+begin
+    inc(VBlankFrames);
+end;
+
+procedure VBlank;
+begin
+    IncrementVBlankFrames;
+end;
+
+begin
+    UpdateFrames := $00;
+    VBlankFrames := $00;
+    nes.set_background_color($21);
+    nes.on_update(Update);
+    nes.on_vblank(VBlank);
+    nes.run;
+end.

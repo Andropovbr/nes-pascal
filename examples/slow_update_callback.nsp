@@ -1,0 +1,27 @@
+program SlowUpdateCallback;
+
+var
+    UpdateCalls: byte;
+    UpdateActive: boolean;
+    Outer: byte;
+    Inner: byte;
+
+procedure Update;
+begin
+    UpdateActive := true;
+    inc(UpdateCalls);
+    for Outer := $00 to $10 do
+    begin
+        for Inner := $00 to $FF do
+        begin
+        end;
+    end;
+    UpdateActive := false;
+end;
+
+begin
+    UpdateCalls := $00;
+    nes.set_background_color($21);
+    nes.on_update(Update);
+    nes.run;
+end.

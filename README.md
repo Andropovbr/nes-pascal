@@ -13,7 +13,11 @@ increment and decrement operations, and acyclic procedures with `byte` and
 compiler temporaries in Zero Page and conservatively promotes frequently
 referenced globals with safe regular-RAM fallback. Its runtime installs a
 minimal register-safe NMI handler, maintains an 8-bit frame counter, and
-provides `nes.wait_frame` for deterministic main-thread frame loops.
+provides `nes.wait_frame` for deterministic main-thread frame loops. Static
+`nes.on_update` and `nes.on_vblank` registrations add one main-thread update
+callback and one conservatively validated NMI VBlank callback. A persistent
+runtime frame baseline coalesces slow-frame backlog without skipping a pending
+frame or nesting update calls.
 
 ## Documentation
 
