@@ -35,9 +35,6 @@ Planned work is tracked separately in the
 
 - [NES Runtime](runtime/index.md)
 - [Target platform](runtime/target-platform.md)
-- [`nes.set_background_color`](runtime/set-background-color.md)
-- [`nes.run`](runtime/run.md)
-- [`nes.wait_frame`](runtime/wait-frame.md)
 - [Frame callbacks](runtime/frame-callbacks.md)
 - [Controller input](runtime/controller-input.md)
 
