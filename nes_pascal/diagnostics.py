@@ -48,12 +48,17 @@ class DiagnosticCode(StrEnum):
     INVALID_CONTROLLER_BUTTON = "E3028"
     INVALID_CONTROLLER_ARGUMENT_COUNT = "E3029"
     INVALID_SPRITE_ZERO_ARGUMENT_COUNT = "E3030"
+    INVALID_BACKGROUND_PALETTE_INDEX = "E3031"
+    INVALID_SPRITE_PALETTE_INDEX = "E3032"
+    INVALID_PALETTE_COLOR_INDEX = "E3033"
+    INVALID_PALETTE_ARGUMENT_COUNT = "E3034"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
     INCOMPATIBLE_TYPES = "E4004"
     UNSUPPORTED_PARAMETER_TYPE = "E4005"
     INVALID_CONTROLLER_ARGUMENT_TYPE = "E4006"
+    INVALID_PALETTE_ARGUMENT_TYPE = "E4007"
     MISSING_TOOLCHAIN = "E5001"
     TOOLCHAIN_FAILURE = "E5002"
     USER_RAM_EXHAUSTED = "E5003"
@@ -175,6 +180,18 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     DiagnosticCode.INVALID_SPRITE_ZERO_ARGUMENT_COUNT: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Invalid sprite-zero argument count"
     ),
+    DiagnosticCode.INVALID_BACKGROUND_PALETTE_INDEX: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid background palette index"
+    ),
+    DiagnosticCode.INVALID_SPRITE_PALETTE_INDEX: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid sprite palette index"
+    ),
+    DiagnosticCode.INVALID_PALETTE_COLOR_INDEX: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid palette color index"
+    ),
+    DiagnosticCode.INVALID_PALETTE_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid palette argument count"
+    ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"
     ),
@@ -192,6 +209,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INVALID_CONTROLLER_ARGUMENT_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Invalid controller argument type"
+    ),
+    DiagnosticCode.INVALID_PALETTE_ARGUMENT_TYPE: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Invalid palette argument type"
     ),
     DiagnosticCode.MISSING_TOOLCHAIN: DiagnosticDefinition(
         DiagnosticCategory.CODE_GENERATION, "Missing toolchain"

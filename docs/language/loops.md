@@ -100,10 +100,10 @@ before the first range check.
 
 ## Runtime restrictions
 
-NES initialization commands cannot be placed inside loops. Doing so produces
-E3011. Loops may execute during initialization or after `nes.run`. A main-block
-loop can use `nes.wait_frame` to synchronize each iteration with a distinct
-NMI:
+`nes.run` cannot be placed inside loops. Loops may execute during initialization
+or after `nes.run`; palette calls after runtime starts queue bounded VBlank
+updates. A main-block loop can use `nes.wait_frame` to synchronize each
+iteration with a distinct NMI:
 
 ```pascal
 nes.run;

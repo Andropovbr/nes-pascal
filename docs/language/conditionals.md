@@ -45,10 +45,9 @@ branches of an `if/else` is assigned afterward. An assignment made only in the
 
 ## Runtime restrictions
 
-[`nes.set_background_color`](../runtime/set-background-color.md) and
-[`nes.run`](../runtime/run.md) are initialization commands and must remain in
-the top-level program block. Placing either command inside a conditional
-produces E3009.
+[`nes.run`](../runtime/run.md) must remain in the top-level program block.
+Palette calls inside runtime conditionals are allowed and stage changes for
+VBlank; pre-`nes.run` top-level calls write directly during initialization.
 
 ## Generated control flow
 

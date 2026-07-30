@@ -1,0 +1,6 @@
+program InvalidPaletteColorIndex;
+begin
+    nes.set_background_palette_color($00, $04, $21);
+    nes.set_background_color($0F);
+    nes.run;
+end.

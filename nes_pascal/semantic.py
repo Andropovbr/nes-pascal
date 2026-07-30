@@ -24,6 +24,7 @@ from .ast import (
     IfStatement,
     ImmediateValue,
     IncrementStatement,
+    PaletteKind,
     Program,
     ProcedureCall,
     ProcedureDeclaration,
@@ -47,6 +48,8 @@ from .ast import (
     ResolvedProcedure,
     ResolvedProcedureCall,
     ResolvedSetBackgroundColor,
+    ResolvedSetPalette,
+    ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
     ResolvedStatement,
     ResolvedValue,
@@ -55,6 +58,8 @@ from .ast import (
     ResolvedUnaryExpression,
     Run,
     SetBackgroundColor,
+    SetPalette,
+    SetPaletteColor,
     SetSpriteZero,
     SourcePosition,
     Statement,
@@ -231,6 +236,7 @@ class SemanticAnalyzer:
                 loop_depth=0,
                 protected_control_variables=frozenset(),
                 inside_procedure=True,
+                runtime_started=True,
             )
             required_variables = frozenset(self.required_variables)
             resolved_procedure = ResolvedProcedure(
@@ -259,6 +265,7 @@ class SemanticAnalyzer:
             loop_depth=0,
             protected_control_variables=frozenset(),
             inside_procedure=False,
+            runtime_started=False,
         )
 
         update_symbol = self.callback_symbols.get(CallbackKind.UPDATE)
@@ -295,6 +302,8 @@ class SemanticAnalyzer:
         statements: tuple[
             Assignment
             | SetBackgroundColor
+            | SetPalette
+            | SetPaletteColor
             | Run
             | WaitFrame
             | CallbackRegistration
@@ -317,6 +326,7 @@ class SemanticAnalyzer:
         loop_depth: int,
         protected_control_variables: frozenset[str],
         inside_procedure: bool,
+        runtime_started: bool,
     ) -> tuple[tuple[ResolvedStatement, ...], set[str]]:
         current_assignments = set(assigned_variables)
         resolved_statements: list[ResolvedStatement] = []
@@ -352,6 +362,7 @@ class SemanticAnalyzer:
                     loop_depth=loop_depth,
                     protected_control_variables=protected_control_variables,
                     inside_procedure=inside_procedure,
+                    runtime_started=runtime_started,
                 )
                 resolved_else = None
                 if statement.else_branch is not None:
@@ -364,6 +375,7 @@ class SemanticAnalyzer:
                         loop_depth=loop_depth,
                         protected_control_variables=protected_control_variables,
                         inside_procedure=inside_procedure,
+                        runtime_started=runtime_started,
                     )
                     current_assignments = (
                         then_assignments & else_assignments
@@ -392,6 +404,7 @@ class SemanticAnalyzer:
                     loop_depth=loop_depth + 1,
                     protected_control_variables=protected_control_variables,
                     inside_procedure=inside_procedure,
+                    runtime_started=runtime_started,
                 )
                 resolved_statements.append(
                     ResolvedWhileStatement(condition, body)
@@ -406,6 +419,7 @@ class SemanticAnalyzer:
                     loop_depth=loop_depth + 1,
                     protected_control_variables=protected_control_variables,
                     inside_procedure=inside_procedure,
+                    runtime_started=runtime_started,
                 )
                 condition = self._resolve_value(
                     statement.condition,
@@ -494,6 +508,7 @@ class SemanticAnalyzer:
                         protected_control_variables | {normalized_target}
                     ),
                     inside_procedure=inside_procedure,
+                    runtime_started=runtime_started,
                 )
                 resolved_statements.append(
                     ResolvedForStatement(
@@ -610,21 +625,6 @@ class SemanticAnalyzer:
                     ResolvedSetSpriteZero(x, y, tile, attributes)
                 )
             elif isinstance(statement, SetBackgroundColor):
-                if inside_procedure:
-                    self._procedure_runtime_command_error(
-                        statement.position,
-                        "nes.set_background_color",
-                    )
-                if loop_depth > 0:
-                    self._loop_runtime_command_error(
-                        statement.position,
-                        "nes.set_background_color",
-                    )
-                if inside_conditional:
-                    self._conditional_runtime_command_error(
-                        statement.position,
-                        "nes.set_background_color",
-                    )
                 resolved_statements.append(
                     ResolvedSetBackgroundColor(
                         self._resolve_value(
@@ -633,7 +633,81 @@ class SemanticAnalyzer:
                             constants,
                             variables,
                             current_assignments,
-                        )
+                        ),
+                        queued=runtime_started or inside_procedure,
+                    )
+                )
+            elif isinstance(statement, SetPalette):
+                command = f"nes.set_{statement.kind.value}_palette"
+                if len(statement.arguments) != 5:
+                    self._palette_argument_count_error(
+                        statement.position,
+                        command,
+                        5,
+                        len(statement.arguments),
+                    )
+                palette_index = self._resolve_palette_index(
+                    statement.arguments[0],
+                    statement.kind,
+                    constants,
+                    variables,
+                    command,
+                )
+                colors = tuple(
+                    self._resolve_palette_color(
+                        argument,
+                        constants,
+                        variables,
+                        current_assignments,
+                        command,
+                    )
+                    for argument in statement.arguments[1:]
+                )
+                assert len(colors) == 4
+                resolved_statements.append(
+                    ResolvedSetPalette(
+                        statement.kind,
+                        palette_index,
+                        colors,
+                        queued=runtime_started or inside_procedure,
+                    )
+                )
+            elif isinstance(statement, SetPaletteColor):
+                command = f"nes.set_{statement.kind.value}_palette_color"
+                if len(statement.arguments) != 3:
+                    self._palette_argument_count_error(
+                        statement.position,
+                        command,
+                        3,
+                        len(statement.arguments),
+                    )
+                palette_index = self._resolve_palette_index(
+                    statement.arguments[0],
+                    statement.kind,
+                    constants,
+                    variables,
+                    command,
+                )
+                color_index = self._resolve_palette_color_index(
+                    statement.arguments[1],
+                    constants,
+                    variables,
+                    command,
+                )
+                color = self._resolve_palette_color(
+                    statement.arguments[2],
+                    constants,
+                    variables,
+                    current_assignments,
+                    command,
+                )
+                resolved_statements.append(
+                    ResolvedSetPaletteColor(
+                        statement.kind,
+                        palette_index,
+                        color_index,
+                        color,
+                        queued=runtime_started or inside_procedure,
                     )
                 )
             elif isinstance(statement, WaitFrame):
@@ -684,6 +758,7 @@ class SemanticAnalyzer:
                             len(registration.procedure_name),
                         )
                 resolved_statements.append(Run())
+                runtime_started = True
 
         return (
             tuple(resolved_statements),
@@ -865,6 +940,19 @@ class SemanticAnalyzer:
                     "commits it safely during NMI.",
                     len("nes.set_sprite_zero"),
                 )
+            if isinstance(
+                statement,
+                (SetBackgroundColor, SetPalette, SetPaletteColor),
+            ):
+                values = (
+                    (statement.argument,)
+                    if isinstance(statement, SetBackgroundColor)
+                    else statement.arguments
+                )
+                for value in values:
+                    if not self._vblank_expression_is_safe(value):
+                        self._vblank_unsafe_expression(value, owner)
+                return
             if isinstance(statement, (IncrementStatement, DecrementStatement)):
                 if statement.amount is not None:
                     self._error(
@@ -998,6 +1086,10 @@ class SemanticAnalyzer:
             return "nes.run"
         if isinstance(statement, SetBackgroundColor):
             return "nes.set_background_color"
+        if isinstance(statement, SetPalette):
+            return f"nes.set_{statement.kind.value}_palette"
+        if isinstance(statement, SetPaletteColor):
+            return f"nes.set_{statement.kind.value}_palette_color"
         if isinstance(statement, SetSpriteZero):
             return "nes.set_sprite_zero"
         if isinstance(statement, CallbackRegistration):
@@ -1515,6 +1607,165 @@ class SemanticAnalyzer:
             )
         return value
 
+    def _palette_argument_count_error(
+        self,
+        position: SourcePosition,
+        command: str,
+        expected: int,
+        actual: int,
+    ) -> None:
+        self._error(
+            position,
+            DiagnosticCode.INVALID_PALETTE_ARGUMENT_COUNT,
+            f"{command} expects exactly {expected} arguments, but {actual} "
+            "were provided.",
+            (
+                "Pass a byte palette index followed by four nes_color values."
+                if expected == 5
+                else "Pass byte palette and color indexes followed by one "
+                "nes_color value."
+            ),
+            len(command),
+        )
+
+    def _resolve_palette_index(
+        self,
+        argument: ValueExpression,
+        kind: PaletteKind,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        command: str,
+    ) -> int:
+        code = (
+            DiagnosticCode.INVALID_BACKGROUND_PALETTE_INDEX
+            if kind is PaletteKind.BACKGROUND
+            else DiagnosticCode.INVALID_SPRITE_PALETTE_INDEX
+        )
+        return self._resolve_fixed_palette_index(
+            argument,
+            constants,
+            variables,
+            command,
+            "palette",
+            code,
+        )
+
+    def _resolve_palette_color_index(
+        self,
+        argument: ValueExpression,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        command: str,
+    ) -> int:
+        return self._resolve_fixed_palette_index(
+            argument,
+            constants,
+            variables,
+            command,
+            "color",
+            DiagnosticCode.INVALID_PALETTE_COLOR_INDEX,
+        )
+
+    def _resolve_fixed_palette_index(
+        self,
+        argument: ValueExpression,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        command: str,
+        description: str,
+        code: DiagnosticCode,
+    ) -> int:
+        value: int | None = None
+        text = getattr(argument, "text", getattr(argument, "name", "expression"))
+        if isinstance(argument, HexLiteral):
+            value = argument.value
+        elif isinstance(argument, ConstantReference):
+            constant = constants.get(argument.name.lower())
+            if constant is None:
+                self._resolve_value(
+                    argument,
+                    BuiltInType.BYTE,
+                    constants,
+                    variables,
+                    set(),
+                )
+                raise AssertionError("unreachable")
+            if constant.type is not BuiltInType.BYTE:
+                self._palette_argument_type_error(
+                    argument.position,
+                    command,
+                    f"{description} index",
+                    constant.type,
+                )
+            value = constant.value
+        else:
+            actual_type = self._expression_type_hint(argument, constants, variables)
+            if actual_type is not None and actual_type is not BuiltInType.BYTE:
+                self._palette_argument_type_error(
+                    argument.position,
+                    command,
+                    f"{description} index",
+                    actual_type,
+                )
+            self._error(
+                argument.position,
+                code,
+                f"The {description} index for {command} must be a compile-time "
+                "byte value in $00..$03.",
+                "Use $00, $01, $02, $03, or a byte constant with one of those values.",
+                len(str(text)),
+            )
+        assert value is not None
+        if value > 3:
+            self._error(
+                argument.position,
+                code,
+                f"{description.capitalize()} index {text} is invalid for {command}.",
+                "Use an index in the range $00..$03.",
+                len(str(text)),
+            )
+        return value
+
+    def _resolve_palette_color(
+        self,
+        argument: ValueExpression,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+        command: str,
+    ) -> ResolvedValue:
+        actual_type = self._expression_type_hint(argument, constants, variables)
+        if actual_type is not None and actual_type is not BuiltInType.NES_COLOR:
+            self._palette_argument_type_error(
+                argument.position,
+                command,
+                "color",
+                actual_type,
+            )
+        return self._resolve_value(
+            argument,
+            BuiltInType.NES_COLOR,
+            constants,
+            variables,
+            assigned_variables,
+        )
+
+    def _palette_argument_type_error(
+        self,
+        position: SourcePosition,
+        command: str,
+        argument_name: str,
+        actual_type: BuiltInType,
+    ) -> None:
+        expected = "byte" if "index" in argument_name else "nes_color"
+        self._error(
+            position,
+            DiagnosticCode.INVALID_PALETTE_ARGUMENT_TYPE,
+            f"The {argument_name} argument to {command} has type "
+            f"{actual_type.value}, but {expected} is required.",
+            f"Use a {expected} value for the {argument_name} argument.",
+        )
+
     def _resolve_controller_button(
         self,
         argument: ValueExpression,
@@ -1922,25 +2173,8 @@ class SemanticAnalyzer:
         color_commands = [
             (index, statement)
             for index, statement in enumerate(program.statements)
-            if isinstance(statement, SetBackgroundColor)
+            if isinstance(statement, SetBackgroundColor) and index < run_index
         ]
-        late_color = next(
-            (
-                statement
-                for index, statement in color_commands
-                if index > run_index
-            ),
-            None,
-        )
-        if late_color is not None:
-            assert late_color.position is not None
-            self._error(
-                late_color.position,
-                DiagnosticCode.STATEMENT_AFTER_RUN,
-                "nes.set_background_color must execute before nes.run.",
-                "Move the initialization palette write before nes.run;.",
-                len("nes.set_background_color"),
-            )
         if len(color_commands) != 1:
             position = (
                 color_commands[1][1].position
@@ -1951,8 +2185,8 @@ class SemanticAnalyzer:
             self._error(
                 position,
                 DiagnosticCode.INVALID_BACKGROUND_COLOR_CALL_COUNT,
-                "The program must set the background color exactly once.",
-                "Add one nes.set_background_color(value); call before nes.run.",
+                "The program must set its initial background color exactly once.",
+                "Add one nes.set_background_color(value); call before nes.run;.",
             )
         early_wait = self._first_wait_frame(program.statements[:run_index])
         if early_wait is not None:
@@ -1994,6 +2228,8 @@ class SemanticAnalyzer:
         statement: (
             Assignment
             | SetBackgroundColor
+            | SetPalette
+            | SetPaletteColor
             | Run
             | WaitFrame
             | IfStatement

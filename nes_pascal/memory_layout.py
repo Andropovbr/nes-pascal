@@ -19,6 +19,8 @@ from .ast import (
     ResolvedProgram,
     ResolvedRepeatStatement,
     ResolvedSetBackgroundColor,
+    ResolvedSetPalette,
+    ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
     ResolvedStatement,
     ResolvedUnaryExpression,
@@ -233,8 +235,12 @@ def build_memory_layout(
     """Validate settings and allocate every RAM-backed program symbol."""
 
     sprite_zero_enabled = _uses_sprite_zero(program)
-    if sprite_zero_enabled and settings.runtime_data_size < 5:
-        settings = replace(settings, runtime_data_size=5)
+    palette_runtime_enabled = _uses_runtime_palette(program)
+    sprite_runtime_size = 5 if sprite_zero_enabled else 0
+    palette_runtime_size = 44 if palette_runtime_enabled else 0
+    required_runtime_size = sprite_runtime_size + palette_runtime_size
+    if settings.runtime_data_size < required_runtime_size:
+        settings = replace(settings, runtime_data_size=required_runtime_size)
 
     regions = _validated_regions(settings, source, filename)
     (
@@ -392,6 +398,74 @@ def build_memory_layout(
                 ),
             )
             if sprite_zero_enabled
+            else ()
+        ),
+        *(
+            (
+                MemorySymbol(
+                    "runtime_palette_shadow",
+                    runtime_data.start + sprite_runtime_size,
+                    32,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "canonical 32-byte background and sprite palette shadow",
+                ),
+                *(
+                    MemorySymbol(
+                        f"runtime_palette_background_{index}_dirty",
+                        runtime_data.start + sprite_runtime_size + 32 + index,
+                        1,
+                        SymbolKind.RUNTIME,
+                        runtime_data.name,
+                        f"atomic publish flag for background palette {index}",
+                    )
+                    for index in range(4)
+                ),
+                *(
+                    MemorySymbol(
+                        f"runtime_palette_sprite_{index}_dirty",
+                        runtime_data.start + sprite_runtime_size + 36 + index,
+                        1,
+                        SymbolKind.RUNTIME,
+                        runtime_data.name,
+                        f"atomic publish flag for sprite palette {index}",
+                    )
+                    for index in range(4)
+                ),
+                MemorySymbol(
+                    "runtime_palette_universal_dirty",
+                    runtime_data.start + sprite_runtime_size + 40,
+                    1,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "atomic publish flag for the universal background color",
+                ),
+                MemorySymbol(
+                    "runtime_ppuctrl_shadow",
+                    runtime_data.start + sprite_runtime_size + 41,
+                    1,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "PPUCTRL value restored after runtime palette uploads",
+                ),
+                MemorySymbol(
+                    "runtime_scroll_x_shadow",
+                    runtime_data.start + sprite_runtime_size + 42,
+                    1,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "horizontal scroll value restored after runtime palette uploads",
+                ),
+                MemorySymbol(
+                    "runtime_scroll_y_shadow",
+                    runtime_data.start + sprite_runtime_size + 43,
+                    1,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "vertical scroll value restored after runtime palette uploads",
+                ),
+            )
+            if palette_runtime_enabled
             else ()
         ),
     )
@@ -1034,6 +1108,33 @@ def _uses_sprite_zero(program: ResolvedProgram) -> bool:
     )
 
 
+def _uses_runtime_palette(program: ResolvedProgram) -> bool:
+    def contains(statements: tuple[ResolvedStatement, ...]) -> bool:
+        for statement in statements:
+            if isinstance(
+                statement,
+                (ResolvedSetBackgroundColor, ResolvedSetPalette, ResolvedSetPaletteColor),
+            ) and statement.queued:
+                return True
+            if isinstance(statement, ResolvedIfStatement):
+                if contains(statement.then_branch):
+                    return True
+                if statement.else_branch is not None and contains(
+                    statement.else_branch
+                ):
+                    return True
+            elif isinstance(
+                statement,
+                (ResolvedWhileStatement, ResolvedRepeatStatement, ResolvedForStatement),
+            ) and contains(statement.body):
+                return True
+        return False
+
+    return contains(program.statements) or any(
+        contains(procedure.body) for procedure in program.procedures
+    )
+
+
 def _count_statement_variable_references(
     statement: ResolvedStatement,
     counts: dict[str, int],
@@ -1043,6 +1144,11 @@ def _count_statement_variable_references(
         _count_value_variable_references(statement.value, counts)
     elif isinstance(statement, ResolvedSetBackgroundColor):
         _count_value_variable_references(statement.argument, counts)
+    elif isinstance(statement, ResolvedSetPalette):
+        for value in statement.colors:
+            _count_value_variable_references(value, counts)
+    elif isinstance(statement, ResolvedSetPaletteColor):
+        _count_value_variable_references(statement.color, counts)
     elif isinstance(statement, ResolvedSetSpriteZero):
         for value in (
             statement.x,
@@ -1140,6 +1246,10 @@ def _statement_expression_depth(statement: ResolvedStatement) -> int:
         return _expression_depth(statement.value)
     if isinstance(statement, ResolvedSetBackgroundColor):
         return _expression_depth(statement.argument)
+    if isinstance(statement, ResolvedSetPalette):
+        return max(_expression_depth(value) for value in statement.colors)
+    if isinstance(statement, ResolvedSetPaletteColor):
+        return _expression_depth(statement.color)
     if isinstance(statement, ResolvedSetSpriteZero):
         return max(
             _expression_depth(statement.x),

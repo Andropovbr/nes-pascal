@@ -26,6 +26,7 @@ python -m nes_pascal.cli examples/frame_callbacks.nsp -o build/frame_callbacks.n
 python -m nes_pascal.cli examples/slow_update_callback.nsp -o build/slow_update_callback.nes
 python -m nes_pascal.cli examples/controller_input.nsp -o build/controller_input.nes
 python -m nes_pascal.cli examples/chr_asset.nsp -o build/chr_asset.nes --chr assets/chr_asset.chr
+python -m nes_pascal.cli examples/palette_support.nsp -o build/palette_support.nes --chr assets/chr_asset.chr
 ```
 
 The examples demonstrate:
@@ -54,6 +55,8 @@ The examples demonstrate:
   appearance, Start reset, Select mode toggle, safe sprite-0 staging, OAM DMA,
   and two small embedded CHR tiles.
 - `chr_asset.nsp`: inclusion of one project-relative raw CHR-ROM asset.
+- `palette_support.nsp`: custom CHR data, initialized background and sprite
+  palettes, then a safely queued full and individual palette update.
 
 The loop, counting, and procedure-parameter examples select background color
 `$21` only when their expected final states are reached.

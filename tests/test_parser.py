@@ -25,6 +25,7 @@ from nes_pascal.ast import (
     ProcedureDeclaration,
     ProcedureParameter,
     RepeatStatement,
+    ResolvedSetBackgroundColor,
     Run,
     SetBackgroundColor,
     SourcePosition,
@@ -127,15 +128,17 @@ class ParserTests(unittest.TestCase):
         self.assertIn("$00..$3F", str(error))
         self.assertEqual(error.location.filename, "invalid-color.nsp")
 
-    def test_rejects_initialization_ppu_write_after_run(self) -> None:
+    def test_accepts_queued_background_color_write_after_run(self) -> None:
         source = program_with(
             "nes.set_background_color($21);\n"
             "nes.run;\n"
             "nes.set_background_color($10);"
         )
-        with self.assertRaises(CompilerError) as context:
-            analyze(parse(source), source)
-        self.assertEqual(context.exception.code, "E3002")
+        resolved = analyze(parse(source), source)
+        command = resolved.statements[2]
+        self.assertIsInstance(command, ResolvedSetBackgroundColor)
+        assert isinstance(command, ResolvedSetBackgroundColor)
+        self.assertTrue(command.queued)
 
     def test_rejects_unknown_command_without_traceback(self) -> None:
         with self.assertRaises(CompilerError) as context:

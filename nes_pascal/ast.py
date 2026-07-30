@@ -53,6 +53,11 @@ class ControllerQueryKind(Enum):
     RELEASED = "released"
 
 
+class PaletteKind(Enum):
+    BACKGROUND = "background"
+    SPRITE = "sprite"
+
+
 @dataclass(frozen=True, slots=True)
 class HexLiteral:
     value: int
@@ -177,6 +182,20 @@ class SetBackgroundColor:
 
 
 @dataclass(frozen=True, slots=True)
+class SetPalette:
+    kind: PaletteKind
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class SetPaletteColor:
+    kind: PaletteKind
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
 class Run:
     position: SourcePosition | None = field(default=None, compare=False)
 
@@ -274,6 +293,8 @@ class ProcedureCall:
 Statement = (
     Assignment
     | SetBackgroundColor
+    | SetPalette
+    | SetPaletteColor
     | Run
     | WaitFrame
     | CallbackRegistration
@@ -388,6 +409,24 @@ class ResolvedAssignment:
 @dataclass(frozen=True, slots=True)
 class ResolvedSetBackgroundColor:
     argument: ResolvedValue
+    queued: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedSetPalette:
+    kind: PaletteKind
+    palette_index: int
+    colors: tuple[ResolvedValue, ResolvedValue, ResolvedValue, ResolvedValue]
+    queued: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedSetPaletteColor:
+    kind: PaletteKind
+    palette_index: int
+    color_index: int
+    color: ResolvedValue
+    queued: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -471,6 +510,8 @@ class ResolvedSetSpriteZero:
 ResolvedStatement = (
     ResolvedAssignment
     | ResolvedSetBackgroundColor
+    | ResolvedSetPalette
+    | ResolvedSetPaletteColor
     | Run
     | WaitFrame
     | ResolvedCallbackRegistration

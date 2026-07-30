@@ -27,13 +27,13 @@ nes.set_background_color(BackgroundColor);
 See [`nes_color`](../language/types.md#nes_color) for its `$00..$3F` range and
 [Assignments](../language/assignments.md) for definite-assignment rules.
 
-## Placement and call count
+## Initialization and runtime behavior
 
-A valid program must call `nes.set_background_color` exactly once before
-`nes.run`. The call must be in the top-level program block. It cannot appear
-inside a conditional, loop, or procedure.
+A valid program must establish its initial background color with exactly one
+top-level call before `nes.run`. That call writes `$3F00` directly while
+rendering is disabled.
 
-These restrictions keep the initialization sequence unconditional and ensure
-that the PPU palette write executes exactly once while rendering is disabled.
-The command cannot be used after `nes.run`; this milestone does not introduce
-a rendering-time PPU command queue.
+Calls after `nes.run` or inside procedures update the canonical palette shadow
+and publish the change for the next VBlank. They never write `$2006/$2007`
+from normal runtime code. Repeated pending changes are last-write-wins. See
+[Palette API](palettes.md) for color-zero mirroring and queue details.

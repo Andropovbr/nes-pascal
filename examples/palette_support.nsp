@@ -1,0 +1,19 @@
+program PaletteSupport;
+
+procedure ChangePalettes;
+begin
+    nes.set_background_palette($00, $0F, $01, $11, $21);
+    nes.set_background_palette($00, $16, $06, $17, $27);
+    nes.set_sprite_palette_color($00, $03, $30);
+end;
+
+begin
+    nes.set_background_palette($00, $0F, $00, $10, $20);
+    nes.set_background_palette($00, $21, $01, $11, $31);
+    nes.set_sprite_palette($00, $21, $06, $16, $26);
+    nes.set_background_color($21);
+    nes.set_sprite_zero($78, $70, $01, $00);
+    nes.run;
+    nes.wait_frame;
+    ChangePalettes;
+end.
