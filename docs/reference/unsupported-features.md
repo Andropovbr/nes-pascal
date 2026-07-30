@@ -48,11 +48,11 @@ the supported language.
 - Automatic Zero Page promotion is limited to the deterministic global-variable
   policy. Explicit Zero Page declarations are not implemented.
 - Only NTSC NES, mapper 0, 32 KiB PRG-ROM, and 8 KiB CHR-ROM are supported.
-- CHR-ROM remains empty unless the fixed sprite-0 demonstration helper is
-  used; that helper embeds two internal 8x8 player tiles.
+- One raw, exactly 8 KiB CHR-ROM file is supported. CHR-RAM, multiple files or
+  banks, graphics conversion, compression, and runtime CHR updates are not.
 - Standard controllers 1 and 2 are supported without remapping, Four Score,
   expansion devices, buffering, combos, turbo, or DMC-safe repeated reads.
-- General sprites, audio, and user-provided graphics assets are not supported.
+- General sprites, audio, and converted graphics assets are not supported.
   `nes.set_sprite_zero` stages hardware sprite 0 only and is not a sprite API.
 - Callback registration is static. There is only one callback of each kind,
   with no parameters, return values, priorities, lists, removal, indirect

@@ -25,6 +25,7 @@ python -m nes_pascal.cli examples/frame_synchronization.nsp -o build/frame_synch
 python -m nes_pascal.cli examples/frame_callbacks.nsp -o build/frame_callbacks.nes
 python -m nes_pascal.cli examples/slow_update_callback.nsp -o build/slow_update_callback.nes
 python -m nes_pascal.cli examples/controller_input.nsp -o build/controller_input.nes
+python -m nes_pascal.cli examples/chr_asset.nsp -o build/chr_asset.nes --chr assets/chr_asset.chr
 ```
 
 The examples demonstrate:
@@ -52,6 +53,7 @@ The examples demonstrate:
 - `controller_input.nsp`: controller 1 movement, held A speed, B press/release
   appearance, Start reset, Select mode toggle, safe sprite-0 staging, OAM DMA,
   and two small embedded CHR tiles.
+- `chr_asset.nsp`: inclusion of one project-relative raw CHR-ROM asset.
 
 The loop, counting, and procedure-parameter examples select background color
 `$21` only when their expected final states are reached.
@@ -69,6 +71,22 @@ Each command also writes a generated ld65 configuration beside the ROM using
 the `.cfg` suffix and a human-readable CPU RAM report using `.map`. The map
 lists reserved, runtime, compiler, user, and free regions plus the address of
 every source variable and value parameter. See [CPU memory](../runtime/cpu-memory.md).
+
+## CHR-ROM assets
+
+Configure one raw CHR-ROM file with `--chr`:
+
+```text
+python -m nes_pascal.cli examples/chr_asset.nsp -o build/chr_asset.nes --chr assets/chr_asset.chr
+```
+
+Relative paths are resolved from the directory containing the `.nsp` source,
+not from the compiler process working directory. `.` and `..` components and
+platform-native separators are supported; absolute paths remain valid. NROM
+currently requires exactly 8192 bytes (8 KiB). A missing, unreadable, or
+incorrectly sized configured file stops compilation with a diagnostic. When
+`--chr` is omitted, the compiler generates an empty 8 KiB CHR-ROM (except for
+the existing fixed sprite-0 demonstration, which retains its internal tiles).
 
 ## Running in Mesen
 

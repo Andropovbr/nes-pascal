@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 
+from .assets import load_chr_rom
 from .backend_ca65 import generate
 from .diagnostics import CompilerError, DiagnosticCode
 from .memory_layout import (
@@ -27,19 +28,21 @@ def compile_source(
     source_path: Path,
     output_path: Path,
     memory_settings: MemoryLayoutSettings = DEFAULT_MEMORY_LAYOUT_SETTINGS,
+    chr_path: str | Path | None = None,
 ) -> tuple[Path, Path]:
     source_path = source_path.resolve()
     output_path = output_path.resolve()
     source = source_path.read_text(encoding="utf-8")
     program = parse(source, str(source_path))
     resolved_program = analyze(program, source, str(source_path))
+    chr_rom = load_chr_rom(chr_path, source_path, source)
     layout = build_memory_layout(
         resolved_program,
         memory_settings,
         source=source,
         filename=str(source_path),
     )
-    assembly = generate(resolved_program, layout)
+    assembly = generate(resolved_program, layout, chr_rom=chr_rom)
     linker_config = generate_linker_config(layout)
     memory_map = generate_memory_map(layout)
 
@@ -94,13 +97,22 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("source", type=Path, help=".nsp source file")
     parser.add_argument("-o", "--output", required=True, type=Path, help=".nes ROM")
+    parser.add_argument(
+        "--chr",
+        type=str,
+        help="8 KiB .chr asset; relative paths use the source file directory",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     arguments = build_argument_parser().parse_args(argv)
     try:
-        assembly_path, rom_path = compile_source(arguments.source, arguments.output)
+        assembly_path, rom_path = compile_source(
+            arguments.source,
+            arguments.output,
+            chr_path=arguments.chr,
+        )
     except (CompilerError, ToolchainError) as error:
         print(error, file=sys.stderr)
         return 1
