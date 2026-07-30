@@ -24,10 +24,13 @@ safe while rendering is disabled. `nes.run` waits for VBlank before enabling
 NMI and rendering.
 
 Each NMI preserves A, X, Y, and stack balance, increments one volatile 8-bit
-frame counter, sets an advisory frame-ready byte, and returns. User logic runs
-only on the main thread. The runtime provides `nes.wait_frame`, but not frame
-callbacks, a generic PPU command queue, sprite management, controller input,
-or audio.
+frame counter, and sets an advisory frame-ready byte. If registered, one
+restricted VBlank callback runs next through direct `JSR`; its procedure ends
+with `RTS`, then NMI restores registers and owns the final `RTI`. Ordinary
+update logic runs only on the main thread. Its persistent last-processed frame
+byte preserves a pending NMI across slow callbacks and coalesces older backlog.
+There is no generic PPU command queue, sprite management, controller input, or
+audio.
 
 ## Memory
 

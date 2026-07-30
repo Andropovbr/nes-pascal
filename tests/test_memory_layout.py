@@ -76,6 +76,10 @@ class MemoryLayoutTests(unittest.TestCase):
         }
         self.assertEqual(runtime_addresses["runtime_frame_counter"], 0x0000)
         self.assertEqual(runtime_addresses["runtime_frame_ready"], 0x0001)
+        self.assertEqual(
+            runtime_addresses["runtime_last_processed_frame"],
+            0x0002,
+        )
         self.assertEqual(runtime_addresses["runtime_oam_shadow"], 0x0200)
 
     def test_nmi_state_is_isolated_from_expression_temporaries(self) -> None:
@@ -96,6 +100,7 @@ class MemoryLayoutTests(unittest.TestCase):
             [
                 ("runtime_frame_counter", 0x0000),
                 ("runtime_frame_ready", 0x0001),
+                ("runtime_last_processed_frame", 0x0002),
             ],
         )
         self.assertTrue(
@@ -108,7 +113,7 @@ class MemoryLayoutTests(unittest.TestCase):
         with self.assertRaises(CompilerError) as context:
             build_memory_layout(
                 resolved_program(source),
-                MemoryLayoutSettings(zero_page_runtime_size=1),
+                MemoryLayoutSettings(zero_page_runtime_size=2),
                 source=source,
             )
 
@@ -297,6 +302,7 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertIn("runtime_oam_shadow", report)
         self.assertIn("runtime_frame_counter", report)
         self.assertIn("runtime_frame_ready", report)
+        self.assertIn("runtime_last_processed_frame", report)
         self.assertIn("Available:", report)
 
     def test_linker_configuration_and_memory_map_are_reproducible(self) -> None:

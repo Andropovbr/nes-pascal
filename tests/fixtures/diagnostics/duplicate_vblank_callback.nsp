@@ -1,0 +1,13 @@
+program DuplicateVBlankCallback;
+procedure First;
+begin
+end;
+procedure Second;
+begin
+end;
+begin
+    nes.set_background_color($21);
+    nes.on_vblank(First);
+    nes.on_vblank(Second);
+    nes.run;
+end.

@@ -30,12 +30,14 @@ the supported language.
 
 - Statements are limited to assignment, `inc` and `dec`, `if`/`else`,
   supported loops, `break`, `continue`, procedure calls,
-  `nes.set_background_color`, `nes.run`, and `nes.wait_frame`.
+  `nes.set_background_color`, `nes.run`, `nes.wait_frame`, `nes.on_update`,
+  and `nes.on_vblank`.
 - Conditional branches and loop bodies may contain supported statements, but
   NES initialization commands remain top-level only. `nes.wait_frame` is the
   sole runtime command allowed in main-block control flow.
-- Frame-synchronized loops run on the main thread. NMI cannot invoke user
-  procedures or statements.
+- Frame-synchronized loops and update callbacks run on the main thread. NMI
+  may invoke only one statically registered, transitively validated VBlank
+  callback.
 - `for` supports only `byte` control variables and bounds. A control variable
   cannot be modified inside its loop body.
 
@@ -45,8 +47,10 @@ the supported language.
   policy. Explicit Zero Page declarations are not implemented.
 - Only NTSC NES, mapper 0, 32 KiB PRG-ROM, and 8 KiB CHR-ROM are supported.
 - CHR-ROM is empty.
-- Sprites, controller input, audio, graphics assets, and frame callbacks are
-  not supported.
+- Sprites, controller input, audio, and graphics assets are not supported.
+- Callback registration is static. There is only one callback of each kind,
+  with no parameters, return values, priorities, lists, removal, indirect
+  calls, IRQ callbacks, or user-owned interrupt handlers.
 - There is no generic PPU command queue. The current runtime exposes no
   rendering-time PPU write command; initialization palette writes remain
   restricted to the rendering-disabled phase.

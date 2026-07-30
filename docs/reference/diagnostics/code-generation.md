@@ -102,7 +102,7 @@ Code-generation diagnostics use the E5000-E5999 range.
   The OAM shadow region must start on a 256-byte page boundary.
   ```
 
-- **Suggested fix:** Restore the supported milestone 0.3.3 NROM defaults.
+- **Suggested fix:** Restore the supported NROM memory defaults.
 
 ## E5006 - RAM segment overflow
 

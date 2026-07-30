@@ -21,7 +21,8 @@ The compiler pipeline is deliberately separated:
 - `lexer.py` produces tokens with line and column information;
 - `parser.py` validates grammar and builds the parsed AST in `ast.py`;
 - `semantic.py` validates declarations, resolves references and procedure
-  calls, checks exact types, and enforces interprocedural definite assignment;
+  calls, checks exact types, enforces interprocedural definite assignment, and
+  validates the complete VBlank callback call graph;
 - `memory_layout.py` owns physical RAM ranges, allocation, bounds and overlap
   checks, mandatory Zero Page storage, conservative optional promotion,
   regular-RAM fallback, ld65 configuration generation, and the human-readable
@@ -29,8 +30,9 @@ The compiler pipeline is deliberately separated:
 - `backend_ca65.py` generates readable, commented Assembly from resolved
   values using the already allocated runtime, temporary, and user symbols, and
   emits left-to-right argument copies before procedure calls. It also owns the
-  minimal NMI handler, VBlank-safe runtime transition, and frame-counter wait
-  sequence;
+  minimal NMI handler, VBlank-safe runtime transition, frame-counter wait
+  sequence, persistent last-processed frame state, and direct static callback
+  calls;
 - `cli.py` writes Assembly, the generated `.cfg` linker configuration, and the
   `.map` CPU memory report before coordinating ca65 and ld65.
 

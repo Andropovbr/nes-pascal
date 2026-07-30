@@ -1,0 +1,10 @@
+program ConflictingCallbackRegistration;
+procedure Both;
+begin
+end;
+begin
+    nes.set_background_color($21);
+    nes.on_update(Both);
+    nes.on_vblank(Both);
+    nes.run;
+end.

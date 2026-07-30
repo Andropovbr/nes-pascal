@@ -411,3 +411,99 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 
 - **Suggested fix:** Move `nes.wait_frame` and its containing frame loop after
   the unconditional top-level `nes.run` call.
+
+## E3018 - Unknown callback procedure
+
+- **Category:** Semantic Analysis
+- **Explanation:** A callback registration names a procedure that is not
+  declared.
+- **Trigger:** `nes.on_update(Missing);`
+- **Expected compiler output:**
+
+  ```text
+  E3018 demo.nsp:4:19
+
+  Unknown callback procedure: Missing.
+  ```
+
+- **Suggested fix:** Declare a parameterless procedure before the main block
+  or correct the identifier.
+
+## E3019 - Invalid callback signature
+
+- **Category:** Semantic Analysis
+- **Explanation:** Update and VBlank callbacks must be parameterless
+  procedures with no return value.
+- **Trigger:** Register `procedure Update(Value: byte);` with
+  `nes.on_update(Update);`.
+- **Expected compiler output:** `E3019` followed by `Callback procedure Update
+  must not have parameters.`
+- **Suggested fix:** Use a procedure declared without a parameter list.
+
+## E3020 - Duplicate update callback
+
+- **Category:** Semantic Analysis
+- **Explanation:** Only one static update callback may be registered.
+- **Trigger:** Place two `nes.on_update(...)` statements in initialization.
+- **Expected compiler output:** `E3020` followed by `Only one update callback
+  may be registered.`
+- **Suggested fix:** Keep one update registration and dispatch explicitly from
+  that procedure when necessary.
+
+## E3021 - Duplicate VBlank callback
+
+- **Category:** Semantic Analysis
+- **Explanation:** Only one static VBlank callback may be registered.
+- **Trigger:** Place two `nes.on_vblank(...)` statements in initialization.
+- **Expected compiler output:** `E3021` followed by `Only one VBlank callback
+  may be registered.`
+- **Suggested fix:** Keep one VBlank registration and call only safe,
+  parameterless helpers from it.
+
+## E3022 - Invalid callback registration context
+
+- **Category:** Semantic Analysis
+- **Explanation:** Registration is compile-time initialization, not a runtime
+  operation. It must be unconditional, top-level, and before `nes.run`.
+- **Trigger:** Put `nes.on_update(Update);` in an `if`, loop, procedure, or
+  after `nes.run`.
+- **Expected compiler output:** `E3022` followed by a callback registration
+  context explanation.
+- **Suggested fix:** Move the registration to unconditional top-level
+  initialization before `nes.run`.
+
+## E3023 - VBlank-unsafe operation
+
+- **Category:** Semantic Analysis
+- **Explanation:** A VBlank callback or reachable helper contains an
+  unbounded operation or uses shared non-reentrant compiler temporary storage.
+- **Trigger:** Use `while`, `repeat`, `for`, arithmetic, a comparison,
+  `nes.wait_frame`, or another unsupported statement on the VBlank call path.
+- **Expected compiler output:** `E3023` identifies the unsafe operation and
+  the procedure path that reaches it.
+- **Suggested fix:** Restrict VBlank code to temporary-free scalar
+  assignments, simple `inc`/`dec`, safe conditionals, and validated helpers.
+
+## E3024 - Invalid callback call graph
+
+- **Category:** Semantic Analysis
+- **Explanation:** A VBlank callback reaches update logic or a parameterized
+  procedure. Such a call is not part of the conservative interrupt-safe
+  subset.
+- **Trigger:** Call the registered update callback or a procedure with value
+  parameters from a VBlank callback or reachable helper.
+- **Expected compiler output:** `E3024` identifies the invalid call edge.
+- **Suggested fix:** Keep update logic outside NMI and use only parameterless,
+  transitively VBlank-safe helpers.
+
+## E3025 - Conflicting callback registration
+
+- **Category:** Semantic Analysis
+- **Explanation:** One procedure cannot be registered for both main-thread
+  update and NMI VBlank contexts in this milestone.
+- **Trigger:** Register `Both` with both `nes.on_update(Both);` and
+  `nes.on_vblank(Both);`.
+- **Expected compiler output:** `E3025` followed by `Procedure Both cannot be
+  registered as both update and VBlank callbacks.`
+- **Suggested fix:** Declare separate parameterless procedures for the two
+  execution contexts.

@@ -43,3 +43,7 @@ end.
 The declaration sections must appear in this order. The main block contains
 the top-level initialization sequence and may continue with frame-synchronized
 main-thread logic after `nes.run`.
+
+Static `nes.on_update(Procedure)` and `nes.on_vblank(Procedure)` registrations,
+when present, belong to the unconditional top-level initialization sequence
+before `nes.run`. See [Frame callbacks](../runtime/frame-callbacks.md).

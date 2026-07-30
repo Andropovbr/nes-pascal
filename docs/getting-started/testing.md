@@ -20,7 +20,8 @@ optional promotion fallback, malformed internal settings, and segment
 capacity. A ca65 listing test verifies Zero Page opcodes for promoted symbols
 and NMI runtime state, plus absolute opcodes for fallback storage. Structural
 backend tests verify register preservation, the counter-authoritative wait
-loop, VBlank-gated rendering startup, and the absence of user calls in NMI.
+loop, persistent pending-frame detection, VBlank-gated rendering startup, and
+the separation of main-thread update calls from the restricted NMI callback.
 Toolchain tests are skipped with an explicit message when `ca65` or `ld65` is
 unavailable.
 
@@ -30,7 +31,9 @@ The test compiles the
 behavior examples, executes their ROMs, and verifies final variables,
 procedure-parameter storage, promoted and regular-RAM addresses where
 applicable, NMI counter progress, three distinct `nes.wait_frame` iterations,
-and the universal background color:
+update and VBlank callback progress across 8-bit frame-counter wraparound, and
+slow-update pending-frame behavior without nested calls, and the universal
+background color:
 
 ```powershell
 $env:MESEN_PATH = "C:\path\to\Mesen.exe"

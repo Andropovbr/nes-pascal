@@ -42,6 +42,11 @@ class BooleanOperator(Enum):
     OR = "or"
 
 
+class CallbackKind(Enum):
+    UPDATE = "update"
+    VBLANK = "vblank"
+
+
 @dataclass(frozen=True, slots=True)
 class HexLiteral:
     value: int
@@ -168,6 +173,14 @@ class WaitFrame:
 
 
 @dataclass(frozen=True, slots=True)
+class CallbackRegistration:
+    kind: CallbackKind
+    procedure_name: str
+    position: SourcePosition
+    procedure_position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
 class IfStatement:
     condition: ValueExpression
     then_branch: tuple[Statement, ...]
@@ -243,6 +256,7 @@ Statement = (
     | SetBackgroundColor
     | Run
     | WaitFrame
+    | CallbackRegistration
     | IfStatement
     | WhileStatement
     | RepeatStatement
@@ -409,11 +423,19 @@ class ResolvedProcedureCall:
     arguments: tuple[ResolvedArgument, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedCallbackRegistration:
+    kind: CallbackKind
+    procedure_name: str
+    procedure_label: str
+
+
 ResolvedStatement = (
     ResolvedAssignment
     | ResolvedSetBackgroundColor
     | Run
     | WaitFrame
+    | ResolvedCallbackRegistration
     | ResolvedIfStatement
     | ResolvedWhileStatement
     | ResolvedRepeatStatement

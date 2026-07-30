@@ -10,6 +10,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class BackendGoldenTests(unittest.TestCase):
+    def test_frame_callbacks_program_matches_golden_assembly(self) -> None:
+        source_path = ROOT / "examples" / "frame_callbacks.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        actual = generate(analyze(parse(source, filename), source, filename))
+        expected = (ROOT / "tests" / "golden" / "frame_callbacks.asm").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(actual, expected)
+
     def test_minimal_program_matches_golden_assembly(self) -> None:
         source_path = ROOT / "examples" / "minimal.nsp"
         source = source_path.read_text(encoding="utf-8")
@@ -33,6 +43,7 @@ class BackendGoldenTests(unittest.TestCase):
         self.assertIn("runtime_oam_shadow: .res 256", assembly)
         self.assertIn("runtime_frame_counter: .res 1", assembly)
         self.assertIn("runtime_frame_ready: .res 1", assembly)
+        self.assertIn("runtime_last_processed_frame: .res 1", assembly)
         self.assertIn("variable_BackgroundColor: .res 1", assembly)
         self.assertIn("sta variable_BackgroundColor", assembly)
         self.assertIn("lda variable_BackgroundColor", assembly)

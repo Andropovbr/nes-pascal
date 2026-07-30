@@ -1,0 +1,14 @@
+program InvalidCallbackCallGraph;
+procedure Update;
+begin
+end;
+procedure VBlank;
+begin
+    Update;
+end;
+begin
+    nes.set_background_color($21);
+    nes.on_update(Update);
+    nes.on_vblank(VBlank);
+    nes.run;
+end.

@@ -1,0 +1,9 @@
+program InvalidCallbackSignature;
+procedure Update(Value: byte);
+begin
+end;
+begin
+    nes.set_background_color($21);
+    nes.on_update(Update);
+    nes.run;
+end.

@@ -86,7 +86,7 @@ class MemorySymbol:
 
 @dataclass(frozen=True, slots=True)
 class MemoryLayoutSettings:
-    """Internal NROM memory defaults for milestone 0.3.3."""
+    """Internal NROM memory defaults for the current runtime ABI."""
 
     physical_ram_start: int = 0x0000
     physical_ram_size: int = 0x0800
@@ -277,7 +277,15 @@ def build_memory_layout(
             1,
             SymbolKind.RUNTIME,
             zero_page_runtime.name,
-            "advisory frame-ready signal set by NMI and consumed by wait_frame",
+            "advisory frame-ready signal consumed by main frame waits",
+        ),
+        MemorySymbol(
+            "runtime_last_processed_frame",
+            zero_page_runtime.start + 2,
+            1,
+            SymbolKind.RUNTIME,
+            zero_page_runtime.name,
+            "persistent update-loop frame baseline",
         ),
         MemorySymbol(
             "runtime_oam_shadow",
@@ -829,7 +837,7 @@ def _invalid_layout(message: str, source: str, filename: str) -> None:
         message,
         filename,
         source,
-        suggestion="Use the supported milestone 0.3.3 NROM memory settings.",
+        suggestion="Use the supported NROM memory settings.",
     )
 
 

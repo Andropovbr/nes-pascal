@@ -10,6 +10,8 @@ from .ast import (
     BooleanNotExpression,
     BreakStatement,
     BuiltInType,
+    CallbackKind,
+    CallbackRegistration,
     ComparisonExpression,
     ComparisonOperator,
     ConstantDeclaration,
@@ -31,6 +33,7 @@ from .ast import (
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
     ResolvedBreakStatement,
+    ResolvedCallbackRegistration,
     ResolvedComparisonExpression,
     ResolvedContinueStatement,
     ResolvedDecrementStatement,
@@ -87,6 +90,10 @@ class SemanticAnalyzer:
         self.filename = filename
         self.required_variables: set[str] | None = None
         self.procedure_summaries: dict[str, ProcedureSummary] = {}
+        self.callback_registrations: dict[
+            CallbackKind, CallbackRegistration
+        ] = {}
+        self.callback_symbols: dict[CallbackKind, ProcedureSymbol] = {}
 
     def analyze(self, program: Program) -> ResolvedProgram:
         constants: dict[str, TypedConstant] = {}
@@ -176,6 +183,8 @@ class SemanticAnalyzer:
                 tuple(resolved_parameters),
             )
 
+        self._validate_callback_registrations(program, procedures)
+
         procedure_order = self._procedure_resolution_order(
             program.procedures,
             procedures,
@@ -184,6 +193,7 @@ class SemanticAnalyzer:
             program.statements,
             procedures,
         )
+        self._validate_vblank_callback(procedures)
         resolved_procedures: dict[str, ResolvedProcedure] = {}
         for normalized_name in procedure_order:
             symbol = procedures[normalized_name]
@@ -221,7 +231,7 @@ class SemanticAnalyzer:
             resolved_procedures[normalized_name] = resolved_procedure
 
         self.required_variables = None
-        resolved_statements, _ = self._resolve_statements(
+        resolved_statements, final_assignments = self._resolve_statements(
             program.statements,
             constants,
             variables,
@@ -231,6 +241,24 @@ class SemanticAnalyzer:
             protected_control_variables=frozenset(),
             inside_procedure=False,
         )
+
+        update_symbol = self.callback_symbols.get(CallbackKind.UPDATE)
+        if update_symbol is not None:
+            summary = self.procedure_summaries[update_symbol.declaration.name.lower()]
+            missing_variables = summary.required_variables - final_assignments
+            if missing_variables:
+                normalized_variable = sorted(missing_variables)[0]
+                variable = variables[normalized_variable]
+                registration = self.callback_registrations[CallbackKind.UPDATE]
+                self._error(
+                    registration.procedure_position,
+                    DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT,
+                    f"Update callback {registration.procedure_name} requires "
+                    f"variable {variable.name} to be assigned before the "
+                    "runtime callback loop starts.",
+                    f"Assign {variable.name} in the main block before it ends.",
+                    len(registration.procedure_name),
+                )
 
         self._validate_program_structure(program)
         return ResolvedProgram(
@@ -250,6 +278,7 @@ class SemanticAnalyzer:
             | SetBackgroundColor
             | Run
             | WaitFrame
+            | CallbackRegistration
             | IfStatement
             | WhileStatement
             | RepeatStatement
@@ -514,6 +543,15 @@ class SemanticAnalyzer:
                         resolved_arguments,
                     )
                 )
+            elif isinstance(statement, CallbackRegistration):
+                symbol = self.callback_symbols[statement.kind]
+                resolved_statements.append(
+                    ResolvedCallbackRegistration(
+                        statement.kind,
+                        symbol.declaration.name,
+                        symbol.label,
+                    )
+                )
             elif isinstance(statement, (BreakStatement, ContinueStatement)):
                 if loop_depth == 0:
                     self._error(
@@ -578,12 +616,310 @@ class SemanticAnalyzer:
                         statement.position,
                         "nes.run",
                     )
+                vblank_symbol = self.callback_symbols.get(CallbackKind.VBLANK)
+                if vblank_symbol is not None:
+                    summary = self.procedure_summaries[
+                        vblank_symbol.declaration.name.lower()
+                    ]
+                    missing_variables = (
+                        summary.required_variables - current_assignments
+                    )
+                    if missing_variables:
+                        normalized_variable = sorted(missing_variables)[0]
+                        variable = variables[normalized_variable]
+                        registration = self.callback_registrations[
+                            CallbackKind.VBLANK
+                        ]
+                        self._error(
+                            registration.procedure_position,
+                            DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT,
+                            f"VBlank callback {registration.procedure_name} "
+                            f"requires variable {variable.name} to be assigned "
+                            "before nes.run enables NMI.",
+                            f"Assign {variable.name} before nes.run;.",
+                            len(registration.procedure_name),
+                        )
                 resolved_statements.append(Run())
 
         return (
             tuple(resolved_statements),
             current_assignments,
         )
+
+    def _validate_callback_registrations(
+        self,
+        program: Program,
+        procedures: dict[str, ProcedureSymbol],
+    ) -> None:
+        for declaration in program.procedures:
+            nested = self._first_callback_registration(declaration.body)
+            if nested is not None:
+                self._invalid_callback_context(
+                    nested,
+                    "Callback registration cannot appear inside a procedure.",
+                )
+
+        for statement in program.statements:
+            if isinstance(statement, CallbackRegistration):
+                continue
+            nested = self._first_callback_registration((statement,))
+            if nested is not None:
+                self._invalid_callback_context(
+                    nested,
+                    "Callback registration must be unconditional top-level "
+                    "initialization.",
+                )
+
+        run_index = next(
+            (
+                index
+                for index, statement in enumerate(program.statements)
+                if isinstance(statement, Run)
+            ),
+            None,
+        )
+        registrations: dict[CallbackKind, CallbackRegistration] = {}
+        symbols: dict[CallbackKind, ProcedureSymbol] = {}
+        for index, statement in enumerate(program.statements):
+            if not isinstance(statement, CallbackRegistration):
+                continue
+            if run_index is not None and index > run_index:
+                self._invalid_callback_context(
+                    statement,
+                    "Callback registration must execute before nes.run.",
+                )
+            previous = registrations.get(statement.kind)
+            if previous is not None:
+                code = (
+                    DiagnosticCode.DUPLICATE_UPDATE_CALLBACK
+                    if statement.kind is CallbackKind.UPDATE
+                    else DiagnosticCode.DUPLICATE_VBLANK_CALLBACK
+                )
+                command = f"nes.on_{statement.kind.value}"
+                callback_name = (
+                    "update"
+                    if statement.kind is CallbackKind.UPDATE
+                    else "VBlank"
+                )
+                self._error(
+                    statement.position,
+                    code,
+                    f"Only one {callback_name} callback may be registered.",
+                    f"Remove the additional {command}(...) registration.",
+                    len(command),
+                )
+            symbol = procedures.get(statement.procedure_name.lower())
+            if symbol is None:
+                self._error(
+                    statement.procedure_position,
+                    DiagnosticCode.UNKNOWN_CALLBACK_PROCEDURE,
+                    f"Unknown callback procedure: {statement.procedure_name}.",
+                    "Declare a parameterless procedure before the main block.",
+                    len(statement.procedure_name),
+                )
+            if symbol.parameters:
+                self._error(
+                    statement.procedure_position,
+                    DiagnosticCode.INVALID_CALLBACK_SIGNATURE,
+                    f"Callback procedure {statement.procedure_name} must not "
+                    "have parameters.",
+                    "Use a procedure declared without a parameter list.",
+                    len(statement.procedure_name),
+                )
+            registrations[statement.kind] = statement
+            symbols[statement.kind] = symbol
+
+        update = registrations.get(CallbackKind.UPDATE)
+        vblank = registrations.get(CallbackKind.VBLANK)
+        if (
+            update is not None
+            and vblank is not None
+            and update.procedure_name.lower() == vblank.procedure_name.lower()
+        ):
+            self._error(
+                vblank.procedure_position,
+                DiagnosticCode.CONFLICTING_CALLBACK_REGISTRATION,
+                f"Procedure {vblank.procedure_name} cannot be registered as "
+                "both update and VBlank callbacks.",
+                "Declare separate parameterless procedures for the two contexts.",
+                len(vblank.procedure_name),
+            )
+
+        self.callback_registrations = registrations
+        self.callback_symbols = symbols
+
+    def _first_callback_registration(
+        self,
+        statements: tuple[Statement, ...],
+    ) -> CallbackRegistration | None:
+        for statement in statements:
+            if isinstance(statement, CallbackRegistration):
+                return statement
+            branches: tuple[tuple[Statement, ...], ...] = ()
+            if isinstance(statement, IfStatement):
+                branches = (statement.then_branch,)
+                if statement.else_branch is not None:
+                    branches += (statement.else_branch,)
+            elif isinstance(
+                statement,
+                (WhileStatement, RepeatStatement, ForStatement),
+            ):
+                branches = (statement.body,)
+            for branch in branches:
+                found = self._first_callback_registration(branch)
+                if found is not None:
+                    return found
+        return None
+
+    def _invalid_callback_context(
+        self,
+        registration: CallbackRegistration,
+        message: str,
+    ) -> None:
+        command = f"nes.on_{registration.kind.value}"
+        self._error(
+            registration.position,
+            DiagnosticCode.INVALID_CALLBACK_REGISTRATION_CONTEXT,
+            message,
+            f"Move {command}(...) to unconditional initialization before nes.run;.",
+            len(command),
+        )
+
+    def _validate_vblank_callback(
+        self,
+        procedures: dict[str, ProcedureSymbol],
+    ) -> None:
+        root = self.callback_symbols.get(CallbackKind.VBLANK)
+        if root is None:
+            return
+        update = self.callback_symbols.get(CallbackKind.UPDATE)
+        update_name = (
+            update.declaration.name.lower() if update is not None else None
+        )
+        validated: set[str] = set()
+
+        def validate(symbol: ProcedureSymbol) -> None:
+            normalized_name = symbol.declaration.name.lower()
+            if normalized_name in validated:
+                return
+            validated.add(normalized_name)
+            for statement in symbol.declaration.body:
+                validate_statement(statement, symbol.declaration.name)
+
+        def validate_statement(statement: Statement, owner: str) -> None:
+            if isinstance(statement, Assignment):
+                if not self._vblank_expression_is_safe(statement.value):
+                    self._vblank_unsafe_expression(statement.value, owner)
+                return
+            if isinstance(statement, (IncrementStatement, DecrementStatement)):
+                if statement.amount is not None:
+                    self._error(
+                        statement.position,
+                        DiagnosticCode.VBLANK_UNSAFE_OPERATION,
+                        f"VBlank callback path through {owner} uses an update "
+                        "amount that requires shared expression storage.",
+                        "Use inc(Target) or dec(Target) without an amount.",
+                        len("inc"),
+                    )
+                return
+            if isinstance(statement, IfStatement):
+                if not self._vblank_expression_is_safe(statement.condition):
+                    self._vblank_unsafe_expression(statement.condition, owner)
+                for item in statement.then_branch:
+                    validate_statement(item, owner)
+                if statement.else_branch is not None:
+                    for item in statement.else_branch:
+                        validate_statement(item, owner)
+                return
+            if isinstance(statement, ProcedureCall):
+                callee_name = statement.name.lower()
+                if callee_name == update_name:
+                    self._error(
+                        statement.position,
+                        DiagnosticCode.INVALID_CALLBACK_CALL_GRAPH,
+                        f"VBlank callback path through {owner} calls update "
+                        f"callback {statement.name}.",
+                        "Keep update logic outside the NMI call graph.",
+                        len(statement.name),
+                    )
+                callee = procedures[callee_name]
+                if statement.arguments or callee.parameters:
+                    self._error(
+                        statement.position,
+                        DiagnosticCode.INVALID_CALLBACK_CALL_GRAPH,
+                        f"VBlank callback path through {owner} calls "
+                        f"parameterized procedure {statement.name}.",
+                        "Call only parameterless procedures from VBlank callbacks.",
+                        len(statement.name),
+                    )
+                validate(callee)
+                return
+
+            position = self._statement_position_for_callback(statement)
+            operation = self._callback_operation_name(statement)
+            self._error(
+                position,
+                DiagnosticCode.VBLANK_UNSAFE_OPERATION,
+                f"VBlank callback path through {owner} reaches unsupported "
+                f"operation {operation}.",
+                "Use only scalar assignments, simple inc/dec, bounded simple "
+                "conditionals, and calls to transitively VBlank-safe procedures.",
+                len(operation),
+            )
+
+        validate(root)
+
+    def _vblank_expression_is_safe(self, value: ValueExpression) -> bool:
+        if isinstance(value, (BinaryExpression, ComparisonExpression)):
+            return False
+        if isinstance(value, (UnaryExpression, BooleanNotExpression)):
+            return self._vblank_expression_is_safe(value.operand)
+        if isinstance(value, BooleanBinaryExpression):
+            return self._vblank_expression_is_safe(
+                value.left
+            ) and self._vblank_expression_is_safe(value.right)
+        return True
+
+    def _vblank_unsafe_expression(
+        self,
+        value: ValueExpression,
+        owner: str,
+    ) -> None:
+        self._error(
+            value.position,
+            DiagnosticCode.VBLANK_UNSAFE_OPERATION,
+            f"VBlank callback path through {owner} uses an expression that "
+            "requires shared compiler temporary storage.",
+            "Use literals, constants, variables, unary operations, or "
+            "short-circuit boolean operations without arithmetic or comparisons.",
+        )
+
+    def _statement_position_for_callback(self, statement: Statement) -> SourcePosition:
+        if isinstance(statement, Assignment):
+            return statement.target_position
+        position = getattr(statement, "position", None)
+        assert position is not None
+        return position
+
+    def _callback_operation_name(self, statement: Statement) -> str:
+        if isinstance(statement, WhileStatement):
+            return "while"
+        if isinstance(statement, RepeatStatement):
+            return "repeat"
+        if isinstance(statement, ForStatement):
+            return "for"
+        if isinstance(statement, WaitFrame):
+            return "nes.wait_frame"
+        if isinstance(statement, Run):
+            return "nes.run"
+        if isinstance(statement, SetBackgroundColor):
+            return "nes.set_background_color"
+        if isinstance(statement, CallbackRegistration):
+            return f"nes.on_{statement.kind.value}"
+        if isinstance(statement, BreakStatement):
+            return "break"
+        assert isinstance(statement, ContinueStatement)
+        return "continue"
 
     def _procedure_resolution_order(
         self,

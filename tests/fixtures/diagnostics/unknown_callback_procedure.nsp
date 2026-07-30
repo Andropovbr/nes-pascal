@@ -1,0 +1,6 @@
+program UnknownCallback;
+begin
+    nes.set_background_color($21);
+    nes.on_update(Missing);
+    nes.run;
+end.

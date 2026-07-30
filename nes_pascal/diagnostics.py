@@ -35,6 +35,14 @@ class DiagnosticCode(StrEnum):
     PROCEDURE_RUNTIME_COMMAND = "E3015"
     PROCEDURE_ARGUMENT_COUNT = "E3016"
     FRAME_WAIT_BEFORE_RUNTIME = "E3017"
+    UNKNOWN_CALLBACK_PROCEDURE = "E3018"
+    INVALID_CALLBACK_SIGNATURE = "E3019"
+    DUPLICATE_UPDATE_CALLBACK = "E3020"
+    DUPLICATE_VBLANK_CALLBACK = "E3021"
+    INVALID_CALLBACK_REGISTRATION_CONTEXT = "E3022"
+    VBLANK_UNSAFE_OPERATION = "E3023"
+    INVALID_CALLBACK_CALL_GRAPH = "E3024"
+    CONFLICTING_CALLBACK_REGISTRATION = "E3025"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -118,6 +126,30 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.FRAME_WAIT_BEFORE_RUNTIME: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Frame wait before runtime start"
+    ),
+    DiagnosticCode.UNKNOWN_CALLBACK_PROCEDURE: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Unknown callback procedure"
+    ),
+    DiagnosticCode.INVALID_CALLBACK_SIGNATURE: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid callback signature"
+    ),
+    DiagnosticCode.DUPLICATE_UPDATE_CALLBACK: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Duplicate update callback"
+    ),
+    DiagnosticCode.DUPLICATE_VBLANK_CALLBACK: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Duplicate VBlank callback"
+    ),
+    DiagnosticCode.INVALID_CALLBACK_REGISTRATION_CONTEXT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid callback registration context"
+    ),
+    DiagnosticCode.VBLANK_UNSAFE_OPERATION: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "VBlank-unsafe operation"
+    ),
+    DiagnosticCode.INVALID_CALLBACK_CALL_GRAPH: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid callback call graph"
+    ),
+    DiagnosticCode.CONFLICTING_CALLBACK_REGISTRATION: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Conflicting callback registration"
     ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"
