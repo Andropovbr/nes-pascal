@@ -47,6 +47,12 @@ class CallbackKind(Enum):
     VBLANK = "vblank"
 
 
+class ControllerQueryKind(Enum):
+    DOWN = "down"
+    PRESSED = "pressed"
+    RELEASED = "released"
+
+
 @dataclass(frozen=True, slots=True)
 class HexLiteral:
     value: int
@@ -136,6 +142,13 @@ class BooleanBinaryExpression:
     position: SourcePosition
 
 
+@dataclass(frozen=True, slots=True)
+class ControllerQuery:
+    kind: ControllerQueryKind
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
 ValueExpression = (
     HexLiteral
     | BooleanLiteral
@@ -146,6 +159,7 @@ ValueExpression = (
     | ComparisonExpression
     | BooleanNotExpression
     | BooleanBinaryExpression
+    | ControllerQuery
 )
 
 
@@ -178,6 +192,12 @@ class CallbackRegistration:
     procedure_name: str
     position: SourcePosition
     procedure_position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class SetSpriteZero:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,6 +277,7 @@ Statement = (
     | Run
     | WaitFrame
     | CallbackRegistration
+    | SetSpriteZero
     | IfStatement
     | WhileStatement
     | RepeatStatement
@@ -338,6 +359,14 @@ class ResolvedBooleanBinaryExpression:
     right: ResolvedValue
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedControllerQuery:
+    kind: ControllerQueryKind
+    controller_index: int
+    button_mask: int
+    button_name: str
+
+
 ResolvedValue = (
     ImmediateValue
     | VariableValue
@@ -346,6 +375,7 @@ ResolvedValue = (
     | ResolvedComparisonExpression
     | ResolvedBooleanNotExpression
     | ResolvedBooleanBinaryExpression
+    | ResolvedControllerQuery
 )
 
 
@@ -430,12 +460,21 @@ class ResolvedCallbackRegistration:
     procedure_label: str
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedSetSpriteZero:
+    x: ResolvedValue
+    y: ResolvedValue
+    tile: ResolvedValue
+    attributes: ResolvedValue
+
+
 ResolvedStatement = (
     ResolvedAssignment
     | ResolvedSetBackgroundColor
     | Run
     | WaitFrame
     | ResolvedCallbackRegistration
+    | ResolvedSetSpriteZero
     | ResolvedIfStatement
     | ResolvedWhileStatement
     | ResolvedRepeatStatement

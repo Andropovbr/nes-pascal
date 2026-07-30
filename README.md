@@ -17,7 +17,9 @@ provides `nes.wait_frame` for deterministic main-thread frame loops. Static
 `nes.on_update` and `nes.on_vblank` registrations add one main-thread update
 callback and one conservatively validated NMI VBlank callback. A persistent
 runtime frame baseline coalesces slow-frame backlog without skipping a pending
-frame or nesting update calls.
+frame or nesting update calls. Standard controllers 1 and 2 are sampled once
+per processed frame outside NMI, with held, pressed, and released queries over
+stable current and previous state.
 
 ## Documentation
 

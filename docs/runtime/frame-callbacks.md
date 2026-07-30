@@ -78,6 +78,11 @@ main-thread frame wait or accepted update clears it. A race may make the latch
 stale, so neither `nes.wait_frame` nor the callback loop uses it to decide
 whether a frame is pending. `runtime_frame_counter` remains authoritative.
 
+Once a pending frame is accepted, the runtime copies current controller state
+to previous state and reads ports 1 and 2 exactly once before calling `Update`.
+The guarded polling abstraction is shared with `nes.wait_frame`; see
+[Controller input](controller-input.md).
+
 VBlank code is intentionally conservative. The compiler transitively validates
 every reachable procedure. The supported subset is:
 

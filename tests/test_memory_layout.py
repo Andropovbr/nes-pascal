@@ -101,6 +101,12 @@ class MemoryLayoutTests(unittest.TestCase):
                 ("runtime_frame_counter", 0x0000),
                 ("runtime_frame_ready", 0x0001),
                 ("runtime_last_processed_frame", 0x0002),
+                ("runtime_controller_1_current", 0x0003),
+                ("runtime_controller_1_previous", 0x0004),
+                ("runtime_controller_2_current", 0x0005),
+                ("runtime_controller_2_previous", 0x0006),
+                ("runtime_controller_polled_frame", 0x0007),
+                ("runtime_controller_poll_valid", 0x0008),
             ],
         )
         self.assertTrue(
@@ -303,6 +309,10 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertIn("runtime_frame_counter", report)
         self.assertIn("runtime_frame_ready", report)
         self.assertIn("runtime_last_processed_frame", report)
+        self.assertIn("runtime_controller_1_current", report)
+        self.assertIn("runtime_controller_2_previous", report)
+        self.assertIn("runtime_controller_polled_frame", report)
+        self.assertIn("runtime_controller_poll_valid", report)
         self.assertIn("Available:", report)
 
     def test_linker_configuration_and_memory_map_are_reproducible(self) -> None:

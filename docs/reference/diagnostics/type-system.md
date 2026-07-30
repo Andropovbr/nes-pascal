@@ -125,3 +125,15 @@ Type-system diagnostics use the E4000-E4999 range.
 
 - **Suggested fix:** Declare the value parameter as `byte` or `boolean`, or
   keep an `nes_color` value in global state.
+
+## E4006 - Invalid controller argument type
+
+- **Category:** Type System
+- **Explanation:** The controller index and button arguments describe
+  compile-time byte values. Boolean values cannot select a port or button.
+- **Trigger:** `nes.controller_down(true, nes.button_a)` or a boolean button
+  argument.
+- **Expected compiler output:** `E4006` identifies the argument and its actual
+  type.
+- **Suggested fix:** Pass `$01` or `$02` as the controller and exactly one
+  `nes.button_*` constant as the button.

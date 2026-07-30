@@ -1,0 +1,8 @@
+program InvalidControllerIndex;
+var
+    Down: boolean;
+begin
+    Down := nes.controller_down($03, nes.button_a);
+    nes.set_background_color($21);
+    nes.run;
+end.

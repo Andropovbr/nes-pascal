@@ -24,6 +24,7 @@ python -m nes_pascal.cli examples/zero_page.nsp -o build/zero_page.nes
 python -m nes_pascal.cli examples/frame_synchronization.nsp -o build/frame_synchronization.nes
 python -m nes_pascal.cli examples/frame_callbacks.nsp -o build/frame_callbacks.nes
 python -m nes_pascal.cli examples/slow_update_callback.nsp -o build/slow_update_callback.nes
+python -m nes_pascal.cli examples/controller_input.nsp -o build/controller_input.nes
 ```
 
 The examples demonstrate:
@@ -48,6 +49,9 @@ The examples demonstrate:
   counter, including a transitively validated VBlank-safe helper.
 - `slow_update_callback.nsp`: a deliberately long update that crosses NMIs and
   demonstrates pending-frame coalescing without nested callbacks.
+- `controller_input.nsp`: controller 1 movement, held A speed, B press/release
+  appearance, Start reset, Select mode toggle, safe sprite-0 staging, OAM DMA,
+  and two small embedded CHR tiles.
 
 The loop, counting, and procedure-parameter examples select background color
 `$21` only when their expected final states are reached.

@@ -1,0 +1,95 @@
+program ControllerInput;
+
+var
+    PlayerX: byte;
+    PlayerY: byte;
+    PlayerTile: byte;
+    MovementSpeed: byte;
+    WrapAtEdges: boolean;
+
+procedure Update;
+begin
+    MovementSpeed := $01;
+    if nes.controller_down($01, nes.button_a) then
+        MovementSpeed := $02;
+
+    if nes.controller_pressed($01, nes.button_select) then
+        WrapAtEdges := not WrapAtEdges;
+
+    if nes.controller_down($01, nes.button_left) then
+    begin
+        if PlayerX <= $0A then
+        begin
+            if WrapAtEdges then
+                PlayerX := $F7
+            else
+                PlayerX := $08;
+        end
+        else
+            PlayerX := PlayerX - MovementSpeed;
+    end;
+
+    if nes.controller_down($01, nes.button_right) then
+    begin
+        if PlayerX >= $F5 then
+        begin
+            if WrapAtEdges then
+                PlayerX := $08
+            else
+                PlayerX := $F7;
+        end
+        else
+            PlayerX := PlayerX + MovementSpeed;
+    end;
+
+    if nes.controller_down($01, nes.button_up) then
+    begin
+        if PlayerY <= $12 then
+        begin
+            if WrapAtEdges then
+                PlayerY := $DF
+            else
+                PlayerY := $10;
+        end
+        else
+            PlayerY := PlayerY - MovementSpeed;
+    end;
+
+    if nes.controller_down($01, nes.button_down) then
+    begin
+        if PlayerY >= $DD then
+        begin
+            if WrapAtEdges then
+                PlayerY := $10
+            else
+                PlayerY := $DF;
+        end
+        else
+            PlayerY := PlayerY + MovementSpeed;
+    end;
+
+    if nes.controller_pressed($01, nes.button_b) then
+        PlayerTile := $02;
+    if nes.controller_released($01, nes.button_b) then
+        PlayerTile := $01;
+
+    if nes.controller_pressed($01, nes.button_start) then
+    begin
+        PlayerX := $78;
+        PlayerY := $70;
+    end;
+
+    nes.set_sprite_zero(PlayerX, PlayerY, PlayerTile, $00);
+end;
+
+begin
+    PlayerX := $78;
+    PlayerY := $70;
+    PlayerTile := $01;
+    MovementSpeed := $01;
+    WrapAtEdges := false;
+    nes.set_sprite_zero(PlayerX, PlayerY, PlayerTile, $00);
+    nes.set_background_color($0F);
+    nes.on_update(Update);
+    nes.run;
+end.

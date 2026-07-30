@@ -179,7 +179,7 @@ end.
         self.assertIn("    jsr procedure_InitializeState", actual)
         self.assertIn("procedure_ChooseColor:", actual)
         self.assertIn("@if_then_", actual)
-        self.assertEqual(actual.count("    rts"), 5)
+        self.assertEqual(actual.count("    rts"), 7)
 
     def test_procedure_parameter_program_matches_golden_assembly(self) -> None:
         source_path = ROOT / "examples" / "procedure_parameters.nsp"

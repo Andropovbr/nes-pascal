@@ -72,6 +72,12 @@ InRange := (Counter >= Minimum) and (Counter <= Maximum);
 of `and` is skipped when the left operand is `false`; the right operand of `or`
 is skipped when the left operand is `true`.
 
+The controller queries `nes.controller_down`, `nes.controller_pressed`, and
+`nes.controller_released` are built-in boolean expressions. They accept a
+compile-time controller index and exactly one `nes.button_*` constant. See
+[Controller input](../runtime/controller-input.md) for frame-transition
+semantics and the complete button list.
+
 ## Precedence
 
 Expression precedence, from highest to lowest, is:

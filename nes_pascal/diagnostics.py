@@ -43,11 +43,17 @@ class DiagnosticCode(StrEnum):
     VBLANK_UNSAFE_OPERATION = "E3023"
     INVALID_CALLBACK_CALL_GRAPH = "E3024"
     CONFLICTING_CALLBACK_REGISTRATION = "E3025"
+    INVALID_CONTROLLER_INDEX = "E3026"
+    DYNAMIC_CONTROLLER_INDEX = "E3027"
+    INVALID_CONTROLLER_BUTTON = "E3028"
+    INVALID_CONTROLLER_ARGUMENT_COUNT = "E3029"
+    INVALID_SPRITE_ZERO_ARGUMENT_COUNT = "E3030"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
     INCOMPATIBLE_TYPES = "E4004"
     UNSUPPORTED_PARAMETER_TYPE = "E4005"
+    INVALID_CONTROLLER_ARGUMENT_TYPE = "E4006"
     MISSING_TOOLCHAIN = "E5001"
     TOOLCHAIN_FAILURE = "E5002"
     USER_RAM_EXHAUSTED = "E5003"
@@ -151,6 +157,21 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     DiagnosticCode.CONFLICTING_CALLBACK_REGISTRATION: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Conflicting callback registration"
     ),
+    DiagnosticCode.INVALID_CONTROLLER_INDEX: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid controller index"
+    ),
+    DiagnosticCode.DYNAMIC_CONTROLLER_INDEX: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Dynamic controller index"
+    ),
+    DiagnosticCode.INVALID_CONTROLLER_BUTTON: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid controller button"
+    ),
+    DiagnosticCode.INVALID_CONTROLLER_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid controller argument count"
+    ),
+    DiagnosticCode.INVALID_SPRITE_ZERO_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid sprite-zero argument count"
+    ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"
     ),
@@ -165,6 +186,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.UNSUPPORTED_PARAMETER_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unsupported parameter type"
+    ),
+    DiagnosticCode.INVALID_CONTROLLER_ARGUMENT_TYPE: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Invalid controller argument type"
     ),
     DiagnosticCode.MISSING_TOOLCHAIN: DiagnosticDefinition(
         DiagnosticCategory.CODE_GENERATION, "Missing toolchain"

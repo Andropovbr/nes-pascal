@@ -27,5 +27,6 @@ counter differs, stores the newest observed value, calls the update procedure
 once with direct `JSR`, and repeats. A frame that arrives during a slow update
 therefore remains pending and is processed immediately after the callback
 returns. Backlogs are coalesced to the newest frame rather than replayed.
-Update logic remains in normal main context. A separately registered VBlank
-callback runs in NMI.
+Before each accepted callback, the main runtime updates both controller ports
+once. Update logic remains in normal main context. A separately registered
+VBlank callback runs in NMI.

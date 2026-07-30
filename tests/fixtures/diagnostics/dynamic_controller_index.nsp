@@ -1,0 +1,10 @@
+program DynamicControllerIndex;
+var
+    Controller: byte;
+    Down: boolean;
+begin
+    Controller := $01;
+    Down := nes.controller_down(Controller, nes.button_a);
+    nes.set_background_color($21);
+    nes.run;
+end.

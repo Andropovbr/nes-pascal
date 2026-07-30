@@ -14,6 +14,12 @@
 runtime_frame_counter: .res 1 ; $0000: volatile 8-bit counter incremented once by each NMI
 runtime_frame_ready: .res 1 ; $0001: advisory frame-ready signal consumed by main frame waits
 runtime_last_processed_frame: .res 1 ; $0002: persistent update-loop frame baseline
+runtime_controller_1_current: .res 1 ; $0003: controller 1 state for the newest processed frame
+runtime_controller_1_previous: .res 1 ; $0004: controller 1 state for the preceding processed frame
+runtime_controller_2_current: .res 1 ; $0005: controller 2 state for the newest processed frame
+runtime_controller_2_previous: .res 1 ; $0006: controller 2 state for the preceding processed frame
+runtime_controller_polled_frame: .res 1 ; $0007: frame counter value of the most recent controller poll
+runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byte from a completed frame-zero poll
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
@@ -26,10 +32,11 @@ variable_BackgroundColor: .res 1 ; $0081: BackgroundColor: nes_color
 
 .segment "OAM_SHADOW"
 ; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
-runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by future sprite runtime support
+runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime sprite support
 
 .segment "RUNTIME_DATA"
-; Runtime: no scalar regular-RAM symbols are currently required
+; Runtime: regular-RAM state kept separate from user variables
+    ; no scalar regular-RAM runtime symbols required
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
@@ -179,11 +186,53 @@ RESET:
     lda #$80
     sta $2000               ; enable NMI after initialization
     lda #$08
-    sta $2001               ; enable background rendering
+    sta $2001               ; enable selected rendering layers
 
 ; Runtime: implicit stable loop after the main program finishes
 @runtime_idle_loop:
     jmp @runtime_idle_loop
+
+; Runtime: idempotent controller update for one newly processed frame
+runtime_update_controllers:
+    tax                     ; X keeps the caller's accepted frame value
+    lda runtime_controller_poll_valid
+    beq @controllers_need_poll
+    txa
+    cmp runtime_controller_polled_frame
+    beq @controllers_already_current
+@controllers_need_poll:
+    lda #$01
+    sta runtime_controller_poll_valid
+    txa
+    sta runtime_controller_polled_frame
+    lda runtime_controller_1_current
+    sta runtime_controller_1_previous
+    lda runtime_controller_2_current
+    sta runtime_controller_2_previous
+    jsr runtime_read_controller_ports
+@controllers_already_current:
+    rts
+
+; Runtime: isolated standard NES serial controller protocol
+; Bit layout: A, B, Select, Start, Up, Down, Left, Right = bits 0..7.
+runtime_read_controller_ports:
+    lda #$01
+    sta $4016               ; latch both controllers
+    lda #$00
+    sta $4016               ; begin serial reads
+    sta runtime_controller_1_current
+    sta runtime_controller_2_current
+    ldx #$08
+@read_controller_bits:
+    lda $4016
+    lsr a                   ; controller 1 serial bit -> carry
+    ror runtime_controller_1_current
+    lda $4017
+    lsr a                   ; controller 2 serial bit -> carry
+    ror runtime_controller_2_current
+    dex
+    bne @read_controller_bits
+    rts
 
 
 .segment "VECTORS"
