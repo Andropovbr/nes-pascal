@@ -5,10 +5,10 @@ progression. Do not infer the current or next milestone from numbering alone.
 
 ## Current roadmap state
 
-- **Current release:** Release 0.3 — NES Runtime
-- **Last completed milestone:** [`0.3.4 — Frame Callbacks`](0.md#frame-callbacks)
-- **Next milestone:** [`0.3.5 — Controller Input`](0.md#controller-input)
-- **Next milestone file:** [Version 0 roadmap](0.md#controller-input)
+- **Current release:** Release 0.4 — Background Graphics
+- **Last completed milestone:** [`0.3.5 — Controller Input`](0.md#controller-input)
+- **Next milestone:** [`0.4.1 — CHR-ROM Asset Inclusion`](0.md#chr-rom-asset-inclusion)
+- **Next milestone file:** [Version 0 roadmap](0.md#chr-rom-asset-inclusion)
 
 ## Philosophy
 

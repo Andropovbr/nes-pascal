@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from .ast import (
@@ -19,6 +19,7 @@ from .ast import (
     ResolvedProgram,
     ResolvedRepeatStatement,
     ResolvedSetBackgroundColor,
+    ResolvedSetSpriteZero,
     ResolvedStatement,
     ResolvedUnaryExpression,
     ResolvedValue,
@@ -231,6 +232,10 @@ def build_memory_layout(
 ) -> ProgramMemoryLayout:
     """Validate settings and allocate every RAM-backed program symbol."""
 
+    sprite_zero_enabled = _uses_sprite_zero(program)
+    if sprite_zero_enabled and settings.runtime_data_size < 5:
+        settings = replace(settings, runtime_data_size=5)
+
     regions = _validated_regions(settings, source, filename)
     (
         physical_ram,
@@ -288,12 +293,106 @@ def build_memory_layout(
             "persistent update-loop frame baseline",
         ),
         MemorySymbol(
+            "runtime_controller_1_current",
+            zero_page_runtime.start + 3,
+            1,
+            SymbolKind.RUNTIME,
+            zero_page_runtime.name,
+            "controller 1 state for the newest processed frame",
+        ),
+        MemorySymbol(
+            "runtime_controller_1_previous",
+            zero_page_runtime.start + 4,
+            1,
+            SymbolKind.RUNTIME,
+            zero_page_runtime.name,
+            "controller 1 state for the preceding processed frame",
+        ),
+        MemorySymbol(
+            "runtime_controller_2_current",
+            zero_page_runtime.start + 5,
+            1,
+            SymbolKind.RUNTIME,
+            zero_page_runtime.name,
+            "controller 2 state for the newest processed frame",
+        ),
+        MemorySymbol(
+            "runtime_controller_2_previous",
+            zero_page_runtime.start + 6,
+            1,
+            SymbolKind.RUNTIME,
+            zero_page_runtime.name,
+            "controller 2 state for the preceding processed frame",
+        ),
+        MemorySymbol(
+            "runtime_controller_polled_frame",
+            zero_page_runtime.start + 7,
+            1,
+            SymbolKind.RUNTIME,
+            zero_page_runtime.name,
+            "frame counter value of the most recent controller poll",
+        ),
+        MemorySymbol(
+            "runtime_controller_poll_valid",
+            zero_page_runtime.start + 8,
+            1,
+            SymbolKind.RUNTIME,
+            zero_page_runtime.name,
+            "distinguishes an initial zero byte from a completed frame-zero poll",
+        ),
+        MemorySymbol(
             "runtime_oam_shadow",
             oam_shadow.start,
             oam_shadow.size,
             SymbolKind.RUNTIME,
             oam_shadow.name,
-            "256-byte page copied to PPU OAM by future sprite runtime support",
+            "256-byte page copied to PPU OAM by runtime sprite support",
+        ),
+        *(
+            (
+                MemorySymbol(
+                    "runtime_sprite_zero_pending_x",
+                    runtime_data.start,
+                    1,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "staged sprite 0 X coordinate",
+                ),
+                MemorySymbol(
+                    "runtime_sprite_zero_pending_y",
+                    runtime_data.start + 1,
+                    1,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "staged sprite 0 Y coordinate",
+                ),
+                MemorySymbol(
+                    "runtime_sprite_zero_pending_tile",
+                    runtime_data.start + 2,
+                    1,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "staged sprite 0 tile index",
+                ),
+                MemorySymbol(
+                    "runtime_sprite_zero_pending_attributes",
+                    runtime_data.start + 3,
+                    1,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "staged sprite 0 attributes",
+                ),
+                MemorySymbol(
+                    "runtime_sprite_zero_ready",
+                    runtime_data.start + 4,
+                    1,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "atomic sprite 0 staging commit flag",
+                ),
+            )
+            if sprite_zero_enabled
+            else ()
         ),
     )
     temporary_symbols = tuple(
@@ -911,6 +1010,30 @@ def _global_variable_reference_counts(program: ResolvedProgram) -> dict[str, int
     return counts
 
 
+def _uses_sprite_zero(program: ResolvedProgram) -> bool:
+    def contains(statements: tuple[ResolvedStatement, ...]) -> bool:
+        for statement in statements:
+            if isinstance(statement, ResolvedSetSpriteZero):
+                return True
+            if isinstance(statement, ResolvedIfStatement):
+                if contains(statement.then_branch):
+                    return True
+                if statement.else_branch is not None and contains(
+                    statement.else_branch
+                ):
+                    return True
+            elif isinstance(
+                statement,
+                (ResolvedWhileStatement, ResolvedRepeatStatement, ResolvedForStatement),
+            ) and contains(statement.body):
+                return True
+        return False
+
+    return contains(program.statements) or any(
+        contains(procedure.body) for procedure in program.procedures
+    )
+
+
 def _count_statement_variable_references(
     statement: ResolvedStatement,
     counts: dict[str, int],
@@ -920,6 +1043,14 @@ def _count_statement_variable_references(
         _count_value_variable_references(statement.value, counts)
     elif isinstance(statement, ResolvedSetBackgroundColor):
         _count_value_variable_references(statement.argument, counts)
+    elif isinstance(statement, ResolvedSetSpriteZero):
+        for value in (
+            statement.x,
+            statement.y,
+            statement.tile,
+            statement.attributes,
+        ):
+            _count_value_variable_references(value, counts)
     elif isinstance(
         statement,
         (ResolvedIncrementStatement, ResolvedDecrementStatement),
@@ -1009,6 +1140,13 @@ def _statement_expression_depth(statement: ResolvedStatement) -> int:
         return _expression_depth(statement.value)
     if isinstance(statement, ResolvedSetBackgroundColor):
         return _expression_depth(statement.argument)
+    if isinstance(statement, ResolvedSetSpriteZero):
+        return max(
+            _expression_depth(statement.x),
+            _expression_depth(statement.y),
+            _expression_depth(statement.tile),
+            _expression_depth(statement.attributes),
+        )
     if isinstance(statement, ResolvedIncrementStatement):
         return _expression_depth(statement.amount) if statement.amount else 0
     if isinstance(statement, ResolvedDecrementStatement):

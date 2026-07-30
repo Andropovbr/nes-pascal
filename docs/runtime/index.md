@@ -1,8 +1,8 @@
 # NES Runtime
 
 The implemented runtime provides a small initialization sequence and a
-runtime-owned NMI handler for an NTSC NROM program. It exposes five
-source-language commands:
+runtime-owned NMI handler for an NTSC NROM program. Its frame and controller
+APIs are:
 
 - [`nes.set_background_color`](set-background-color.md) sets the universal
   NES background palette color;
@@ -14,6 +14,11 @@ source-language commands:
   procedure for the main-thread frame loop;
 - [`nes.on_vblank`](frame-callbacks.md) statically registers one restricted,
   parameterless procedure for NMI VBlank work.
+- [`nes.controller_down`, `nes.controller_pressed`, and
+  `nes.controller_released`](controller-input.md) query stable state from
+  standard controllers 1 and 2.
+- `nes.set_sprite_zero` is the fixed, example-only OAM staging helper described
+  in the controller documentation; it is not a general sprite API.
 
 The initialization commands belong to the top-level main program block.
 `nes.wait_frame` may appear in main-block loops and conditionals after

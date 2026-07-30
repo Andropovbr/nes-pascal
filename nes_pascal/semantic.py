@@ -12,6 +12,7 @@ from .ast import (
     BuiltInType,
     CallbackKind,
     CallbackRegistration,
+    ControllerQuery,
     ComparisonExpression,
     ComparisonOperator,
     ConstantDeclaration,
@@ -35,6 +36,7 @@ from .ast import (
     ResolvedBreakStatement,
     ResolvedCallbackRegistration,
     ResolvedComparisonExpression,
+    ResolvedControllerQuery,
     ResolvedContinueStatement,
     ResolvedDecrementStatement,
     ResolvedForStatement,
@@ -45,6 +47,7 @@ from .ast import (
     ResolvedProcedure,
     ResolvedProcedureCall,
     ResolvedSetBackgroundColor,
+    ResolvedSetSpriteZero,
     ResolvedStatement,
     ResolvedValue,
     ResolvedVariable,
@@ -52,6 +55,7 @@ from .ast import (
     ResolvedUnaryExpression,
     Run,
     SetBackgroundColor,
+    SetSpriteZero,
     SourcePosition,
     Statement,
     UnaryExpression,
@@ -62,6 +66,18 @@ from .ast import (
     WhileStatement,
 )
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
+
+
+CONTROLLER_BUTTONS: dict[str, int] = {
+    "nes.button_a": 0x01,
+    "nes.button_b": 0x02,
+    "nes.button_select": 0x04,
+    "nes.button_start": 0x08,
+    "nes.button_up": 0x10,
+    "nes.button_down": 0x20,
+    "nes.button_left": 0x40,
+    "nes.button_right": 0x80,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,7 +112,10 @@ class SemanticAnalyzer:
         self.callback_symbols: dict[CallbackKind, ProcedureSymbol] = {}
 
     def analyze(self, program: Program) -> ResolvedProgram:
-        constants: dict[str, TypedConstant] = {}
+        constants: dict[str, TypedConstant] = {
+            name: TypedConstant(BuiltInType.BYTE, value)
+            for name, value in CONTROLLER_BUTTONS.items()
+        }
         declared_names: set[str] = set()
         for declaration in program.constants:
             normalized_name = declaration.name.lower()
@@ -279,6 +298,7 @@ class SemanticAnalyzer:
             | Run
             | WaitFrame
             | CallbackRegistration
+            | SetSpriteZero
             | IfStatement
             | WhileStatement
             | RepeatStatement
@@ -565,6 +585,30 @@ class SemanticAnalyzer:
                     resolved_statements.append(ResolvedBreakStatement())
                 else:
                     resolved_statements.append(ResolvedContinueStatement())
+            elif isinstance(statement, SetSpriteZero):
+                if len(statement.arguments) != 4:
+                    self._error(
+                        statement.position,
+                        DiagnosticCode.INVALID_SPRITE_ZERO_ARGUMENT_COUNT,
+                        "nes.set_sprite_zero expects exactly 4 arguments "
+                        "(x, y, tile, attributes), but "
+                        f"{len(statement.arguments)} were provided.",
+                        "Pass x, y, tile, and attributes as byte values.",
+                        len("nes.set_sprite_zero"),
+                    )
+                x, y, tile, attributes = (
+                    self._resolve_value(
+                        argument,
+                        BuiltInType.BYTE,
+                        constants,
+                        variables,
+                        current_assignments,
+                    )
+                    for argument in statement.arguments
+                )
+                resolved_statements.append(
+                    ResolvedSetSpriteZero(x, y, tile, attributes)
+                )
             elif isinstance(statement, SetBackgroundColor):
                 if inside_procedure:
                     self._procedure_runtime_command_error(
@@ -811,6 +855,16 @@ class SemanticAnalyzer:
                 if not self._vblank_expression_is_safe(statement.value):
                     self._vblank_unsafe_expression(statement.value, owner)
                 return
+            if isinstance(statement, SetSpriteZero):
+                self._error(
+                    statement.position,
+                    DiagnosticCode.VBLANK_UNSAFE_OPERATION,
+                    f"VBlank callback path through {owner} reaches unsupported "
+                    "operation nes.set_sprite_zero.",
+                    "Stage sprite 0 from the update callback; the runtime "
+                    "commits it safely during NMI.",
+                    len("nes.set_sprite_zero"),
+                )
             if isinstance(statement, (IncrementStatement, DecrementStatement)):
                 if statement.amount is not None:
                     self._error(
@@ -870,6 +924,8 @@ class SemanticAnalyzer:
         validate(root)
 
     def _vblank_expression_is_safe(self, value: ValueExpression) -> bool:
+        if isinstance(value, ControllerQuery):
+            return False
         if isinstance(value, (BinaryExpression, ComparisonExpression)):
             return False
         if isinstance(value, (UnaryExpression, BooleanNotExpression)):
@@ -885,6 +941,17 @@ class SemanticAnalyzer:
         value: ValueExpression,
         owner: str,
     ) -> None:
+        controller_query = self._first_controller_query(value)
+        if controller_query is not None:
+            command = f"nes.controller_{controller_query.kind.value}"
+            self._error(
+                controller_query.position,
+                DiagnosticCode.VBLANK_UNSAFE_OPERATION,
+                f"VBlank callback path through {owner} queries {command}.",
+                "Query controller state from main code or the update callback; "
+                "controller polling runs outside NMI.",
+                len(command),
+            )
         self._error(
             value.position,
             DiagnosticCode.VBLANK_UNSAFE_OPERATION,
@@ -893,6 +960,23 @@ class SemanticAnalyzer:
             "Use literals, constants, variables, unary operations, or "
             "short-circuit boolean operations without arithmetic or comparisons.",
         )
+
+    def _first_controller_query(
+        self,
+        value: ValueExpression,
+    ) -> ControllerQuery | None:
+        if isinstance(value, ControllerQuery):
+            return value
+        if isinstance(value, (UnaryExpression, BooleanNotExpression)):
+            return self._first_controller_query(value.operand)
+        if isinstance(
+            value,
+            (BinaryExpression, BooleanBinaryExpression, ComparisonExpression),
+        ):
+            return self._first_controller_query(
+                value.left
+            ) or self._first_controller_query(value.right)
+        return None
 
     def _statement_position_for_callback(self, statement: Statement) -> SourcePosition:
         if isinstance(statement, Assignment):
@@ -914,6 +998,8 @@ class SemanticAnalyzer:
             return "nes.run"
         if isinstance(statement, SetBackgroundColor):
             return "nes.set_background_color"
+        if isinstance(statement, SetSpriteZero):
+            return "nes.set_sprite_zero"
         if isinstance(statement, CallbackRegistration):
             return f"nes.on_{statement.kind.value}"
         if isinstance(statement, BreakStatement):
@@ -1206,6 +1292,14 @@ class SemanticAnalyzer:
         assigned_variables: set[str],
         assignment_target: ResolvedVariable | None = None,
     ) -> ResolvedValue:
+        if isinstance(expression, ControllerQuery):
+            return self._resolve_controller_query(
+                expression,
+                expected_type,
+                constants,
+                variables,
+                assignment_target,
+            )
         if isinstance(
             expression,
             (BooleanNotExpression, BooleanBinaryExpression),
@@ -1287,6 +1381,204 @@ class SemanticAnalyzer:
                     len(expression.name),
                 )
         return VariableValue(variable)
+
+    def _resolve_controller_query(
+        self,
+        expression: ControllerQuery,
+        expected_type: BuiltInType,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assignment_target: ResolvedVariable | None,
+    ) -> ResolvedControllerQuery:
+        command = f"nes.controller_{expression.kind.value}"
+        self._require_expression_result_type(
+            expression.position,
+            BuiltInType.BOOLEAN,
+            expected_type,
+            f"{command} result",
+            assignment_target,
+        )
+        if len(expression.arguments) != 2:
+            self._error(
+                expression.position,
+                DiagnosticCode.INVALID_CONTROLLER_ARGUMENT_COUNT,
+                f"{command} expects exactly 2 arguments, but "
+                f"{len(expression.arguments)} were provided.",
+                f"Use {command}($01, nes.button_a) with one controller "
+                "index and one button constant.",
+                len(command),
+            )
+
+        controller_argument, button_argument = expression.arguments
+        controller_index = self._resolve_controller_index(
+            controller_argument,
+            constants,
+            variables,
+            command,
+        )
+        button_name, button_mask = self._resolve_controller_button(
+            button_argument,
+            constants,
+            variables,
+            command,
+        )
+        return ResolvedControllerQuery(
+            expression.kind,
+            controller_index,
+            button_mask,
+            button_name,
+        )
+
+    def _resolve_controller_index(
+        self,
+        argument: ValueExpression,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        command: str,
+    ) -> int:
+        if isinstance(argument, BooleanLiteral):
+            self._controller_argument_type_error(
+                argument.position,
+                command,
+                "controller index",
+                "boolean",
+            )
+        if isinstance(argument, HexLiteral):
+            value = argument.value
+            position = argument.position
+            text = argument.text
+        elif isinstance(argument, ConstantReference):
+            normalized = argument.name.lower()
+            constant = constants.get(normalized)
+            if constant is None:
+                self._error(
+                    argument.position,
+                    DiagnosticCode.UNKNOWN_IDENTIFIER,
+                    f"Unknown identifier: {argument.name}.",
+                    "Declare a byte constant with value $01 or $02.",
+                    len(argument.name),
+                )
+            if constant.type is not BuiltInType.BYTE:
+                self._controller_argument_type_error(
+                    argument.position,
+                    command,
+                    "controller index",
+                    constant.type.value,
+                )
+            value = constant.value
+            position = argument.position
+            text = argument.name
+        elif isinstance(argument, VariableReference):
+            variable = variables.get(argument.name.lower())
+            if variable is not None and variable.type is not BuiltInType.BYTE:
+                self._controller_argument_type_error(
+                    argument.position,
+                    command,
+                    "controller index",
+                    variable.type.value,
+                )
+            self._error(
+                argument.position,
+                DiagnosticCode.DYNAMIC_CONTROLLER_INDEX,
+                f"{command} requires a compile-time controller index; "
+                f"{argument.name} is dynamic.",
+                "Pass $01, $02, or a byte constant with one of those values.",
+                len(argument.name),
+            )
+        else:
+            actual_type = self._expression_type_hint(
+                argument,
+                constants,
+                variables,
+            )
+            if actual_type is BuiltInType.BOOLEAN:
+                self._controller_argument_type_error(
+                    argument.position,
+                    command,
+                    "controller index",
+                    "boolean",
+                )
+            self._error(
+                argument.position,
+                DiagnosticCode.DYNAMIC_CONTROLLER_INDEX,
+                f"{command} requires a direct compile-time controller index.",
+                "Pass $01, $02, or a byte constant with one of those values.",
+            )
+
+        if value not in (1, 2):
+            self._error(
+                position,
+                DiagnosticCode.INVALID_CONTROLLER_INDEX,
+                f"Controller index {text} is invalid for {command}.",
+                "Use controller $01 or $02.",
+                len(text),
+            )
+        return value
+
+    def _resolve_controller_button(
+        self,
+        argument: ValueExpression,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        command: str,
+    ) -> tuple[str, int]:
+        if isinstance(argument, ConstantReference):
+            normalized = argument.name.lower()
+            mask = CONTROLLER_BUTTONS.get(normalized)
+            if mask is not None:
+                return normalized, mask
+            constant = constants.get(normalized)
+            if constant is not None and constant.type is not BuiltInType.BYTE:
+                self._controller_argument_type_error(
+                    argument.position,
+                    command,
+                    "button",
+                    constant.type.value,
+                )
+        elif isinstance(argument, BooleanLiteral):
+            self._controller_argument_type_error(
+                argument.position,
+                command,
+                "button",
+                "boolean",
+            )
+        elif isinstance(argument, VariableReference):
+            variable = variables.get(argument.name.lower())
+            if variable is not None and variable.type is not BuiltInType.BYTE:
+                self._controller_argument_type_error(
+                    argument.position,
+                    command,
+                    "button",
+                    variable.type.value,
+                )
+
+        position = argument.position
+        text = getattr(argument, "name", getattr(argument, "text", "expression"))
+        self._error(
+            position,
+            DiagnosticCode.INVALID_CONTROLLER_BUTTON,
+            f"{text} is not a valid controller button for {command}.",
+            "Use exactly one of nes.button_a, nes.button_b, "
+            "nes.button_select, nes.button_start, nes.button_up, "
+            "nes.button_down, nes.button_left, or nes.button_right.",
+            len(text),
+        )
+
+    def _controller_argument_type_error(
+        self,
+        position: SourcePosition,
+        command: str,
+        argument_name: str,
+        actual_type: str,
+    ) -> None:
+        self._error(
+            position,
+            DiagnosticCode.INVALID_CONTROLLER_ARGUMENT_TYPE,
+            f"The {argument_name} argument to {command} has type "
+            f"{actual_type}, but a byte constant is required.",
+            "Use $01 or $02 for the controller and a nes.button_* constant "
+            "for the button.",
+        )
 
     def _resolve_arithmetic_expression(
         self,
@@ -1463,6 +1755,7 @@ class SemanticAnalyzer:
                 BooleanNotExpression,
                 BooleanBinaryExpression,
                 ComparisonExpression,
+                ControllerQuery,
             ),
         ):
             return BuiltInType.BOOLEAN

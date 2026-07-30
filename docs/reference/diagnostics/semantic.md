@@ -507,3 +507,54 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
   registered as both update and VBlank callbacks.`
 - **Suggested fix:** Declare separate parameterless procedures for the two
   execution contexts.
+
+## E3026 - Invalid controller index
+
+- **Category:** Semantic Analysis
+- **Explanation:** Standard controller queries support only ports 1 and 2.
+- **Trigger:** `nes.controller_down($03, nes.button_a)` or index `$00`.
+- **Expected compiler output:** `E3026` identifies the invalid constant.
+- **Suggested fix:** Pass `$01`, `$02`, or a declared `byte` constant with one
+  of those values.
+
+## E3027 - Dynamic controller index
+
+- **Category:** Semantic Analysis
+- **Explanation:** The controller index must be selected at compile time so
+  code generation can use one fixed runtime state byte.
+- **Trigger:** Pass a variable or expression as the first controller-query
+  argument.
+- **Expected compiler output:** `E3027` followed by `requires a compile-time
+  controller index`.
+- **Suggested fix:** Use `$01`, `$02`, or a direct declared `byte` constant.
+
+## E3028 - Invalid controller button
+
+- **Category:** Semantic Analysis
+- **Explanation:** A controller query accepts exactly one standard
+  `nes.button_*` constant, not a literal, user constant, expression, or unknown
+  button name.
+- **Trigger:** `nes.controller_down($01, nes.button_fire)`.
+- **Expected compiler output:** `E3028` identifies the invalid button.
+- **Suggested fix:** Use A, B, Select, Start, Up, Down, Left, or Right through
+  its documented built-in constant.
+
+## E3029 - Invalid controller argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** Each controller query requires one controller index and one
+  button constant.
+- **Trigger:** Omit either argument or provide an extra argument.
+- **Expected compiler output:** `E3029` reports the provided count.
+- **Suggested fix:** Use a call such as
+  `nes.controller_pressed($01, nes.button_start)`.
+
+## E3030 - Invalid sprite-zero argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** The fixed controller-example sprite helper requires X, Y,
+  tile, and attributes values.
+- **Trigger:** Call `nes.set_sprite_zero` with other than four arguments.
+- **Expected compiler output:** `E3030` reports the provided count.
+- **Suggested fix:** Pass exactly four `byte` expressions. This helper is not a
+  general sprite API.

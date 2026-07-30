@@ -22,6 +22,10 @@ and NMI runtime state, plus absolute opcodes for fallback storage. Structural
 backend tests verify register preservation, the counter-authoritative wait
 loop, persistent pending-frame detection, VBlank-gated rendering startup, and
 the separation of main-thread update calls from the restricted NMI callback.
+Controller tests verify serial bit order, independent current/previous state,
+compile-time arguments, transition masking, one guarded poll per processed
+frame, Zero Page opcodes, fixed sprite staging, OAM DMA, and deterministic
+Assembly.
 Toolchain tests are skipped with an explicit message when `ca65` or `ld65` is
 unavailable.
 
@@ -33,7 +37,9 @@ procedure-parameter storage, promoted and regular-RAM addresses where
 applicable, NMI counter progress, three distinct `nes.wait_frame` iterations,
 update and VBlank callback progress across 8-bit frame-counter wraparound, and
 slow-update pending-frame behavior without nested calls, and the universal
-background color:
+background color. The controller ROM additionally drives both virtual ports,
+checks every direction and button behavior, verifies OAM consistency, and
+runs across an 8-bit frame-counter wrap:
 
 ```powershell
 $env:MESEN_PATH = "C:\path\to\Mesen.exe"

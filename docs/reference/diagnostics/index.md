@@ -50,11 +50,17 @@ the range reserved for their category.
 | [E3023](semantic.md) | Semantic Analysis | VBlank-unsafe operation |
 | [E3024](semantic.md) | Semantic Analysis | Invalid callback call graph |
 | [E3025](semantic.md) | Semantic Analysis | Conflicting callback registration |
+| [E3026](semantic.md) | Semantic Analysis | Invalid controller index |
+| [E3027](semantic.md) | Semantic Analysis | Dynamic controller index |
+| [E3028](semantic.md) | Semantic Analysis | Invalid controller button |
+| [E3029](semantic.md) | Semantic Analysis | Invalid controller argument count |
+| [E3030](semantic.md) | Semantic Analysis | Invalid sprite-zero argument count |
 | [E4001](type-system.md) | Type System | Unknown type |
 | [E4002](type-system.md) | Type System | Invalid `nes_color` value |
 | [E4003](type-system.md) | Type System | Invalid `byte` value |
 | [E4004](type-system.md) | Type System | Incompatible types |
 | [E4005](type-system.md) | Type System | Unsupported parameter type |
+| [E4006](type-system.md) | Type System | Invalid controller argument type |
 | [E5001](code-generation.md) | Code Generation | Missing toolchain |
 | [E5002](code-generation.md) | Code Generation | Toolchain failure |
 | [E5003](code-generation.md) | Code Generation | User RAM exhausted |

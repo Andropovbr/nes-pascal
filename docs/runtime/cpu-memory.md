@@ -14,17 +14,23 @@ and are never treated as additional storage.
 | `$0080-$00FF` | 128 bytes | User | Optional automatic global-variable promotion |
 | `$0100-$01FF` | 256 bytes | Reserved | 6502 hardware stack |
 | `$0200-$02FF` | 256 bytes | Runtime | Page-aligned OAM shadow, symbol `runtime_oam_shadow` |
-| `$0300` | 0 bytes | Runtime | Scalar regular-RAM runtime data; currently empty |
-| `$0300-$07FF` | 1,280 bytes | User/free | Non-promoted globals and all procedure parameters |
+| `$0300-$0304` | 0 or 5 bytes | Runtime | Fixed sprite-0 staging record, allocated only when used |
+| `$0300-$07FF` | up to 1,280 bytes | User/free | Non-promoted globals and all procedure parameters |
 
 The Zero Page partitions are fixed and non-overlapping. Runtime and compiler
 allocations are mandatory. They never borrow from optional promotion space.
 The runtime owns `runtime_frame_counter` at `$0000` and
 `runtime_frame_ready` at `$0001`. The update loop owns
-`runtime_last_processed_frame` at `$0002`. These runtime bytes cannot overlap
+`runtime_last_processed_frame` at `$0002`. Controller current, previous, and
+poll-guard state occupy `$0003-$0008`. These runtime bytes cannot overlap
 compiler storage. The compiler places reusable expression slots and cached
 `for` limits in `$0010-$001F`. Needing more than 16 temporary bytes is a
 compilation error.
+
+The fixed controller-example sprite helper conditionally reserves five bytes
+at `$0300-$0304`: four staged fields and an atomic publish flag. General user
+RAM then begins at `$0305`. Programs that do not use the helper reserve no
+scalar runtime data and keep general user RAM at `$0300`.
 
 VBlank callback validation rejects any reachable operation that uses those
 shared compiler temporaries. The interrupt path therefore uses runtime-owned
@@ -89,4 +95,16 @@ The runtime-symbol table also reports:
 $0000       1  runtime_frame_counter  volatile 8-bit NMI frame counter
 $0001       1  runtime_frame_ready    best-effort advisory frame-ready latch
 $0002       1  runtime_last_processed_frame  persistent update-loop baseline
+$0003       1  runtime_controller_1_current  controller 1 current state
+$0004       1  runtime_controller_1_previous controller 1 previous state
+$0005       1  runtime_controller_2_current  controller 2 current state
+$0006       1  runtime_controller_2_previous controller 2 previous state
+$0007       1  runtime_controller_polled_frame most recently polled frame
+$0008       1  runtime_controller_poll_valid distinguishes initial RAM from frame zero
 ```
+
+When fixed sprite 0 support is present, the same table reports
+`runtime_sprite_zero_pending_x`, `runtime_sprite_zero_pending_y`,
+`runtime_sprite_zero_pending_tile`,
+`runtime_sprite_zero_pending_attributes`, and `runtime_sprite_zero_ready` at
+`$0300-$0304`.

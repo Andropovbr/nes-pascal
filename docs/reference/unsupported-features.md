@@ -19,7 +19,8 @@ the supported language.
   limited to `byte`.
 - Boolean expressions support only `not`, `and`, and `or`.
 - `case`, arrays, records, functions, runtime strings, and inline Assembly are
-  not supported.
+  not supported. The three fixed controller query intrinsics are the only
+  function-shaped expressions.
 - Procedure parameters are limited to `byte` and `boolean` values. There are
   no reference parameters, default values, return values, or general local
   variables.
@@ -31,7 +32,8 @@ the supported language.
 - Statements are limited to assignment, `inc` and `dec`, `if`/`else`,
   supported loops, `break`, `continue`, procedure calls,
   `nes.set_background_color`, `nes.run`, `nes.wait_frame`, `nes.on_update`,
-  and `nes.on_vblank`.
+  `nes.on_vblank`, and the fixed controller-example `nes.set_sprite_zero`
+  helper.
 - Conditional branches and loop bodies may contain supported statements, but
   NES initialization commands remain top-level only. `nes.wait_frame` is the
   sole runtime command allowed in main-block control flow.
@@ -46,8 +48,12 @@ the supported language.
 - Automatic Zero Page promotion is limited to the deterministic global-variable
   policy. Explicit Zero Page declarations are not implemented.
 - Only NTSC NES, mapper 0, 32 KiB PRG-ROM, and 8 KiB CHR-ROM are supported.
-- CHR-ROM is empty.
-- Sprites, controller input, audio, and graphics assets are not supported.
+- CHR-ROM remains empty unless the fixed sprite-0 demonstration helper is
+  used; that helper embeds two internal 8x8 player tiles.
+- Standard controllers 1 and 2 are supported without remapping, Four Score,
+  expansion devices, buffering, combos, turbo, or DMC-safe repeated reads.
+- General sprites, audio, and user-provided graphics assets are not supported.
+  `nes.set_sprite_zero` stages hardware sprite 0 only and is not a sprite API.
 - Callback registration is static. There is only one callback of each kind,
   with no parameters, return values, priorities, lists, removal, indirect
   calls, IRQ callbacks, or user-owned interrupt handlers.

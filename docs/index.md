@@ -39,6 +39,7 @@ Planned work is tracked separately in the
 - [`nes.run`](runtime/run.md)
 - [`nes.wait_frame`](runtime/wait-frame.md)
 - [Frame callbacks](runtime/frame-callbacks.md)
+- [Controller input](runtime/controller-input.md)
 
 ## Reference
 

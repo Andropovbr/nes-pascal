@@ -12,6 +12,8 @@ from .ast import (
     BuiltInType,
     CallbackKind,
     CallbackRegistration,
+    ControllerQuery,
+    ControllerQueryKind,
     ConstantDeclaration,
     ConstantReference,
     ComparisonExpression,
@@ -31,6 +33,7 @@ from .ast import (
     RepeatStatement,
     Run,
     SetBackgroundColor,
+    SetSpriteZero,
     SourcePosition,
     Statement,
     UnaryExpression,
@@ -330,6 +333,17 @@ class Parser:
                 SourcePosition(namespace.line, namespace.column),
                 consume_terminator,
             )
+        if normalized == "nes.set_sprite_zero":
+            arguments = self._parse_expression_arguments(normalized)
+            if consume_terminator:
+                self._expect(
+                    TokenKind.SEMICOLON,
+                    "Expected ';' after 'nes.set_sprite_zero(...)'.",
+                )
+            return SetSpriteZero(
+                arguments,
+                SourcePosition(namespace.line, namespace.column),
+            )
         if normalized == "nes.run":
             if consume_terminator:
                 self._expect(TokenKind.SEMICOLON, "Expected ';' after 'nes.run'.")
@@ -454,6 +468,26 @@ class Parser:
             position,
             SourcePosition(procedure.line, procedure.column),
         )
+
+    def _parse_expression_arguments(
+        self,
+        qualified_name: str,
+    ) -> tuple[ValueExpression, ...]:
+        self._expect(
+            TokenKind.LEFT_PAREN,
+            f"Expected '(' after '{qualified_name}'.",
+        )
+        arguments: list[ValueExpression] = []
+        if not self._check(TokenKind.RIGHT_PAREN):
+            while True:
+                arguments.append(self._parse_expression())
+                if not self._match(TokenKind.COMMA):
+                    break
+        self._expect(
+            TokenKind.RIGHT_PAREN,
+            f"Expected ')' after '{qualified_name}' arguments.",
+        )
+        return tuple(arguments)
 
     def _parse_if_statement(self, consume_terminator: bool) -> IfStatement:
         if_token = self._expect(TokenKind.IF, "Expected 'if'.")
@@ -743,6 +777,26 @@ class Parser:
             return self._parse_literal("value")
         if self._match(TokenKind.IDENTIFIER):
             position = SourcePosition(token.line, token.column)
+            if self._match(TokenKind.DOT):
+                member = self._expect(
+                    TokenKind.IDENTIFIER,
+                    "Expected a built-in name after '.'.",
+                )
+                qualified_name = f"{token.text}.{member.text}"
+                normalized = qualified_name.lower()
+                query_kinds = {
+                    "nes.controller_down": ControllerQueryKind.DOWN,
+                    "nes.controller_pressed": ControllerQueryKind.PRESSED,
+                    "nes.controller_released": ControllerQueryKind.RELEASED,
+                }
+                query_kind = query_kinds.get(normalized)
+                if query_kind is not None:
+                    return ControllerQuery(
+                        query_kind,
+                        self._parse_expression_arguments(normalized),
+                        position,
+                    )
+                return ConstantReference(qualified_name, position)
             if token.text.lower() in (
                 self.variable_names | self.parameter_names
             ):

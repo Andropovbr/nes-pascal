@@ -32,5 +32,9 @@ stack balance. It may call the one statically registered and validated
 VBlank callback after frame bookkeeping. It does not run update logic or
 process a generic PPU command queue.
 
-`nes.wait_frame` synchronizes CPU work with frames but does not itself perform
-PPU writes. Rendering-sensitive runtime PPU operations must execute in VBlank.
+After observing the new counter value, `nes.wait_frame` updates both controller
+ports through the same guarded polling routine used by the callback loop. This
+makes fresh [`controller_down`, `controller_pressed`, and
+`controller_released`](controller-input.md) state available to explicit main
+loops without polling a processed frame twice. It does not itself perform PPU
+writes. Rendering-sensitive runtime PPU operations must execute in VBlank.

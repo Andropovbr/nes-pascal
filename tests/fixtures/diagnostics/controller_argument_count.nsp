@@ -1,0 +1,8 @@
+program ControllerArgumentCount;
+var
+    Down: boolean;
+begin
+    Down := nes.controller_down($01);
+    nes.set_background_color($21);
+    nes.run;
+end.

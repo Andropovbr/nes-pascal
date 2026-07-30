@@ -43,6 +43,7 @@ class ToolchainIntegrationTests(unittest.TestCase):
         self,
         example_name: str,
         expected_vectors: tuple[int, int, int] = (0x8000, 0x8012, 0x8011),
+        expected_empty_chr: bool = True,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             rom_path = Path(temporary_directory) / f"{example_name}.nes"
@@ -55,7 +56,10 @@ class ToolchainIntegrationTests(unittest.TestCase):
         self.assertEqual(rom[6] & 0xF0, 0, "lower mapper bits must be zero")
         self.assertEqual(rom[7] & 0xF0, 0, "upper mapper bits must be zero")
         self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
-        self.assertEqual(rom[-8 * 1024 :], bytes(8 * 1024))
+        if expected_empty_chr:
+            self.assertEqual(rom[-8 * 1024 :], bytes(8 * 1024))
+        else:
+            self.assertNotEqual(rom[-8 * 1024 :], bytes(8 * 1024))
 
         vector_offset = 16 + 0x7FFA
         nmi = int.from_bytes(rom[vector_offset : vector_offset + 2], "little")
@@ -104,6 +108,13 @@ class ToolchainIntegrationTests(unittest.TestCase):
 
     def test_slow_update_callback_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("slow_update_callback")
+
+    def test_controller_input_example_builds_with_player_chr_asset(self) -> None:
+        self._assert_valid_nrom_image(
+            "controller_input",
+            expected_vectors=(0x8000, 0x803E, 0x803D),
+            expected_empty_chr=False,
+        )
 
     def test_optional_promotion_fallback_builds_the_same_valid_rom_format(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -201,6 +212,45 @@ class ToolchainIntegrationTests(unittest.TestCase):
         self.assertRegex(
             listing,
             r"C5 rr\s+cmp runtime_last_processed_frame",
+        )
+
+    def test_controller_runtime_state_uses_zero_page_opcodes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            rom_path = directory / "controller_input.nes"
+            assembly_path, _ = compile_source(
+                ROOT / "examples" / "controller_input.nsp",
+                rom_path,
+            )
+            listing_path = directory / "controller_input.lst"
+            listing_object = directory / "controller_input_listing.o"
+            result = subprocess.run(
+                [
+                    str(shutil.which("ca65")),
+                    str(assembly_path),
+                    "-o",
+                    str(listing_object),
+                    "-l",
+                    str(listing_path),
+                ],
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            listing = listing_path.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertRegex(
+            listing,
+            r"A5 rr\s+lda runtime_controller_1_current",
+        )
+        self.assertRegex(
+            listing,
+            r"66 rr\s+ror runtime_controller_2_current",
+        )
+        self.assertRegex(
+            listing,
+            r"C5 rr\s+cmp runtime_controller_polled_frame",
         )
 
     def test_generated_memory_artifacts_are_complete_and_reproducible(self) -> None:
@@ -363,6 +413,12 @@ class MesenIntegrationTests(unittest.TestCase):
         self._run_mesen_test(
             "slow_update_callback",
             "verify_slow_update_callback.lua",
+        )
+
+    def test_controller_example_validates_input_and_oam_across_wrap(self) -> None:
+        self._run_mesen_test(
+            "controller_input",
+            "verify_controller_input.lua",
         )
 
 
