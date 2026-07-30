@@ -27,7 +27,7 @@ Type-system diagnostics use the E4000-E4999 range.
 
 - **Category:** Type System
 - **Explanation:** `nes_color` values are limited to the NES palette range
-  `$00..$3F`.
+  `$00..$3F` in declarations, assignments, and every palette API.
 - **Trigger:**
 
   ```pascal
@@ -137,3 +137,15 @@ Type-system diagnostics use the E4000-E4999 range.
   type.
 - **Suggested fix:** Pass `$01` or `$02` as the controller and exactly one
   `nes.button_*` constant as the button.
+
+## E4007 - Invalid palette argument type
+
+- **Category:** Type System
+- **Explanation:** Palette and color indexes require compile-time `byte`
+  values, while color arguments require `nes_color`. No implicit conversions
+  are performed.
+- **Trigger:** Pass a Boolean index or a `byte` variable as a palette color.
+- **Expected compiler output:** `E4007` identifies the argument, actual type,
+  and required type.
+- **Suggested fix:** Use a `byte` constant for indexes and an assigned
+  `nes_color` value for colors.

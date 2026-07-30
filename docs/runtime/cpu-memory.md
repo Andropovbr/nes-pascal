@@ -15,6 +15,7 @@ and are never treated as additional storage.
 | `$0100-$01FF` | 256 bytes | Reserved | 6502 hardware stack |
 | `$0200-$02FF` | 256 bytes | Runtime | Page-aligned OAM shadow, symbol `runtime_oam_shadow` |
 | `$0300-$0304` | 0 or 5 bytes | Runtime | Fixed sprite-0 staging record, allocated only when used |
+| `$0300-$032B` or `$0305-$0330` | 0 or 44 bytes | Runtime | Palette shadow, atomic dirty flags, and PPU restoration state, allocated only for runtime palette calls |
 | `$0300-$07FF` | up to 1,280 bytes | User/free | Non-promoted globals and all procedure parameters |
 
 The Zero Page partitions are fixed and non-overlapping. Runtime and compiler
@@ -31,6 +32,14 @@ The fixed controller-example sprite helper conditionally reserves five bytes
 at `$0300-$0304`: four staged fields and an atomic publish flag. General user
 RAM then begins at `$0305`. Programs that do not use the helper reserve no
 scalar runtime data and keep general user RAM at `$0300`.
+
+Programs with runtime palette calls reserve a 32-byte palette shadow, four
+background-palette flags, four sprite-palette flags, one universal-color flag,
+and three PPU restoration bytes in regular runtime RAM. The restoration bytes
+hold PPUCTRL, scroll X, and scroll Y. This 44-byte block starts at `$0300`, or
+`$0305` when fixed sprite-zero state is also present. It uses no additional
+Zero Page. User RAM begins immediately after the conditionally allocated
+runtime blocks.
 
 VBlank callback validation rejects any reachable operation that uses those
 shared compiler temporaries. The interrupt path therefore uses runtime-owned
@@ -108,3 +117,10 @@ When fixed sprite 0 support is present, the same table reports
 `runtime_sprite_zero_pending_tile`,
 `runtime_sprite_zero_pending_attributes`, and `runtime_sprite_zero_ready` at
 `$0300-$0304`.
+
+When runtime palette support is present, the table also reports
+`runtime_palette_shadow`, `runtime_palette_background_0_dirty` through
+`runtime_palette_background_3_dirty`, `runtime_palette_sprite_0_dirty` through
+`runtime_palette_sprite_3_dirty`, `runtime_palette_universal_dirty`,
+`runtime_ppuctrl_shadow`, `runtime_scroll_x_shadow`, and
+`runtime_scroll_y_shadow`.

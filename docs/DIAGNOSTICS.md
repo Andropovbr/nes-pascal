@@ -44,12 +44,17 @@ diagnostics section.
 | E3028 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E3029 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E3030 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3031 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3032 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3033 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3034 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E4001 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4002 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4003 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4004 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4005 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4006 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4007 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E5001 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5002 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5003 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |

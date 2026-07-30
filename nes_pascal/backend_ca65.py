@@ -9,6 +9,7 @@ from .ast import (
     ComparisonOperator,
     ForDirection,
     ImmediateValue,
+    PaletteKind,
     ResolvedAssignment,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
@@ -27,6 +28,8 @@ from .ast import (
     ResolvedProcedureCall,
     ResolvedRepeatStatement,
     ResolvedSetBackgroundColor,
+    ResolvedSetPalette,
+    ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
     ResolvedStatement,
     ResolvedUnaryExpression,
@@ -54,7 +57,8 @@ def generate(
     run_commands = [
         statement for statement in program.statements if isinstance(statement, Run)
     ]
-    if len(color_commands) != 1 or len(run_commands) != 1:
+    initialization_colors = [command for command in color_commands if not command.queued]
+    if len(initialization_colors) != 1 or len(run_commands) != 1:
         raise ValueError("invalid resolved AST for the current milestone")
     callback_registrations = {
         statement.kind: statement
@@ -104,6 +108,13 @@ def generate(
         symbol.assembly_symbol == "runtime_sprite_zero_ready"
         for symbol in layout.runtime_symbols
     )
+    palette_runtime_enabled = any(
+        symbol.assembly_symbol == "runtime_palette_shadow"
+        for symbol in layout.runtime_symbols
+    )
+    custom_sprite_palette_initialized = _has_initial_sprite_palette(
+        program.statements
+    )
 
     label_counter = [0]
     for_counter = [0]
@@ -113,12 +124,16 @@ def generate(
         (),
         for_counter,
         sprite_zero_enabled,
+        palette_runtime_enabled,
+        sprite_zero_enabled and not custom_sprite_palette_initialized,
     )
     procedure_lines = _generate_procedures(
         program.procedures,
         label_counter,
         for_counter,
         sprite_zero_enabled,
+        palette_runtime_enabled,
+        sprite_zero_enabled and not custom_sprite_palette_initialized,
     )
 
     temporaries = "\n".join(temporary_lines)
@@ -199,6 +214,20 @@ def generate(
         if sprite_zero_enabled
         else ""
     )
+    palette_nmi_work = (
+        "\n\n    ; Runtime: consume bounded queued palette updates before user VBlank work\n"
+        "    jsr runtime_upload_queued_palettes"
+        if palette_runtime_enabled
+        else ""
+    )
+    nmi_work = (
+        f"{sprite_nmi_work}{palette_nmi_work}{vblank_callback_call}"
+        if palette_runtime_enabled
+        else f"{vblank_callback_call}{sprite_nmi_work}"
+    )
+    palette_runtime_routine = (
+        _generate_palette_upload_routine() if palette_runtime_enabled else ""
+    )
     chr_storage = _generate_chr_storage(
         settings.chr_rom_size,
         sprite_zero_enabled,
@@ -251,7 +280,7 @@ NMI:
 
     inc runtime_frame_counter ; volatile 8-bit counter, wraps modulo 256
     lda #$01
-    sta runtime_frame_ready   ; advisory; frame counter is authoritative{vblank_callback_call}{sprite_nmi_work}
+    sta runtime_frame_ready   ; advisory; frame counter is authoritative{nmi_work}
 
     pla
     tay
@@ -334,7 +363,7 @@ runtime_read_controller_ports:
     ror runtime_controller_2_current
     dex
     bne @read_controller_bits
-    rts
+    rts{palette_runtime_routine}
 {procedures}
 
 .segment "VECTORS"
@@ -353,6 +382,8 @@ def _generate_statements(
     loop_targets: tuple[tuple[str, str], ...],
     for_counter: list[int],
     sprite_zero_enabled: bool,
+    palette_runtime_enabled: bool,
+    default_sprite_palette_enabled: bool,
 ) -> list[str]:
     statement_lines: list[str] = []
     for statement in statements:
@@ -366,17 +397,43 @@ def _generate_statements(
                 ]
             )
         elif isinstance(statement, ResolvedSetBackgroundColor):
+            if statement.queued:
+                statement_lines.extend(
+                    _queue_universal_color(statement.argument, label_counter)
+                )
+            else:
+                statement_lines.extend(
+                    [
+                        "",
+                        "; Source: nes.set_background_color(value)",
+                        "    lda #$3F",
+                        "    sta $2006               ; universal palette address, high byte",
+                        "    lda #$00",
+                        "    sta $2006               ; low byte",
+                        *_load_value(statement.argument, label_counter),
+                        "    sta $2007",
+                        *(
+                            ["    sta runtime_palette_shadow"]
+                            if palette_runtime_enabled
+                            else []
+                        ),
+                    ]
+                )
+        elif isinstance(statement, ResolvedSetPalette):
             statement_lines.extend(
-                [
-                    "",
-                    "; Source: nes.set_background_color(value)",
-                    "    lda #$3F",
-                    "    sta $2006               ; universal palette address, high byte",
-                    "    lda #$00",
-                    "    sta $2006               ; low byte",
-                    *_load_value(statement.argument, label_counter),
-                    "    sta $2007",
-                ]
+                _generate_set_palette(
+                    statement,
+                    label_counter,
+                    palette_runtime_enabled,
+                )
+            )
+        elif isinstance(statement, ResolvedSetPaletteColor):
+            statement_lines.extend(
+                _generate_set_palette_color(
+                    statement,
+                    label_counter,
+                    palette_runtime_enabled,
+                )
             )
         elif isinstance(statement, Run):
             wait_vblank_label = _new_label(
@@ -384,23 +441,60 @@ def _generate_statements(
                 "wait_render_vblank",
             )
             sprite_palette_lines = (
-                [
-                    "    ; Runtime: minimal palette for fixed sprite 0 support",
-                    "    lda #$3F",
-                    "    sta $2006",
-                    "    lda #$11",
-                    "    sta $2006",
-                    "    lda #$16",
-                    "    sta $2007",
-                    "    lda #$27",
-                    "    sta $2007",
-                    "    lda #$30",
-                    "    sta $2007",
-                ]
-                if sprite_zero_enabled
+                (
+                    [
+                        "    ; Runtime: minimal palette for fixed sprite 0 support",
+                        "    lda #$3F",
+                        "    sta $2006",
+                        "    lda #$11",
+                        "    sta $2006",
+                        "    lda #$16",
+                        "    sta $2007",
+                        "    lda #$27",
+                        "    sta $2007",
+                        "    lda #$30",
+                        "    sta $2007",
+                    ]
+                    + (
+                        [
+                            "    lda #$16",
+                            "    sta runtime_palette_shadow + 17",
+                            "    lda #$27",
+                            "    sta runtime_palette_shadow + 18",
+                            "    lda #$30",
+                            "    sta runtime_palette_shadow + 19",
+                        ]
+                        if palette_runtime_enabled
+                        else []
+                    )
+                )
+                if default_sprite_palette_enabled
                 else []
             )
             rendering_mask = 0x18 if sprite_zero_enabled else 0x08
+            ppu_state_lines = (
+                [
+                    "    lda #$00",
+                    "    sta runtime_scroll_x_shadow ; current default scroll X",
+                    "    sta runtime_scroll_y_shadow ; current default scroll Y",
+                    "    lda #$80",
+                    "    sta runtime_ppuctrl_shadow ; current default PPUCTRL",
+                    "    lda runtime_scroll_x_shadow",
+                    "    sta $2005               ; scroll X",
+                    "    lda runtime_scroll_y_shadow",
+                    "    sta $2005               ; scroll Y",
+                    "    lda runtime_ppuctrl_shadow",
+                    "    sta $2000               ; enable NMI after initialization",
+                ]
+                if palette_runtime_enabled
+                else [
+                    "    lda #$00",
+                    "    sta $2005               ; scroll X",
+                    "    sta $2005               ; scroll Y",
+                    "    lda #$80",
+                    "    sta $2000               ; enable NMI after initialization",
+                ]
+            )
             statement_lines.extend(
                 [
                     "",
@@ -410,11 +504,7 @@ def _generate_statements(
                     "    bit $2002",
                     f"    bpl {wait_vblank_label}",
                     *sprite_palette_lines,
-                    "    lda #$00",
-                    "    sta $2005               ; scroll X",
-                    "    sta $2005               ; scroll Y",
-                    "    lda #$80",
-                    "    sta $2000               ; enable NMI after initialization",
+                    *ppu_state_lines,
                     f"    lda #${rendering_mask:02X}",
                     "    sta $2001               ; enable selected rendering layers",
                 ]
@@ -479,6 +569,8 @@ def _generate_statements(
                         loop_targets,
                         for_counter,
                         sprite_zero_enabled,
+                        palette_runtime_enabled,
+                        default_sprite_palette_enabled,
                     ),
                 ]
             )
@@ -493,6 +585,8 @@ def _generate_statements(
                             loop_targets,
                             for_counter,
                             sprite_zero_enabled,
+                            palette_runtime_enabled,
+                            default_sprite_palette_enabled,
                         ),
                     ]
                 )
@@ -517,6 +611,8 @@ def _generate_statements(
                         (*loop_targets, (end_label, condition_label)),
                         for_counter,
                         sprite_zero_enabled,
+                        palette_runtime_enabled,
+                        default_sprite_palette_enabled,
                     ),
                     f"    jmp {condition_label}",
                     f"{end_label}:",
@@ -537,6 +633,8 @@ def _generate_statements(
                         (*loop_targets, (end_label, condition_label)),
                         for_counter,
                         sprite_zero_enabled,
+                        palette_runtime_enabled,
+                        default_sprite_palette_enabled,
                     ),
                     f"{condition_label}:",
                     *_load_value(statement.condition, label_counter),
@@ -596,6 +694,8 @@ def _generate_statements(
                         (*loop_targets, (end_label, step_label)),
                         for_counter,
                         sprite_zero_enabled,
+                        palette_runtime_enabled,
+                        default_sprite_palette_enabled,
                     ),
                     f"{step_label}:",
                     f"    lda {statement.target.label}",
@@ -651,11 +751,266 @@ def _generate_statements(
     return statement_lines
 
 
+def _has_initial_sprite_palette(
+    statements: tuple[ResolvedStatement, ...],
+) -> bool:
+    for statement in statements:
+        if isinstance(
+            statement,
+            (ResolvedSetPalette, ResolvedSetPaletteColor),
+        ) and statement.kind is PaletteKind.SPRITE and not statement.queued:
+            return True
+        if isinstance(statement, ResolvedIfStatement):
+            if _has_initial_sprite_palette(statement.then_branch):
+                return True
+            if statement.else_branch is not None and _has_initial_sprite_palette(
+                statement.else_branch
+            ):
+                return True
+        elif isinstance(
+            statement,
+            (ResolvedWhileStatement, ResolvedRepeatStatement, ResolvedForStatement),
+        ) and _has_initial_sprite_palette(statement.body):
+            return True
+    return False
+
+
+def _palette_shadow_base(kind: PaletteKind, palette_index: int) -> int:
+    return (0 if kind is PaletteKind.BACKGROUND else 16) + palette_index * 4
+
+
+def _palette_dirty_symbol(kind: PaletteKind, palette_index: int) -> str:
+    return f"runtime_palette_{kind.value}_{palette_index}_dirty"
+
+
+def _direct_palette_write(
+    low_address: int,
+    values: tuple[ResolvedValue, ...],
+    label_counter: list[int],
+) -> list[str]:
+    lines = [
+        "    bit $2002               ; reset PPU address latch",
+        "    lda #$3F",
+        "    sta $2006               ; palette address, high byte",
+        f"    lda #${low_address:02X}",
+        "    sta $2006               ; palette address, low byte",
+    ]
+    for value in values:
+        lines.extend([*_load_value(value, label_counter), "    sta $2007"])
+    return lines
+
+
+def _queue_universal_color(
+    value: ResolvedValue,
+    label_counter: list[int],
+) -> list[str]:
+    return [
+        "",
+        "; Source: nes.set_background_color(value)",
+        "; Runtime: invalidate, stage, then publish for the next VBlank",
+        "    lda #$00",
+        "    sta runtime_palette_universal_dirty",
+        *_load_value(value, label_counter),
+        "    sta runtime_palette_shadow",
+        "    lda #$01",
+        "    sta runtime_palette_universal_dirty",
+    ]
+
+
+def _generate_set_palette(
+    statement: ResolvedSetPalette,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    command = f"nes.set_{statement.kind.value}_palette"
+    base = _palette_shadow_base(statement.kind, statement.palette_index)
+    if not statement.queued:
+        lines = [
+            "",
+            f"; Source: {command}(index, color0, color1, color2, color3)",
+            "; Initialization: color 0 uses the canonical universal color",
+            *_direct_palette_write(0x00, (statement.colors[0],), label_counter),
+            *_direct_palette_write(
+                base + 1,
+                statement.colors[1:],
+                label_counter,
+            ),
+        ]
+        if palette_runtime_enabled:
+            lines.extend(
+                [
+                    *_load_value(statement.colors[0], label_counter),
+                    "    sta runtime_palette_shadow",
+                ]
+            )
+            for index, value in enumerate(statement.colors[1:], start=1):
+                lines.extend(
+                    [
+                        *_load_value(value, label_counter),
+                        f"    sta runtime_palette_shadow + {base + index}",
+                    ]
+                )
+        return lines
+
+    dirty = _palette_dirty_symbol(statement.kind, statement.palette_index)
+    lines = [
+        "",
+        f"; Source: {command}(index, color0, color1, color2, color3)",
+        "; Runtime: invalidate both publications before staging any bytes",
+        "    lda #$00",
+        f"    sta {dirty}",
+        "    sta runtime_palette_universal_dirty",
+        *_load_value(statement.colors[0], label_counter),
+        "    sta runtime_palette_shadow ; canonical universal color",
+    ]
+    for index, value in enumerate(statement.colors[1:], start=1):
+        lines.extend(
+            [
+                *_load_value(value, label_counter),
+                f"    sta runtime_palette_shadow + {base + index}",
+            ]
+        )
+    lines.extend(
+        [
+            "    lda #$01",
+            "    sta runtime_palette_universal_dirty",
+            f"    sta {dirty}",
+        ]
+    )
+    return lines
+
+
+def _generate_set_palette_color(
+    statement: ResolvedSetPaletteColor,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    command = f"nes.set_{statement.kind.value}_palette_color"
+    if statement.color_index == 0:
+        if statement.queued:
+            lines = _queue_universal_color(statement.color, label_counter)
+            lines[1] = f"; Source: {command}(palette, color, value)"
+            return lines
+        lines = [
+            "",
+            f"; Source: {command}(palette, color, value)",
+            "; Initialization: color 0 uses the canonical universal color",
+            *_direct_palette_write(0x00, (statement.color,), label_counter),
+        ]
+        if palette_runtime_enabled:
+            lines.extend(
+                [
+                    *_load_value(statement.color, label_counter),
+                    "    sta runtime_palette_shadow",
+                ]
+            )
+        return lines
+
+    base = _palette_shadow_base(statement.kind, statement.palette_index)
+    offset = base + statement.color_index
+    if not statement.queued:
+        lines = [
+            "",
+            f"; Source: {command}(palette, color, value)",
+            *_direct_palette_write(offset, (statement.color,), label_counter),
+        ]
+        if palette_runtime_enabled:
+            lines.extend(
+                [
+                    *_load_value(statement.color, label_counter),
+                    f"    sta runtime_palette_shadow + {offset}",
+                ]
+            )
+        return lines
+
+    dirty = _palette_dirty_symbol(statement.kind, statement.palette_index)
+    return [
+        "",
+        f"; Source: {command}(palette, color, value)",
+        "; Runtime: invalidate, stage one color, then publish the palette",
+        "    lda #$00",
+        f"    sta {dirty}",
+        *_load_value(statement.color, label_counter),
+        f"    sta runtime_palette_shadow + {offset}",
+        "    lda #$01",
+        f"    sta {dirty}",
+    ]
+
+
+def _generate_palette_upload_routine() -> str:
+    lines = [
+        "",
+        "",
+        "; Runtime: bounded VBlank palette uploader (at most eight triplets and one universal color)",
+        "runtime_upload_queued_palettes:",
+    ]
+    for kind in (PaletteKind.BACKGROUND, PaletteKind.SPRITE):
+        for palette_index in range(4):
+            dirty = _palette_dirty_symbol(kind, palette_index)
+            skip = f"@skip_{kind.value}_palette_{palette_index}"
+            base = _palette_shadow_base(kind, palette_index)
+            low_address = base + 1
+            lines.extend(
+                [
+                    f"    lda {dirty}",
+                    f"    beq {skip}",
+                    "    lda #$00",
+                    f"    sta {dirty}            ; consume complete staged palette",
+                    f"    lda #${low_address:02X}",
+                    f"    ldx #${base + 1:02X}",
+                    "    jsr runtime_upload_palette_triplet",
+                    f"{skip}:",
+                ]
+            )
+    lines.extend(
+        [
+            "    lda runtime_palette_universal_dirty",
+            "    beq @skip_universal_palette_color",
+            "    lda #$00",
+            "    sta runtime_palette_universal_dirty ; consume complete staged color",
+            "    bit $2002               ; reset PPU address latch",
+            "    lda #$3F",
+            "    sta $2006",
+            "    lda #$00",
+            "    sta $2006",
+            "    lda runtime_palette_shadow",
+            "    sta $2007",
+            "@skip_universal_palette_color:",
+            "    lda runtime_ppuctrl_shadow",
+            "    sta $2000               ; restore compiler-owned PPU state",
+            "    lda runtime_scroll_x_shadow",
+            "    sta $2005",
+            "    lda runtime_scroll_y_shadow",
+            "    sta $2005",
+            "    rts",
+            "",
+            "runtime_upload_palette_triplet:",
+            "    tay                     ; preserve target low address",
+            "    bit $2002               ; reset PPU address latch",
+            "    lda #$3F",
+            "    sta $2006",
+            "    tya",
+            "    sta $2006",
+            "    ldy #$03",
+            "@palette_triplet_loop:",
+            "    lda runtime_palette_shadow, x",
+            "    sta $2007",
+            "    inx",
+            "    dey",
+            "    bne @palette_triplet_loop",
+            "    rts",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def _generate_procedures(
     procedures: tuple[ResolvedProcedure, ...],
     label_counter: list[int],
     for_counter: list[int],
     sprite_zero_enabled: bool,
+    palette_runtime_enabled: bool,
+    default_sprite_palette_enabled: bool,
 ) -> list[str]:
     lines: list[str] = []
     for procedure in procedures:
@@ -671,6 +1026,8 @@ def _generate_procedures(
                     (),
                     for_counter,
                     sprite_zero_enabled,
+                    palette_runtime_enabled,
+                    default_sprite_palette_enabled,
                 ),
                 "    rts",
             ]

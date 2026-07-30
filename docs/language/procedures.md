@@ -101,8 +101,9 @@ return value exists.
 
 ## Runtime restrictions
 
-NES initialization and registration commands remain exclusive to the main
-block. Using `nes.set_background_color`, `nes.run`, or `nes.wait_frame` inside
-a procedure produces E3015; callback registration inside a procedure produces
-E3022. Parameterless procedures may be registered as the update or VBlank
-callback under the rules in [Frame callbacks](../runtime/frame-callbacks.md).
+`nes.run`, `nes.wait_frame`, and registration commands remain exclusive to the
+main block. Palette calls, including `nes.set_background_color`, are allowed in
+procedures and stage changes for VBlank. Callback registration inside a
+procedure produces E3022. Parameterless procedures may be registered as the
+update or VBlank callback under the rules in
+[Frame callbacks](../runtime/frame-callbacks.md).

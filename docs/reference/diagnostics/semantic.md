@@ -29,13 +29,13 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 ## E3002 - Statement after `nes.run`
 
 - **Category:** Semantic Analysis
-- **Explanation:** Ordinary main-thread statements may follow `nes.run`, but
-  initialization-only PPU writes and additional `nes.run` calls may not.
+- **Explanation:** Ordinary main-thread statements, including queued palette
+  updates, may follow `nes.run`, but additional `nes.run` calls may not.
 - **Trigger:**
 
   ```pascal
   nes.run;
-  nes.set_background_color($21);
+  nes.run;
   ```
 
 - **Expected compiler output:**
@@ -43,17 +43,16 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
   ```text
   E3002 demo.nsp:2:1
 
-  nes.set_background_color must execute before nes.run.
+  nes.run may appear only once.
   ```
 
-- **Suggested fix:** Move initialization-only commands before `nes.run`, or
-  remove a duplicate `nes.run` call.
+- **Suggested fix:** Remove the duplicate `nes.run` call.
 
 ## E3003 - Invalid background-color call count
 
 - **Category:** Semantic Analysis
-- **Explanation:** A valid program requires exactly one call to
-  `nes.set_background_color`.
+- **Explanation:** A valid program requires exactly one initialization call to
+  `nes.set_background_color` before `nes.run`. Later queued calls are allowed.
 - **Trigger:**
 
   ```pascal
@@ -67,7 +66,7 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
   ```text
   E3003 demo.nsp:3:1
 
-  The program must set the background color exactly once.
+  The program must set its initial background color exactly once.
   ```
 
 - **Suggested fix:** Add one `nes.set_background_color(value);` call before
@@ -191,9 +190,9 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 ## E3009 - Runtime command inside conditional
 
 - **Category:** Semantic Analysis
-- **Explanation:** NES initialization commands must execute exactly once in
-  the top-level program block. `nes.set_background_color` and `nes.run` cannot
-  be placed on a conditional execution path.
+- **Explanation:** `nes.run` must execute exactly once in the top-level program
+  block and cannot be placed on a conditional execution path. Palette calls
+  are allowed and queue changes after runtime starts.
 - **Trigger:**
 
   ```pascal
@@ -238,8 +237,8 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 ## E3011 - Runtime command inside loop
 
 - **Category:** Semantic Analysis
-- **Explanation:** NES initialization commands must execute exactly once.
-  `nes.set_background_color` and `nes.run` cannot be repeated by a loop.
+- **Explanation:** `nes.run` must execute exactly once and cannot be repeated
+  by a loop. Palette calls are allowed and queue changes after runtime starts.
 - **Trigger:**
 
   ```pascal
@@ -336,9 +335,9 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 ## E3015 - Runtime command inside procedure
 
 - **Category:** Semantic Analysis
-- **Explanation:** `nes.set_background_color` and `nes.run` belong to the main
-  initialization sequence. `nes.wait_frame` depends on the main block's known
-  runtime phase. None of these commands may be hidden behind a procedure call.
+- **Explanation:** `nes.run` belongs to the main initialization sequence and
+  `nes.wait_frame` depends on the main block's known runtime phase. Palette
+  calls are allowed in procedures and publish changes for VBlank.
 - **Trigger:**
 
   ```pascal
@@ -482,7 +481,8 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 - **Expected compiler output:** `E3023` identifies the unsafe operation and
   the procedure path that reaches it.
 - **Suggested fix:** Restrict VBlank code to temporary-free scalar
-  assignments, simple `inc`/`dec`, safe conditionals, and validated helpers.
+  assignments, simple `inc`/`dec`, safe conditionals, palette staging calls
+  with temporary-free values, and validated helpers.
 
 ## E3024 - Invalid callback call graph
 
@@ -558,3 +558,41 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 - **Expected compiler output:** `E3030` reports the provided count.
 - **Suggested fix:** Pass exactly four `byte` expressions. This helper is not a
   general sprite API.
+
+## E3031 - Invalid background palette index
+
+- **Category:** Semantic Analysis
+- **Explanation:** A background palette index must be a compile-time `byte`
+  value from `$00` through `$03`.
+- **Trigger:** Pass `$04` or a dynamic expression to
+  `nes.set_background_palette` or its individual-color form.
+- **Expected compiler output:** `E3031` identifies the invalid index and API.
+- **Suggested fix:** Use `$00..$03` or a `byte` constant in that range.
+
+## E3032 - Invalid sprite palette index
+
+- **Category:** Semantic Analysis
+- **Explanation:** A sprite palette index must be a compile-time `byte` value
+  from `$00` through `$03`.
+- **Trigger:** Pass `$04` or a dynamic expression to `nes.set_sprite_palette`
+  or its individual-color form.
+- **Expected compiler output:** `E3032` identifies the invalid index and API.
+- **Suggested fix:** Use `$00..$03` or a `byte` constant in that range.
+
+## E3033 - Invalid palette color index
+
+- **Category:** Semantic Analysis
+- **Explanation:** Individual palette updates select color `$00..$03` at
+  compile time.
+- **Trigger:** Pass color index `$04` or a dynamic expression.
+- **Expected compiler output:** `E3033` identifies the invalid color index.
+- **Suggested fix:** Use `$00..$03` or a `byte` constant in that range.
+
+## E3034 - Invalid palette argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** Full palette calls require one index and four colors;
+  individual calls require palette index, color index, and color.
+- **Trigger:** Omit an argument or provide an extra argument.
+- **Expected compiler output:** `E3034` reports the expected and actual count.
+- **Suggested fix:** Use the documented five- or three-argument signature.

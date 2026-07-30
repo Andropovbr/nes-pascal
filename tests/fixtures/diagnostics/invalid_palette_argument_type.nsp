@@ -1,0 +1,9 @@
+program InvalidPaletteArgumentType;
+var
+    Color: byte;
+begin
+    Color := $21;
+    nes.set_background_palette_color($00, $01, Color);
+    nes.set_background_color($0F);
+    nes.run;
+end.

@@ -8,6 +8,10 @@ types are distinct and are not implicitly converted.
 `nes_color` occupies one byte and represents an NES palette value. Its allowed
 range is `$00..$3F`.
 
+The same range is enforced for scalar assignments, universal background-color
+calls, full background and sprite palettes, and individual palette colors.
+Values are never wrapped or masked into range.
+
 Valid:
 
 ```pascal

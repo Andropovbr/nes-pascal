@@ -31,12 +31,12 @@ the supported language.
 
 - Statements are limited to assignment, `inc` and `dec`, `if`/`else`,
   supported loops, `break`, `continue`, procedure calls,
-  `nes.set_background_color`, `nes.run`, `nes.wait_frame`, `nes.on_update`,
-  `nes.on_vblank`, and the fixed controller-example `nes.set_sprite_zero`
-  helper.
+  the palette APIs, `nes.set_background_color`, `nes.run`, `nes.wait_frame`,
+  `nes.on_update`, `nes.on_vblank`, and the fixed controller-example
+  `nes.set_sprite_zero` helper.
 - Conditional branches and loop bodies may contain supported statements, but
-  NES initialization commands remain top-level only. `nes.wait_frame` is the
-  sole runtime command allowed in main-block control flow.
+  `nes.run` and callback registration remain top-level only. Palette calls in
+  runtime control flow or procedures are staged for VBlank.
 - Frame-synchronized loops and update callbacks run on the main thread. NMI
   may invoke only one statically registered, transitively validated VBlank
   callback.
@@ -57,8 +57,8 @@ the supported language.
 - Callback registration is static. There is only one callback of each kind,
   with no parameters, return values, priorities, lists, removal, indirect
   calls, IRQ callbacks, or user-owned interrupt handlers.
-- There is no generic PPU command queue. The current runtime exposes no
-  rendering-time PPU write command; initialization palette writes remain
-  restricted to the rendering-disabled phase.
+- There is no generic PPU command queue. Runtime palette changes use one fixed
+  shadow and bounded VBlank uploader; other rendering-time PPU writes remain
+  unsupported.
 - The compiler does not provide a game engine or a general optimization pass;
   Zero Page promotion is a fixed allocation policy, not a hotness optimizer.

@@ -25,6 +25,7 @@ from .ast import (
     HexLiteral,
     IfStatement,
     IncrementStatement,
+    PaletteKind,
     Literal,
     Program,
     ProcedureCall,
@@ -33,6 +34,8 @@ from .ast import (
     RepeatStatement,
     Run,
     SetBackgroundColor,
+    SetPalette,
+    SetPaletteColor,
     SetSpriteZero,
     SourcePosition,
     Statement,
@@ -318,7 +321,7 @@ class Parser:
         namespace = self._expect(
             TokenKind.IDENTIFIER,
             "Expected an assignment, update, control-flow statement, "
-            "nes.set_background_color, callback registration, "
+            "a NES palette command, callback registration, "
             "nes.wait_frame, or nes.run.",
         )
         self._expect(TokenKind.DOT, "Expected '.' after 'nes'.")
@@ -344,6 +347,25 @@ class Parser:
                 arguments,
                 SourcePosition(namespace.line, namespace.column),
             )
+        palette_commands = {
+            "nes.set_background_palette": (PaletteKind.BACKGROUND, False),
+            "nes.set_sprite_palette": (PaletteKind.SPRITE, False),
+            "nes.set_background_palette_color": (PaletteKind.BACKGROUND, True),
+            "nes.set_sprite_palette_color": (PaletteKind.SPRITE, True),
+        }
+        palette_command = palette_commands.get(normalized)
+        if palette_command is not None:
+            kind, individual = palette_command
+            arguments = self._parse_expression_arguments(normalized)
+            if consume_terminator:
+                self._expect(
+                    TokenKind.SEMICOLON,
+                    f"Expected ';' after '{normalized}(...)'.",
+                )
+            position = SourcePosition(namespace.line, namespace.column)
+            if individual:
+                return SetPaletteColor(kind, arguments, position)
+            return SetPalette(kind, arguments, position)
         if normalized == "nes.run":
             if consume_terminator:
                 self._expect(TokenKind.SEMICOLON, "Expected ';' after 'nes.run'.")
@@ -825,8 +847,9 @@ class Parser:
             f"Unknown command: {name}.",
             "Use an assignment, procedure call, inc/dec update, "
             "control-flow statement, "
-            "nes.set_background_color(value);, nes.on_update(Procedure);, "
-            "nes.on_vblank(Procedure);, nes.wait_frame;, or nes.run;.",
+            "a nes.set_* palette call, nes.set_sprite_zero(...);, "
+            "nes.on_update(Procedure);, nes.on_vblank(Procedure);, "
+            "nes.wait_frame;, or nes.run;.",
         )
 
     def _match(self, kind: TokenKind) -> bool:

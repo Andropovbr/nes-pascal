@@ -68,10 +68,12 @@ implicit update or idle loop.
 ## VBlank callback
 
 NMI always preserves A, X, and Y first. It then increments
-`runtime_frame_counter`, sets the advisory `runtime_frame_ready` byte, and
-calls the VBlank procedure with direct `JSR`. The callback and any safe helper
-end with `RTS`; NMI restores registers and ends with `RTI`. This ordering is
-fixed and deterministic.
+`runtime_frame_counter`, sets `runtime_frame_ready`, performs mandatory sprite
+work when enabled, uploads queued palette changes, and calls the VBlank
+procedure with direct `JSR`. The callback and any safe helper end with `RTS`;
+NMI restores registers and ends with `RTI`. Palette calls made by the VBlank
+callback are published for the following NMI because this frame's upload has
+already completed. This ordering is fixed and deterministic.
 
 `runtime_frame_ready` is a best-effort advisory latch. NMI sets it, and a
 main-thread frame wait or accepted update clears it. A race may make the latch
@@ -91,12 +93,17 @@ every reachable procedure. The supported subset is:
 - `if` statements with temporary-free conditions and safe branches;
 - calls to parameterless procedures whose complete call graphs satisfy the
   same rules.
+- palette calls with temporary-free values; these stage the following frame's
+  bounded runtime upload.
 
 Arithmetic and comparison expressions, update amounts, all loops,
 `nes.wait_frame`, `nes.run`, registration commands, parameterized calls,
 recursion, and calls into the update callback are rejected. VBlank inputs must
-be assigned before `nes.run` enables NMI. This milestone performs no cycle
-budget analysis and provides no generic event or PPU command queue.
+be assigned before `nes.run` enables NMI. The compiler validates structural
+safety but does not reject callbacks by estimated cycle count. The fixed
+palette uploader is runtime-owned bounded work; user code must fit within the
+remaining [VBlank cycle budget](vblank-cycle-budget.md). There is no generic
+event or PPU command queue.
 
 `nes.wait_frame` is also rejected inside an update callback because runtime
 commands cannot appear in procedures. Registering one procedure for both

@@ -180,6 +180,26 @@ end.
         self.assertEqual(len(expected_chr), NROM_CHR_ROM_SIZE)
         self.assertEqual(rom[-NROM_CHR_ROM_SIZE:], expected_chr)
 
+    def test_palette_example_builds_with_custom_chr_and_runtime_palette_state(self) -> None:
+        expected_chr = (ROOT / "examples" / "assets" / "chr_asset.chr").read_bytes()
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            rom_path = Path(temporary_directory) / "palette_support.nes"
+            compile_source(
+                ROOT / "examples" / "palette_support.nsp",
+                rom_path,
+                chr_path="assets/chr_asset.chr",
+            )
+            rom = rom_path.read_bytes()
+            memory_map = rom_path.with_suffix(".map").read_text(encoding="utf-8")
+
+        self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
+        self.assertEqual(rom[-NROM_CHR_ROM_SIZE:], expected_chr)
+        self.assertIn("runtime_palette_shadow", memory_map)
+        self.assertIn("runtime_palette_universal_dirty", memory_map)
+        self.assertIn("runtime_ppuctrl_shadow", memory_map)
+        self.assertIn("runtime_scroll_x_shadow", memory_map)
+        self.assertIn("runtime_scroll_y_shadow", memory_map)
+
     def test_optional_promotion_fallback_builds_the_same_valid_rom_format(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             rom_path = Path(temporary_directory) / "zero_page_fallback.nes"
@@ -400,14 +420,20 @@ class MesenIntegrationTests(unittest.TestCase):
         example_name: str,
         script_name: str,
         memory_settings: MemoryLayoutSettings | None = None,
+        chr_path: str | Path | None = None,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             rom_path = Path(temporary_directory) / f"{example_name}.nes"
             source_path = ROOT / "examples" / f"{example_name}.nsp"
             if memory_settings is None:
-                compile_source(source_path, rom_path)
+                compile_source(source_path, rom_path, chr_path=chr_path)
             else:
-                compile_source(source_path, rom_path, memory_settings)
+                compile_source(
+                    source_path,
+                    rom_path,
+                    memory_settings,
+                    chr_path=chr_path,
+                )
             result = subprocess.run(
                 [
                     str(MESEN_EXECUTABLE),
@@ -483,6 +509,13 @@ class MesenIntegrationTests(unittest.TestCase):
         self._run_mesen_test(
             "controller_input",
             "verify_controller_input.lua",
+        )
+
+    def test_palette_example_uploads_initial_and_runtime_palettes(self) -> None:
+        self._run_mesen_test(
+            "palette_support",
+            "verify_palette_support.lua",
+            chr_path="assets/chr_asset.chr",
         )
 
 
