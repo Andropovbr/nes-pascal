@@ -6,9 +6,10 @@ import shutil
 import subprocess
 import sys
 
-from .assets import load_chr_rom
+from .assets import load_background_data, load_chr_rom
+from .ast import ResolvedLoadBackground
 from .backend_ca65 import generate
-from .diagnostics import CompilerError, DiagnosticCode
+from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
 from .memory_layout import (
     DEFAULT_MEMORY_LAYOUT_SETTINGS,
     MemoryLayoutSettings,
@@ -29,6 +30,9 @@ def compile_source(
     output_path: Path,
     memory_settings: MemoryLayoutSettings = DEFAULT_MEMORY_LAYOUT_SETTINGS,
     chr_path: str | Path | None = None,
+    nametable_path: str | Path | None = None,
+    nametable_tiles_path: str | Path | None = None,
+    nametable_attributes_path: str | Path | None = None,
 ) -> tuple[Path, Path]:
     source_path = source_path.resolve()
     output_path = output_path.resolve()
@@ -36,13 +40,49 @@ def compile_source(
     program = parse(source, str(source_path))
     resolved_program = analyze(program, source, str(source_path))
     chr_rom = load_chr_rom(chr_path, source_path, source)
+    background_data = load_background_data(
+        nametable_path,
+        nametable_tiles_path,
+        nametable_attributes_path,
+        source_path,
+        source,
+    )
+    has_background_load = any(
+        isinstance(statement, ResolvedLoadBackground)
+        for statement in resolved_program.statements
+    )
+    if has_background_load and background_data is None:
+        raise CompilerError(
+            DiagnosticCode.BACKGROUND_ASSET_REQUIRED,
+            "nes.load_background() requires configured nametable data.",
+            SourceLocation(str(source_path), 1, 1),
+            source.splitlines()[0] if source.splitlines() else "",
+            suggestion=(
+                "Pass --nametable with one 1024-byte file, or pass both "
+                "--nametable-tiles and --nametable-attributes."
+            ),
+        )
+    if background_data is not None and not has_background_load:
+        raise CompilerError(
+            DiagnosticCode.INVALID_BACKGROUND_ASSET_CONFIGURATION,
+            "Background data was configured, but the program does not call "
+            "nes.load_background().",
+            SourceLocation(str(source_path), 1, 1),
+            source.splitlines()[0] if source.splitlines() else "",
+            suggestion="Add one nes.load_background(); call before nes.run;.",
+        )
     layout = build_memory_layout(
         resolved_program,
         memory_settings,
         source=source,
         filename=str(source_path),
     )
-    assembly = generate(resolved_program, layout, chr_rom=chr_rom)
+    assembly = generate(
+        resolved_program,
+        layout,
+        chr_rom=chr_rom,
+        background_data=background_data,
+    )
     linker_config = generate_linker_config(layout)
     memory_map = generate_memory_map(layout)
 
@@ -102,6 +142,21 @@ def build_argument_parser() -> argparse.ArgumentParser:
         type=str,
         help="8 KiB .chr asset; relative paths use the source file directory",
     )
+    parser.add_argument(
+        "--nametable",
+        type=str,
+        help="1 KiB raw nametable; relative paths use the source file directory",
+    )
+    parser.add_argument(
+        "--nametable-tiles",
+        type=str,
+        help="960-byte tile map used with --nametable-attributes",
+    )
+    parser.add_argument(
+        "--nametable-attributes",
+        type=str,
+        help="64-byte attribute table used with --nametable-tiles",
+    )
     return parser
 
 
@@ -112,6 +167,9 @@ def main(argv: list[str] | None = None) -> int:
             arguments.source,
             arguments.output,
             chr_path=arguments.chr,
+            nametable_path=arguments.nametable,
+            nametable_tiles_path=arguments.nametable_tiles,
+            nametable_attributes_path=arguments.nametable_attributes,
         )
     except (CompilerError, ToolchainError) as error:
         print(error, file=sys.stderr)

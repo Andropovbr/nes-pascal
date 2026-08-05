@@ -10,6 +10,7 @@ from .ast import (
     ForDirection,
     ImmediateValue,
     PaletteKind,
+    ResolvedLoadBackground,
     ResolvedAssignment,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
@@ -47,6 +48,7 @@ def generate(
     program: ResolvedProgram,
     layout: ProgramMemoryLayout | None = None,
     chr_rom: bytes | None = None,
+    background_data: bytes | None = None,
 ) -> str:
     layout = layout or build_memory_layout(program)
     color_commands = [
@@ -57,8 +59,18 @@ def generate(
     run_commands = [
         statement for statement in program.statements if isinstance(statement, Run)
     ]
+    background_loads = [
+        statement
+        for statement in program.statements
+        if isinstance(statement, ResolvedLoadBackground)
+    ]
     initialization_colors = [command for command in color_commands if not command.queued]
-    if len(initialization_colors) != 1 or len(run_commands) != 1:
+    if (
+        len(initialization_colors) != 1
+        or len(run_commands) != 1
+        or len(background_loads) > 1
+        or bool(background_loads) != (background_data is not None)
+    ):
         raise ValueError("invalid resolved AST for the current milestone")
     callback_registrations = {
         statement.kind: statement
@@ -146,6 +158,11 @@ def generate(
         "\n\n; Source: procedure declarations\n"
         + "\n".join(procedure_lines)
         if procedure_lines
+        else ""
+    )
+    background_storage = (
+        _generate_background_storage(background_data)
+        if background_data is not None
         else ""
     )
     settings = layout.settings
@@ -364,7 +381,7 @@ runtime_read_controller_ports:
     dex
     bne @read_controller_bits
     rts{palette_runtime_routine}
-{procedures}
+{procedures}{background_storage}
 
 .segment "VECTORS"
     .word NMI
@@ -435,6 +452,8 @@ def _generate_statements(
                     palette_runtime_enabled,
                 )
             )
+        elif isinstance(statement, ResolvedLoadBackground):
+            statement_lines.extend(_generate_background_upload())
         elif isinstance(statement, Run):
             wait_vblank_label = _new_label(
                 label_counter,
@@ -1001,6 +1020,51 @@ def _generate_palette_upload_routine() -> str:
             "    rts",
         ]
     )
+    return "\n".join(lines)
+
+
+def _generate_background_upload() -> list[str]:
+    lines = [
+        "",
+        "; Source: nes.load_background()",
+        "; Initialization: upload one complete nametable while rendering is disabled",
+        "    lda #$00",
+        "    sta $2001               ; keep rendering disabled during bulk upload",
+        "    bit $2002               ; reset PPU address latch",
+        "    lda #$20",
+        "    sta $2006               ; nametable 0 address, high byte",
+        "    lda #$00",
+        "    sta $2006               ; nametable 0 address, low byte",
+        "    ldx #$00",
+    ]
+    for page in range(4):
+        offset = "" if page == 0 else f" + ${page * 0x100:04X}"
+        label = f"@upload_background_page_{page}"
+        lines.extend(
+            [
+                f"{label}:",
+                f"    lda background_nametable_data{offset}, x",
+                "    sta $2007",
+                "    inx",
+                f"    bne {label}",
+            ]
+        )
+    return lines
+
+
+def _generate_background_storage(background_data: bytes) -> str:
+    if len(background_data) != 1024:
+        raise ValueError("validated background data must contain exactly 1024 bytes")
+    lines = [
+        "",
+        "",
+        "; Asset: configured 1 KiB nametable (960 tile bytes and 64 attributes)",
+        "background_nametable_data:",
+    ]
+    for start in range(0, len(background_data), 16):
+        chunk = background_data[start : start + 16]
+        values = ", ".join(f"${value:02X}" for value in chunk)
+        lines.append(f"    .byte {values}")
     return "\n".join(lines)
 
 

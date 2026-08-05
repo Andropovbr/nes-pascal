@@ -1,0 +1,8 @@
+program NametableLoading;
+
+begin
+    nes.load_background();
+    nes.set_background_palette($00, $0F, $01, $11, $21);
+    nes.set_background_color($0F);
+    nes.run;
+end.

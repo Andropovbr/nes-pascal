@@ -1,0 +1,7 @@
+program BackgroundLoadAfterRun;
+
+begin
+    nes.set_background_color($0F);
+    nes.run;
+    nes.load_background();
+end.

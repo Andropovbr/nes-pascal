@@ -3,7 +3,7 @@
 The compiler pipeline is deliberately separated:
 
 ```text
-.nsp source
+.nsp source + optional CHR-ROM and nametable assets
   -> lexer
   -> parser
   -> AST
@@ -23,6 +23,8 @@ The compiler pipeline is deliberately separated:
 - `semantic.py` validates declarations, resolves references and procedure
   calls, checks exact types, enforces interprocedural definite assignment, and
   validates controller intrinsics and the complete VBlank callback call graph;
+- `assets.py` resolves configured paths from the source directory and validates
+  raw CHR-ROM, combined nametable, and split tile/attribute byte counts;
 - `memory_layout.py` owns physical RAM ranges, allocation, bounds and overlap
   checks, mandatory Zero Page storage, conservative optional promotion,
   regular-RAM fallback, ld65 configuration generation, and the human-readable
@@ -30,9 +32,10 @@ The compiler pipeline is deliberately separated:
 - `backend_ca65.py` generates readable, commented Assembly from resolved
   values using the already allocated runtime, temporary, and user symbols, and
   emits left-to-right argument copies before procedure calls. It also owns the
-  minimal NMI handler, VBlank-safe runtime transition, frame-counter wait
-  sequence, persistent last-processed frame state, isolated serial controller
-  reader, guarded controller polling, and direct static callback calls;
+  initialization nametable upload, minimal NMI handler, VBlank-safe runtime
+  transition, frame-counter wait sequence, persistent last-processed frame
+  state, isolated serial controller reader, guarded controller polling, and
+  direct static callback calls;
 - `cli.py` writes Assembly, the generated `.cfg` linker configuration, and the
   `.map` CPU memory report before coordinating ca65 and ld65.
 

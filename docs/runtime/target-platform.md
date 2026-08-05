@@ -22,8 +22,9 @@ and 8 KiB of CHR-ROM.
 
 The RESET path disables interrupts, initializes the stack and runtime-owned
 RAM, and waits for the PPU to stabilize. Initialization palette writes remain
-safe while rendering is disabled. `nes.run` waits for VBlank before enabling
-NMI and rendering.
+safe while rendering is disabled. A configured nametable is copied to
+`$2000-$23FF` during this disabled-rendering phase. `nes.run` waits for VBlank
+before enabling NMI and rendering.
 
 Each NMI preserves A, X, Y, and stack balance, increments one volatile 8-bit
 frame counter, and sets an advisory frame-ready byte. If registered, one
@@ -50,6 +51,11 @@ the compiler's `--chr` option; relative paths use the source file directory.
 The controller example conditionally embeds two internal 8x8 player tiles when
 no file is selected. Configured CHR bytes occupy the existing CHR segment once
 and are not converted or modified.
+
+One complete 1024-byte nametable can be embedded in PRG-ROM and uploaded to
+PPU nametable 0. It contains 960 tile indexes followed by the 64-byte attribute
+table. The compiler also accepts those two portions as separate files and
+concatenates them without conversion. See [Background loading](background-loading.md).
 
 The generated Assembly is intentionally readable and includes comments that
 identify the source of generated blocks. The backend is not a generic game

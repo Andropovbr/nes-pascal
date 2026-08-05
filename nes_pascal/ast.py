@@ -196,6 +196,12 @@ class SetPaletteColor:
 
 
 @dataclass(frozen=True, slots=True)
+class LoadBackground:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
 class Run:
     position: SourcePosition | None = field(default=None, compare=False)
 
@@ -295,6 +301,7 @@ Statement = (
     | SetBackgroundColor
     | SetPalette
     | SetPaletteColor
+    | LoadBackground
     | Run
     | WaitFrame
     | CallbackRegistration
@@ -430,6 +437,11 @@ class ResolvedSetPaletteColor:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedLoadBackground:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedIfStatement:
     condition: ResolvedValue
     then_branch: tuple[ResolvedStatement, ...]
@@ -512,6 +524,7 @@ ResolvedStatement = (
     | ResolvedSetBackgroundColor
     | ResolvedSetPalette
     | ResolvedSetPaletteColor
+    | ResolvedLoadBackground
     | Run
     | WaitFrame
     | ResolvedCallbackRegistration

@@ -24,6 +24,7 @@ from .ast import (
     IfStatement,
     ImmediateValue,
     IncrementStatement,
+    LoadBackground,
     PaletteKind,
     Program,
     ProcedureCall,
@@ -43,6 +44,7 @@ from .ast import (
     ResolvedForStatement,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
+    ResolvedLoadBackground,
     ResolvedRepeatStatement,
     ResolvedProgram,
     ResolvedProcedure,
@@ -304,6 +306,7 @@ class SemanticAnalyzer:
             | SetBackgroundColor
             | SetPalette
             | SetPaletteColor
+            | LoadBackground
             | Run
             | WaitFrame
             | CallbackRegistration
@@ -710,6 +713,41 @@ class SemanticAnalyzer:
                         queued=runtime_started or inside_procedure,
                     )
                 )
+            elif isinstance(statement, LoadBackground):
+                if statement.arguments:
+                    self._error(
+                        statement.position,
+                        DiagnosticCode.INVALID_BACKGROUND_LOAD_ARGUMENT_COUNT,
+                        "nes.load_background expects no arguments, but "
+                        f"{len(statement.arguments)} were provided.",
+                        "Call nes.load_background(); without arguments.",
+                        len("nes.load_background"),
+                    )
+                if inside_procedure:
+                    self._procedure_runtime_command_error(
+                        statement.position,
+                        "nes.load_background",
+                    )
+                if loop_depth > 0:
+                    self._loop_runtime_command_error(
+                        statement.position,
+                        "nes.load_background",
+                    )
+                if inside_conditional:
+                    self._conditional_runtime_command_error(
+                        statement.position,
+                        "nes.load_background",
+                    )
+                if runtime_started:
+                    self._error(
+                        statement.position,
+                        DiagnosticCode.BACKGROUND_LOAD_AFTER_RUN,
+                        "nes.load_background cannot execute after nes.run "
+                        "enables rendering.",
+                        "Move nes.load_background(); before nes.run;.",
+                        len("nes.load_background"),
+                    )
+                resolved_statements.append(ResolvedLoadBackground())
             elif isinstance(statement, WaitFrame):
                 if inside_procedure:
                     self._procedure_runtime_command_error(
@@ -1092,6 +1130,8 @@ class SemanticAnalyzer:
             return f"nes.set_{statement.kind.value}_palette_color"
         if isinstance(statement, SetSpriteZero):
             return "nes.set_sprite_zero"
+        if isinstance(statement, LoadBackground):
+            return "nes.load_background"
         if isinstance(statement, CallbackRegistration):
             return f"nes.on_{statement.kind.value}"
         if isinstance(statement, BreakStatement):
@@ -2188,6 +2228,19 @@ class SemanticAnalyzer:
                 "The program must set its initial background color exactly once.",
                 "Add one nes.set_background_color(value); call before nes.run;.",
             )
+        background_loads = [
+            statement
+            for statement in program.statements
+            if isinstance(statement, LoadBackground)
+        ]
+        if len(background_loads) > 1:
+            self._error(
+                background_loads[1].position,
+                DiagnosticCode.DUPLICATE_BACKGROUND_LOAD,
+                "nes.load_background may appear at most once.",
+                "Remove the later nes.load_background(); call.",
+                len("nes.load_background"),
+            )
         early_wait = self._first_wait_frame(program.statements[:run_index])
         if early_wait is not None:
             assert early_wait.position is not None
@@ -2230,6 +2283,7 @@ class SemanticAnalyzer:
             | SetBackgroundColor
             | SetPalette
             | SetPaletteColor
+            | LoadBackground
             | Run
             | WaitFrame
             | IfStatement
