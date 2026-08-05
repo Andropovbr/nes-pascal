@@ -47,3 +47,7 @@ main-thread logic after `nes.run`.
 Static `nes.on_update(Procedure)` and `nes.on_vblank(Procedure)` registrations,
 when present, belong to the unconditional top-level initialization sequence
 before `nes.run`. See [Frame callbacks](../runtime/frame-callbacks.md).
+
+The optional `nes.load_background()` command is also an unconditional,
+top-level initialization statement before `nes.run`. It has no arguments and
+requires configured [nametable data](../runtime/background-loading.md).

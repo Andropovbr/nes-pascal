@@ -8,6 +8,8 @@ APIs are:
   NES background palette color;
 - [Palette APIs](palettes.md) configure four background and four sprite
   palettes and queue runtime changes for VBlank;
+- [`nes.load_background`](background-loading.md) uploads one configured raw
+  nametable and its attribute table during initialization;
 - [`nes.run`](run.md) completes initialization, enables NMI and rendering at
   VBlank, and starts the frame-synchronized runtime phase;
 - [`nes.wait_frame`](wait-frame.md) waits for the volatile NMI frame counter
@@ -22,8 +24,9 @@ APIs are:
 - `nes.set_sprite_zero` is the fixed, example-only OAM staging helper described
   in the controller documentation; it is not a general sprite API.
 
-Direct initialization palette commands belong before `nes.run`; palette calls
-in procedures or after `nes.run` are queued instead.
+`nes.load_background()` and direct initialization palette commands belong
+before `nes.run`; palette calls in procedures or after `nes.run` are queued
+instead.
 `nes.wait_frame` may appear in main-block loops and conditionals after
 `nes.run`, but not in procedures. The only user code executed by NMI is the
 single statically validated VBlank callback, when registered.

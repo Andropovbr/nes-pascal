@@ -25,6 +25,7 @@ from .ast import (
     HexLiteral,
     IfStatement,
     IncrementStatement,
+    LoadBackground,
     PaletteKind,
     Literal,
     Program,
@@ -321,7 +322,7 @@ class Parser:
         namespace = self._expect(
             TokenKind.IDENTIFIER,
             "Expected an assignment, update, control-flow statement, "
-            "a NES palette command, callback registration, "
+            "a NES background or palette command, callback registration, "
             "nes.wait_frame, or nes.run.",
         )
         self._expect(TokenKind.DOT, "Expected '.' after 'nes'.")
@@ -344,6 +345,17 @@ class Parser:
                     "Expected ';' after 'nes.set_sprite_zero(...)'.",
                 )
             return SetSpriteZero(
+                arguments,
+                SourcePosition(namespace.line, namespace.column),
+            )
+        if normalized == "nes.load_background":
+            arguments = self._parse_expression_arguments(normalized)
+            if consume_terminator:
+                self._expect(
+                    TokenKind.SEMICOLON,
+                    "Expected ';' after 'nes.load_background()'.",
+                )
+            return LoadBackground(
                 arguments,
                 SourcePosition(namespace.line, namespace.column),
             )
@@ -847,7 +859,8 @@ class Parser:
             f"Unknown command: {name}.",
             "Use an assignment, procedure call, inc/dec update, "
             "control-flow statement, "
-            "a nes.set_* palette call, nes.set_sprite_zero(...);, "
+            "nes.load_background();, a nes.set_* palette call, "
+            "nes.set_sprite_zero(...);, "
             "nes.on_update(Procedure);, nes.on_vblank(Procedure);, "
             "nes.wait_frame;, or nes.run;.",
         )

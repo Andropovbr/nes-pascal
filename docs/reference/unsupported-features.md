@@ -31,7 +31,8 @@ the supported language.
 
 - Statements are limited to assignment, `inc` and `dec`, `if`/`else`,
   supported loops, `break`, `continue`, procedure calls,
-  the palette APIs, `nes.set_background_color`, `nes.run`, `nes.wait_frame`,
+  the palette APIs, `nes.load_background`, `nes.set_background_color`,
+  `nes.run`, `nes.wait_frame`,
   `nes.on_update`, `nes.on_vblank`, and the fixed controller-example
   `nes.set_sprite_zero` helper.
 - Conditional branches and loop bodies may contain supported statements, but
@@ -50,6 +51,10 @@ the supported language.
 - Only NTSC NES, mapper 0, 32 KiB PRG-ROM, and 8 KiB CHR-ROM are supported.
 - One raw, exactly 8 KiB CHR-ROM file is supported. CHR-RAM, multiple files or
   banks, graphics conversion, compression, and runtime CHR updates are not.
+- One raw 1 KiB nametable for nametable 0 is supported during initialization,
+  either combined or as 960 tile bytes plus 64 attribute bytes. Multiple
+  screens, runtime tile updates, generated nametables, alternate nametable
+  selection, and background scrolling are not supported.
 - Standard controllers 1 and 2 are supported without remapping, Four Score,
   expansion devices, buffering, combos, turbo, or DMC-safe repeated reads.
 - General sprites, audio, and converted graphics assets are not supported.

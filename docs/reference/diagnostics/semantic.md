@@ -596,3 +596,31 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 - **Trigger:** Omit an argument or provide an extra argument.
 - **Expected compiler output:** `E3034` reports the expected and actual count.
 - **Suggested fix:** Use the documented five- or three-argument signature.
+
+## E3035 - Invalid background-load argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.load_background()` selects the background configured
+  by compiler options and therefore takes no source-language arguments.
+- **Trigger:** `nes.load_background($00);`
+- **Expected compiler output:** `E3035` reports the provided argument count.
+- **Suggested fix:** Call `nes.load_background();` without arguments.
+
+## E3036 - Background load after runtime start
+
+- **Category:** Semantic Analysis
+- **Explanation:** A full 1 KiB nametable upload is initialization-only and
+  cannot run after `nes.run` enables rendering.
+- **Trigger:** Place `nes.load_background();` after `nes.run;`.
+- **Expected compiler output:** `E3036` identifies the unsafe command.
+- **Suggested fix:** Move the load to unconditional top-level initialization
+  before `nes.run;`.
+
+## E3037 - Duplicate background load
+
+- **Category:** Semantic Analysis
+- **Explanation:** The current NROM program supports one static background
+  load into nametable 0.
+- **Trigger:** Call `nes.load_background();` twice in the main block.
+- **Expected compiler output:** `E3037` points to the second call.
+- **Suggested fix:** Keep one initialization call and one configured asset.

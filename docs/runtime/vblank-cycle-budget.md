@@ -14,6 +14,9 @@ The generated NMI performs work in this fixed order:
 4. call the optional user VBlank callback;
 5. restore registers and return.
 
+The 1 KiB `nes.load_background()` transfer is not part of this budget. It runs
+once during RESET initialization while rendering and NMI are disabled.
+
 ## Current costs
 
 The following counts use standard Ricoh 2A03 instruction timings and include

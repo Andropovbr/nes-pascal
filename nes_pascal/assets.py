@@ -9,6 +9,9 @@ from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
 
 
 NROM_CHR_ROM_SIZE = 8 * 1024
+NAMETABLE_SIZE = 1024
+NAMETABLE_TILE_SIZE = 960
+ATTRIBUTE_TABLE_SIZE = 64
 
 
 def load_chr_rom(
@@ -67,3 +70,141 @@ def load_chr_rom(
         )
 
     return chr_rom
+
+
+def load_background_data(
+    nametable_path: str | PathLike[str] | None,
+    tile_path: str | PathLike[str] | None,
+    attribute_path: str | PathLike[str] | None,
+    source_path: Path,
+    source: str,
+) -> bytes | None:
+    """Load one raw nametable or a tile/attribute pair beside the source."""
+
+    has_combined = nametable_path is not None
+    has_tiles = tile_path is not None
+    has_attributes = attribute_path is not None
+    if not (has_combined or has_tiles or has_attributes):
+        return None
+
+    if has_combined and (has_tiles or has_attributes):
+        _background_configuration_error(
+            source_path,
+            source,
+            "A combined nametable cannot be configured together with separate "
+            "tile or attribute data.",
+            "Use --nametable alone, or use both --nametable-tiles and "
+            "--nametable-attributes.",
+        )
+    if has_tiles != has_attributes:
+        missing = "--nametable-attributes" if has_tiles else "--nametable-tiles"
+        _background_configuration_error(
+            source_path,
+            source,
+            "Separate background data requires both tile and attribute files.",
+            f"Add {missing}, or replace the separate option with --nametable.",
+        )
+
+    if nametable_path is not None:
+        return _load_background_asset(
+            nametable_path,
+            source_path,
+            source,
+            asset_name="Nametable",
+            option_name="--nametable",
+            expected_size=NAMETABLE_SIZE,
+        )
+
+    assert tile_path is not None and attribute_path is not None
+    tiles = _load_background_asset(
+        tile_path,
+        source_path,
+        source,
+        asset_name="Nametable tile data",
+        option_name="--nametable-tiles",
+        expected_size=NAMETABLE_TILE_SIZE,
+    )
+    attributes = _load_background_asset(
+        attribute_path,
+        source_path,
+        source,
+        asset_name="Attribute table data",
+        option_name="--nametable-attributes",
+        expected_size=ATTRIBUTE_TABLE_SIZE,
+    )
+    return tiles + attributes
+
+
+def _load_background_asset(
+    configured_path: str | PathLike[str],
+    source_path: Path,
+    source: str,
+    *,
+    asset_name: str,
+    option_name: str,
+    expected_size: int,
+) -> bytes:
+    original_path = str(configured_path)
+    candidate = Path(configured_path)
+    if not candidate.is_absolute():
+        candidate = source_path.parent / candidate
+    resolved_path = candidate.resolve()
+    location = SourceLocation(str(source_path), 1, 1)
+    source_line = source.splitlines()[0] if source.splitlines() else ""
+
+    try:
+        data = resolved_path.read_bytes()
+    except FileNotFoundError as error:
+        raise CompilerError(
+            DiagnosticCode.BACKGROUND_ASSET_NOT_FOUND,
+            f"Configured {asset_name.lower()} file was not found: "
+            f"{original_path}.\nResolved path: {resolved_path}",
+            location,
+            source_line,
+            suggestion=(
+                f"Check the {option_name} path. Relative paths are resolved "
+                "from the source file's directory."
+            ),
+        ) from error
+    except OSError as error:
+        raise CompilerError(
+            DiagnosticCode.BACKGROUND_ASSET_READ_FAILURE,
+            f"Configured {asset_name.lower()} file cannot be read: "
+            f"{original_path}.\nResolved path: {resolved_path}\n"
+            f"Operating-system error: {error}",
+            location,
+            source_line,
+            suggestion="Check that the file is readable and is not a directory.",
+        ) from error
+
+    actual_size = len(data)
+    if actual_size != expected_size:
+        raise CompilerError(
+            DiagnosticCode.INVALID_BACKGROUND_ASSET_SIZE,
+            f"Invalid {asset_name.lower()} size for {original_path}: expected "
+            f"{expected_size} bytes, but found {actual_size} bytes.\n"
+            f"Resolved path: {resolved_path}",
+            location,
+            source_line,
+            suggestion=(
+                "Provide exactly 1024 bytes for a combined nametable, or "
+                "exactly 960 tile bytes and 64 attribute bytes separately."
+            ),
+        )
+    return data
+
+
+def _background_configuration_error(
+    source_path: Path,
+    source: str,
+    message: str,
+    suggestion: str,
+) -> None:
+    source_line = source.splitlines()[0] if source.splitlines() else ""
+    raise CompilerError(
+        DiagnosticCode.INVALID_BACKGROUND_ASSET_CONFIGURATION,
+        message,
+        SourceLocation(str(source_path), 1, 1),
+        source_line,
+        suggestion=suggestion,
+    )

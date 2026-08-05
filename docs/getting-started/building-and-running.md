@@ -27,6 +27,7 @@ python -m nes_pascal.cli examples/slow_update_callback.nsp -o build/slow_update_
 python -m nes_pascal.cli examples/controller_input.nsp -o build/controller_input.nes
 python -m nes_pascal.cli examples/chr_asset.nsp -o build/chr_asset.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/palette_support.nsp -o build/palette_support.nes --chr assets/chr_asset.chr
+python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
 ```
 
 The examples demonstrate:
@@ -57,6 +58,8 @@ The examples demonstrate:
 - `chr_asset.nsp`: inclusion of one project-relative raw CHR-ROM asset.
 - `palette_support.nsp`: custom CHR data, initialized background and sprite
   palettes, then a safely queued full and individual palette update.
+- `nametable_loading.nsp`: one project-relative raw 1 KiB nametable uploaded
+  completely, including its attribute table, before rendering starts.
 
 The loop, counting, and procedure-parameter examples select background color
 `$21` only when their expected final states are reached.
@@ -90,6 +93,21 @@ currently requires exactly 8192 bytes (8 KiB). A missing, unreadable, or
 incorrectly sized configured file stops compilation with a diagnostic. When
 `--chr` is omitted, the compiler generates an empty 8 KiB CHR-ROM (except for
 the existing fixed sprite-0 demonstration, which retains its internal tiles).
+
+## Nametable assets
+
+Programs using `nes.load_background();` configure either one raw 1024-byte
+file or a 960-byte tile map plus a 64-byte attribute table:
+
+```text
+python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
+python -m nes_pascal.cli game.nsp -o build/game.nes --nametable-tiles assets/screen.tiles --nametable-attributes assets/screen.attributes
+```
+
+The options are mutually exclusive forms. Split options must appear together.
+Paths follow the same source-relative and normalized rules as `--chr`. See
+[Background loading](../runtime/background-loading.md) for the raw layout,
+initialization behavior, and current single-screen limits.
 
 ## Running in Mesen
 

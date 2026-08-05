@@ -48,6 +48,9 @@ diagnostics section.
 | E3032 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E3033 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E3034 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3035 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3036 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3037 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E4001 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4002 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4003 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
@@ -65,3 +68,8 @@ diagnostics section.
 | E6002 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
 | E6003 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
 | E6004 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6005 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6006 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6007 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6008 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6009 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |

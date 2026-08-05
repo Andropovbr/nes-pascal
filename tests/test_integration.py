@@ -5,7 +5,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from nes_pascal.assets import NROM_CHR_ROM_SIZE
+from nes_pascal.assets import (
+    ATTRIBUTE_TABLE_SIZE,
+    NAMETABLE_TILE_SIZE,
+    NROM_CHR_ROM_SIZE,
+)
 from nes_pascal.cli import compile_source
 from nes_pascal.memory_layout import MemoryLayoutSettings
 
@@ -199,6 +203,68 @@ end.
         self.assertIn("runtime_ppuctrl_shadow", memory_map)
         self.assertIn("runtime_scroll_x_shadow", memory_map)
         self.assertIn("runtime_scroll_y_shadow", memory_map)
+
+    def test_nametable_example_embeds_and_builds_complete_background(self) -> None:
+        expected = (
+            ROOT / "examples" / "assets" / "nametable_loading.nam"
+        ).read_bytes()
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            directory = Path(temporary_directory)
+            first_rom = directory / "first.nes"
+            second_rom = directory / "second.nes"
+            arguments = {
+                "chr_path": "assets/chr_asset.chr",
+                "nametable_path": "assets/nametable_loading.nam",
+            }
+            first_assembly, _ = compile_source(
+                ROOT / "examples" / "nametable_loading.nsp",
+                first_rom,
+                **arguments,
+            )
+            second_assembly, _ = compile_source(
+                ROOT / "examples" / "nametable_loading.nsp",
+                second_rom,
+                **arguments,
+            )
+            first_bytes = first_rom.read_bytes()
+            second_bytes = second_rom.read_bytes()
+            first_assembly_bytes = first_assembly.read_bytes()
+            second_assembly_bytes = second_assembly.read_bytes()
+
+        prg = first_bytes[16 : 16 + 32 * 1024]
+        self.assertEqual(prg.count(expected), 1)
+        self.assertEqual(first_bytes, second_bytes)
+        self.assertEqual(first_assembly_bytes, second_assembly_bytes)
+        self.assertEqual(len(first_bytes), 16 + 32 * 1024 + 8 * 1024)
+
+    def test_split_nametable_assets_build_as_one_complete_asset(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            project = Path(temporary_directory)
+            source_path = project / "main.nsp"
+            source_path.write_text(
+                """program SplitBackground;
+begin
+    nes.load_background();
+    nes.set_background_color($0F);
+    nes.run;
+end.
+""",
+                encoding="utf-8",
+            )
+            tiles = bytes([0x12]) * NAMETABLE_TILE_SIZE
+            attributes = bytes([0xE4]) * ATTRIBUTE_TABLE_SIZE
+            (project / "tiles.bin").write_bytes(tiles)
+            (project / "attributes.bin").write_bytes(attributes)
+            rom_path = project / "main.nes"
+            compile_source(
+                source_path,
+                rom_path,
+                nametable_tiles_path="tiles.bin",
+                nametable_attributes_path="attributes.bin",
+            )
+            prg = rom_path.read_bytes()[16 : 16 + 32 * 1024]
+
+        self.assertEqual(prg.count(tiles + attributes), 1)
 
     def test_optional_promotion_fallback_builds_the_same_valid_rom_format(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -421,18 +487,25 @@ class MesenIntegrationTests(unittest.TestCase):
         script_name: str,
         memory_settings: MemoryLayoutSettings | None = None,
         chr_path: str | Path | None = None,
+        nametable_path: str | Path | None = None,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             rom_path = Path(temporary_directory) / f"{example_name}.nes"
             source_path = ROOT / "examples" / f"{example_name}.nsp"
             if memory_settings is None:
-                compile_source(source_path, rom_path, chr_path=chr_path)
+                compile_source(
+                    source_path,
+                    rom_path,
+                    chr_path=chr_path,
+                    nametable_path=nametable_path,
+                )
             else:
                 compile_source(
                     source_path,
                     rom_path,
                     memory_settings,
                     chr_path=chr_path,
+                    nametable_path=nametable_path,
                 )
             result = subprocess.run(
                 [
@@ -516,6 +589,14 @@ class MesenIntegrationTests(unittest.TestCase):
             "palette_support",
             "verify_palette_support.lua",
             chr_path="assets/chr_asset.chr",
+        )
+
+    def test_nametable_example_uploads_tiles_and_attributes(self) -> None:
+        self._run_mesen_test(
+            "nametable_loading",
+            "verify_nametable_loading.lua",
+            chr_path="assets/chr_asset.chr",
+            nametable_path="assets/nametable_loading.nam",
         )
 
 

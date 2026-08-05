@@ -52,6 +52,9 @@ class DiagnosticCode(StrEnum):
     INVALID_SPRITE_PALETTE_INDEX = "E3032"
     INVALID_PALETTE_COLOR_INDEX = "E3033"
     INVALID_PALETTE_ARGUMENT_COUNT = "E3034"
+    INVALID_BACKGROUND_LOAD_ARGUMENT_COUNT = "E3035"
+    BACKGROUND_LOAD_AFTER_RUN = "E3036"
+    DUPLICATE_BACKGROUND_LOAD = "E3037"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -69,6 +72,11 @@ class DiagnosticCode(StrEnum):
     CHR_ASSET_NOT_FOUND = "E6002"
     CHR_ASSET_READ_FAILURE = "E6003"
     INVALID_CHR_ROM_SIZE = "E6004"
+    INVALID_BACKGROUND_ASSET_CONFIGURATION = "E6005"
+    BACKGROUND_ASSET_NOT_FOUND = "E6006"
+    BACKGROUND_ASSET_READ_FAILURE = "E6007"
+    INVALID_BACKGROUND_ASSET_SIZE = "E6008"
+    BACKGROUND_ASSET_REQUIRED = "E6009"
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,6 +200,15 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     DiagnosticCode.INVALID_PALETTE_ARGUMENT_COUNT: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Invalid palette argument count"
     ),
+    DiagnosticCode.INVALID_BACKGROUND_LOAD_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid background-load argument count"
+    ),
+    DiagnosticCode.BACKGROUND_LOAD_AFTER_RUN: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Background load after runtime start"
+    ),
+    DiagnosticCode.DUPLICATE_BACKGROUND_LOAD: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Duplicate background load"
+    ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"
     ),
@@ -242,6 +259,21 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INVALID_CHR_ROM_SIZE: DiagnosticDefinition(
         DiagnosticCategory.RUNTIME, "Invalid CHR-ROM size"
+    ),
+    DiagnosticCode.INVALID_BACKGROUND_ASSET_CONFIGURATION: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Invalid background asset configuration"
+    ),
+    DiagnosticCode.BACKGROUND_ASSET_NOT_FOUND: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Background asset not found"
+    ),
+    DiagnosticCode.BACKGROUND_ASSET_READ_FAILURE: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Background asset read failure"
+    ),
+    DiagnosticCode.INVALID_BACKGROUND_ASSET_SIZE: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Invalid background asset size"
+    ),
+    DiagnosticCode.BACKGROUND_ASSET_REQUIRED: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Background asset required"
     ),
 }
 

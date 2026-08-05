@@ -59,6 +59,9 @@ the range reserved for their category.
 | [E3032](semantic.md) | Semantic Analysis | Invalid sprite palette index |
 | [E3033](semantic.md) | Semantic Analysis | Invalid palette color index |
 | [E3034](semantic.md) | Semantic Analysis | Invalid palette argument count |
+| [E3035](semantic.md) | Semantic Analysis | Invalid background-load argument count |
+| [E3036](semantic.md) | Semantic Analysis | Background load after runtime start |
+| [E3037](semantic.md) | Semantic Analysis | Duplicate background load |
 | [E4001](type-system.md) | Type System | Unknown type |
 | [E4002](type-system.md) | Type System | Invalid `nes_color` value |
 | [E4003](type-system.md) | Type System | Invalid `byte` value |
@@ -76,6 +79,11 @@ the range reserved for their category.
 | [E6002](runtime-validation.md) | Runtime Validation | CHR-ROM asset not found |
 | [E6003](runtime-validation.md) | Runtime Validation | CHR-ROM asset read failure |
 | [E6004](runtime-validation.md) | Runtime Validation | Invalid CHR-ROM size |
+| [E6005](runtime-validation.md) | Runtime Validation | Invalid background asset configuration |
+| [E6006](runtime-validation.md) | Runtime Validation | Background asset not found |
+| [E6007](runtime-validation.md) | Runtime Validation | Background asset read failure |
+| [E6008](runtime-validation.md) | Runtime Validation | Invalid background asset size |
+| [E6009](runtime-validation.md) | Runtime Validation | Background asset required |
 
 ## Warnings
 

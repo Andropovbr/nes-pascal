@@ -19,6 +19,11 @@ palette uploads restore state rather than assume literal scroll values; they
 do not expose scrolling APIs. Runtime-owned state and initialization PPU writes
 are complete before NMI is enabled.
 
+When present, [`nes.load_background()`](background-loading.md) performs its
+complete 1 KiB PPU upload earlier in the initialization sequence with
+rendering disabled. `nes.run` remains the single point that enables rendering
+after all initialization uploads finish.
+
 Statements after `nes.run` execute on the main thread. A loop can call
 [`nes.wait_frame`](wait-frame.md) to advance once per NMI. Existing programs
 that end with `nes.run` remain valid: the compiler emits an implicit stable

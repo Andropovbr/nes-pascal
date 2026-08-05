@@ -20,6 +20,8 @@ runtime frame baseline coalesces slow-frame backlog without skipping a pending
 frame or nesting update calls. Standard controllers 1 and 2 are sampled once
 per processed frame outside NMI, with held, pressed, and released queries over
 stable current and previous state.
+Initialization can embed and upload one complete raw nametable and attribute
+table before rendering begins, alongside configured CHR-ROM and palette data.
 
 ## Documentation
 
