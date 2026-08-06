@@ -51,3 +51,7 @@ before `nes.run`. See [Frame callbacks](../runtime/frame-callbacks.md).
 The optional `nes.load_background()` command is also an unconditional,
 top-level initialization statement before `nes.run`. It has no arguments and
 requires configured [nametable data](../runtime/background-loading.md).
+
+Bounded [runtime background updates](../runtime/background-updates.md) may be
+staged from main code or procedures. Their queue-mutating operations are not
+allowed on a VBlank callback path; the simple overflow query is safe there.

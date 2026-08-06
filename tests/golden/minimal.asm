@@ -29,9 +29,6 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 ; Source: optional global-variable promotion with regular-RAM fallback
     ; no globals selected for automatic promotion
 
-.segment "OAM_SHADOW"
-; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
-runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime sprite support
 
 .segment "RUNTIME_DATA"
 ; Runtime: regular-RAM state kept separate from user variables
@@ -39,9 +36,9 @@ runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
-variable_BackgroundColor: .res 1 ; $0300: BackgroundColor: nes_color
-variable_FrameCounter: .res 1 ; $0301: FrameCounter: byte
-variable_RenderingEnabled: .res 1 ; $0302: RenderingEnabled: boolean
+variable_BackgroundColor: .res 1 ; $0200: BackgroundColor: nes_color
+variable_FrameCounter: .res 1 ; $0201: FrameCounter: byte
+variable_RenderingEnabled: .res 1 ; $0202: RenderingEnabled: boolean
 
 .segment "CODE"
 

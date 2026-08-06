@@ -51,6 +51,14 @@ diagnostics section.
 | E3035 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E3036 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E3037 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3038 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3039 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3040 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3041 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3042 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3043 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3044 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3045 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E4001 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4002 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4003 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |

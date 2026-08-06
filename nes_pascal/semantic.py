@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from .ast import (
     Assignment,
+    BackgroundUpdatesOverflowed,
     BinaryExpression,
     BooleanBinaryExpression,
     BooleanLiteral,
@@ -12,6 +13,8 @@ from .ast import (
     BuiltInType,
     CallbackKind,
     CallbackRegistration,
+    ClearBackgroundUpdates,
+    ClearBackgroundUpdateOverflow,
     ControllerQuery,
     ComparisonExpression,
     ComparisonOperator,
@@ -20,6 +23,7 @@ from .ast import (
     ContinueStatement,
     DecrementStatement,
     ForStatement,
+    GetTile,
     HexLiteral,
     IfStatement,
     ImmediateValue,
@@ -32,16 +36,20 @@ from .ast import (
     RepeatStatement,
     ResolvedArgument,
     ResolvedAssignment,
+    ResolvedBackgroundUpdatesOverflowed,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
     ResolvedBreakStatement,
     ResolvedCallbackRegistration,
+    ResolvedClearBackgroundUpdates,
+    ResolvedClearBackgroundUpdateOverflow,
     ResolvedComparisonExpression,
     ResolvedControllerQuery,
     ResolvedContinueStatement,
     ResolvedDecrementStatement,
     ResolvedForStatement,
+    ResolvedGetTile,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
     ResolvedLoadBackground,
@@ -50,9 +58,11 @@ from .ast import (
     ResolvedProcedure,
     ResolvedProcedureCall,
     ResolvedSetBackgroundColor,
+    ResolvedSetAttribute,
     ResolvedSetPalette,
     ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
+    ResolvedSetTile,
     ResolvedStatement,
     ResolvedValue,
     ResolvedVariable,
@@ -60,9 +70,11 @@ from .ast import (
     ResolvedUnaryExpression,
     Run,
     SetBackgroundColor,
+    SetAttribute,
     SetPalette,
     SetPaletteColor,
     SetSpriteZero,
+    SetTile,
     SourcePosition,
     Statement,
     UnaryExpression,
@@ -307,6 +319,10 @@ class SemanticAnalyzer:
             | SetPalette
             | SetPaletteColor
             | LoadBackground
+            | SetTile
+            | SetAttribute
+            | ClearBackgroundUpdates
+            | ClearBackgroundUpdateOverflow
             | Run
             | WaitFrame
             | CallbackRegistration
@@ -639,6 +655,96 @@ class SemanticAnalyzer:
                         ),
                         queued=runtime_started or inside_procedure,
                     )
+                )
+            elif isinstance(statement, SetTile):
+                self._require_background_argument_count(
+                    statement.position,
+                    "nes.set_tile",
+                    statement.arguments,
+                    3,
+                    DiagnosticCode.INVALID_SET_TILE_ARGUMENT_COUNT,
+                    "Pass x, y, and tile as byte values.",
+                )
+                x, y, tile = (
+                    self._resolve_value(
+                        argument,
+                        BuiltInType.BYTE,
+                        constants,
+                        variables,
+                        current_assignments,
+                    )
+                    for argument in statement.arguments
+                )
+                self._validate_immediate_coordinate(
+                    x,
+                    31,
+                    "tile X",
+                    statement.position,
+                    DiagnosticCode.INVALID_TILE_COORDINATE,
+                )
+                self._validate_immediate_coordinate(
+                    y,
+                    29,
+                    "tile Y",
+                    statement.position,
+                    DiagnosticCode.INVALID_TILE_COORDINATE,
+                )
+                resolved_statements.append(ResolvedSetTile(x, y, tile))
+            elif isinstance(statement, SetAttribute):
+                self._require_background_argument_count(
+                    statement.position,
+                    "nes.set_attribute",
+                    statement.arguments,
+                    3,
+                    DiagnosticCode.INVALID_SET_ATTRIBUTE_ARGUMENT_COUNT,
+                    "Pass attribute X, attribute Y, and value as byte values.",
+                )
+                x, y, value = (
+                    self._resolve_value(
+                        argument,
+                        BuiltInType.BYTE,
+                        constants,
+                        variables,
+                        current_assignments,
+                    )
+                    for argument in statement.arguments
+                )
+                self._validate_immediate_coordinate(
+                    x,
+                    7,
+                    "attribute X",
+                    statement.position,
+                    DiagnosticCode.INVALID_ATTRIBUTE_COORDINATE,
+                )
+                self._validate_immediate_coordinate(
+                    y,
+                    7,
+                    "attribute Y",
+                    statement.position,
+                    DiagnosticCode.INVALID_ATTRIBUTE_COORDINATE,
+                )
+                resolved_statements.append(ResolvedSetAttribute(x, y, value))
+            elif isinstance(statement, ClearBackgroundUpdates):
+                self._require_background_argument_count(
+                    statement.position,
+                    "nes.clear_background_updates",
+                    statement.arguments,
+                    0,
+                    DiagnosticCode.INVALID_CLEAR_BACKGROUND_UPDATES_ARGUMENT_COUNT,
+                    "Call nes.clear_background_updates(); without arguments.",
+                )
+                resolved_statements.append(ResolvedClearBackgroundUpdates())
+            elif isinstance(statement, ClearBackgroundUpdateOverflow):
+                self._require_background_argument_count(
+                    statement.position,
+                    "nes.clear_background_update_overflow",
+                    statement.arguments,
+                    0,
+                    DiagnosticCode.INVALID_BACKGROUND_OVERFLOW_CLEAR_ARGUMENT_COUNT,
+                    "Call nes.clear_background_update_overflow(); without arguments.",
+                )
+                resolved_statements.append(
+                    ResolvedClearBackgroundUpdateOverflow()
                 )
             elif isinstance(statement, SetPalette):
                 command = f"nes.set_{statement.kind.value}_palette"
@@ -1050,7 +1156,7 @@ class SemanticAnalyzer:
         validate(root)
 
     def _vblank_expression_is_safe(self, value: ValueExpression) -> bool:
-        if isinstance(value, ControllerQuery):
+        if isinstance(value, (ControllerQuery, GetTile)):
             return False
         if isinstance(value, (BinaryExpression, ComparisonExpression)):
             return False
@@ -1067,6 +1173,16 @@ class SemanticAnalyzer:
         value: ValueExpression,
         owner: str,
     ) -> None:
+        tile_query = self._first_get_tile(value)
+        if tile_query is not None:
+            self._error(
+                tile_query.position,
+                DiagnosticCode.VBLANK_UNSAFE_OPERATION,
+                f"VBlank callback path through {owner} queries nes.get_tile.",
+                "Read the background shadow from main code or the update "
+                "callback; NMI owns background queue consumption.",
+                len("nes.get_tile"),
+            )
         controller_query = self._first_controller_query(value)
         if controller_query is not None:
             command = f"nes.controller_{controller_query.kind.value}"
@@ -1104,6 +1220,18 @@ class SemanticAnalyzer:
             ) or self._first_controller_query(value.right)
         return None
 
+    def _first_get_tile(self, value: ValueExpression) -> GetTile | None:
+        if isinstance(value, GetTile):
+            return value
+        if isinstance(value, (UnaryExpression, BooleanNotExpression)):
+            return self._first_get_tile(value.operand)
+        if isinstance(
+            value,
+            (BinaryExpression, BooleanBinaryExpression, ComparisonExpression),
+        ):
+            return self._first_get_tile(value.left) or self._first_get_tile(value.right)
+        return None
+
     def _statement_position_for_callback(self, statement: Statement) -> SourcePosition:
         if isinstance(statement, Assignment):
             return statement.target_position
@@ -1132,6 +1260,14 @@ class SemanticAnalyzer:
             return "nes.set_sprite_zero"
         if isinstance(statement, LoadBackground):
             return "nes.load_background"
+        if isinstance(statement, SetTile):
+            return "nes.set_tile"
+        if isinstance(statement, SetAttribute):
+            return "nes.set_attribute"
+        if isinstance(statement, ClearBackgroundUpdates):
+            return "nes.clear_background_updates"
+        if isinstance(statement, ClearBackgroundUpdateOverflow):
+            return "nes.clear_background_update_overflow"
         if isinstance(statement, CallbackRegistration):
             return f"nes.on_{statement.kind.value}"
         if isinstance(statement, BreakStatement):
@@ -1424,6 +1560,64 @@ class SemanticAnalyzer:
         assigned_variables: set[str],
         assignment_target: ResolvedVariable | None = None,
     ) -> ResolvedValue:
+        if isinstance(expression, BackgroundUpdatesOverflowed):
+            self._require_expression_result_type(
+                expression.position,
+                BuiltInType.BOOLEAN,
+                expected_type,
+                "nes.background_updates_overflowed result",
+                assignment_target,
+            )
+            self._require_background_argument_count(
+                expression.position,
+                "nes.background_updates_overflowed",
+                expression.arguments,
+                0,
+                DiagnosticCode.INVALID_BACKGROUND_OVERFLOW_QUERY_ARGUMENT_COUNT,
+                "Call nes.background_updates_overflowed() without arguments.",
+            )
+            return ResolvedBackgroundUpdatesOverflowed()
+        if isinstance(expression, GetTile):
+            self._require_expression_result_type(
+                expression.position,
+                BuiltInType.BYTE,
+                expected_type,
+                "nes.get_tile result",
+                assignment_target,
+            )
+            self._require_background_argument_count(
+                expression.position,
+                "nes.get_tile",
+                expression.arguments,
+                2,
+                DiagnosticCode.INVALID_GET_TILE_ARGUMENT_COUNT,
+                "Pass x and y as byte values.",
+            )
+            x, y = (
+                self._resolve_value(
+                    argument,
+                    BuiltInType.BYTE,
+                    constants,
+                    variables,
+                    assigned_variables,
+                )
+                for argument in expression.arguments
+            )
+            self._validate_immediate_coordinate(
+                x,
+                31,
+                "tile X",
+                expression.position,
+                DiagnosticCode.INVALID_TILE_COORDINATE,
+            )
+            self._validate_immediate_coordinate(
+                y,
+                29,
+                "tile Y",
+                expression.position,
+                DiagnosticCode.INVALID_TILE_COORDINATE,
+            )
+            return ResolvedGetTile(x, y)
         if isinstance(expression, ControllerQuery):
             return self._resolve_controller_query(
                 expression,
@@ -1646,6 +1840,44 @@ class SemanticAnalyzer:
                 len(text),
             )
         return value
+
+    def _require_background_argument_count(
+        self,
+        position: SourcePosition,
+        command: str,
+        arguments: tuple[ValueExpression, ...],
+        expected: int,
+        code: DiagnosticCode,
+        suggestion: str,
+    ) -> None:
+        if len(arguments) == expected:
+            return
+        self._error(
+            position,
+            code,
+            f"{command} expects exactly {expected} arguments, but "
+            f"{len(arguments)} were provided.",
+            suggestion,
+            len(command),
+        )
+
+    def _validate_immediate_coordinate(
+        self,
+        value: ResolvedValue,
+        maximum: int,
+        description: str,
+        position: SourcePosition,
+        code: DiagnosticCode,
+    ) -> None:
+        if not isinstance(value, ImmediateValue) or value.value <= maximum:
+            return
+        self._error(
+            position,
+            code,
+            f"The {description} coordinate must be between 0 and {maximum}, "
+            f"but {value.value} was provided.",
+            f"Use a {description} coordinate from 0 through {maximum}.",
+        )
 
     def _palette_argument_count_error(
         self,
@@ -2047,9 +2279,15 @@ class SemanticAnalyzer:
                 BooleanBinaryExpression,
                 ComparisonExpression,
                 ControllerQuery,
+                GetTile,
+                BackgroundUpdatesOverflowed,
             ),
         ):
-            return BuiltInType.BOOLEAN
+            return (
+                BuiltInType.BYTE
+                if isinstance(expression, GetTile)
+                else BuiltInType.BOOLEAN
+            )
         if isinstance(expression, (UnaryExpression, BinaryExpression)):
             return BuiltInType.BYTE
         if isinstance(expression, HexLiteral):

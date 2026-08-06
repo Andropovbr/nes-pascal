@@ -237,6 +237,23 @@ end.
         self.assertEqual(first_assembly_bytes, second_assembly_bytes)
         self.assertEqual(len(first_bytes), 16 + 32 * 1024 + 8 * 1024)
 
+    def test_background_update_example_builds_with_bounded_runtime_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            rom_path = Path(temporary_directory) / "background_updates.nes"
+            compile_source(
+                ROOT / "examples" / "background_updates.nsp",
+                rom_path,
+                chr_path="assets/chr_asset.chr",
+                nametable_path="assets/nametable_loading.nam",
+            )
+            rom = rom_path.read_bytes()
+            memory_map = rom_path.with_suffix(".map").read_text(encoding="utf-8")
+
+        self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
+        self.assertIn("runtime_background_shadow", memory_map)
+        self.assertIn("runtime_background_queue_ready", memory_map)
+        self.assertIn("runtime_background_queue_overflow", memory_map)
+
     def test_split_nametable_assets_build_as_one_complete_asset(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             project = Path(temporary_directory)
@@ -420,8 +437,8 @@ end.
 
         self.assertEqual(first_config, second_config)
         self.assertEqual(first_map, second_map)
-        self.assertIn("OAM:     start = $0200, size = $0100", first_config)
-        self.assertIn("runtime_oam_shadow", first_map)
+        self.assertNotIn("OAM:", first_config)
+        self.assertNotIn("runtime_oam_shadow", first_map)
         self.assertIn("variable_BackgroundColor", first_map)
 
     def test_conditional_branch_larger_than_relative_branch_range(self) -> None:
@@ -595,6 +612,14 @@ class MesenIntegrationTests(unittest.TestCase):
         self._run_mesen_test(
             "nametable_loading",
             "verify_nametable_loading.lua",
+            chr_path="assets/chr_asset.chr",
+            nametable_path="assets/nametable_loading.nam",
+        )
+
+    def test_background_updates_are_bounded_and_uploaded_during_vblank(self) -> None:
+        self._run_mesen_test(
+            "background_updates",
+            "verify_background_updates.lua",
             chr_path="assets/chr_asset.chr",
             nametable_path="assets/nametable_loading.nam",
         )

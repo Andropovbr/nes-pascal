@@ -7,21 +7,27 @@ from enum import StrEnum
 
 from .ast import (
     ResolvedAssignment,
+    ResolvedBackgroundUpdatesOverflowed,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
     ResolvedComparisonExpression,
+    ResolvedClearBackgroundUpdates,
+    ResolvedClearBackgroundUpdateOverflow,
     ResolvedDecrementStatement,
     ResolvedForStatement,
+    ResolvedGetTile,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
     ResolvedProcedureCall,
     ResolvedProgram,
     ResolvedRepeatStatement,
     ResolvedSetBackgroundColor,
+    ResolvedSetAttribute,
     ResolvedSetPalette,
     ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
+    ResolvedSetTile,
     ResolvedStatement,
     ResolvedUnaryExpression,
     ResolvedValue,
@@ -123,6 +129,46 @@ class MemoryLayoutSettings:
 
 
 DEFAULT_MEMORY_LAYOUT_SETTINGS = MemoryLayoutSettings()
+
+
+@dataclass(frozen=True, slots=True)
+class BackgroundRuntimeFeatures:
+    """Direct background API use and the small runtime dependencies it enables."""
+
+    set_tile: bool = False
+    get_tile: bool = False
+    set_attribute: bool = False
+    clear_updates: bool = False
+    inspect_overflow: bool = False
+    clear_overflow: bool = False
+
+    @property
+    def queue(self) -> bool:
+        return self.set_tile or self.set_attribute or self.clear_updates
+
+    @property
+    def queue_writer(self) -> bool:
+        return self.set_tile or self.set_attribute
+
+    @property
+    def overflow_flag(self) -> bool:
+        return self.queue_writer or self.inspect_overflow or self.clear_overflow
+
+    @property
+    def cancellation_lock(self) -> bool:
+        return self.clear_updates
+
+    @property
+    def shadow(self) -> bool:
+        return self.get_tile
+
+    @property
+    def coordinate_inputs(self) -> bool:
+        return self.set_tile or self.get_tile or self.set_attribute
+
+    @property
+    def tile_index(self) -> bool:
+        return self.set_tile or self.get_tile
 
 
 @dataclass(frozen=True, slots=True)
@@ -236,13 +282,37 @@ def build_memory_layout(
 
     sprite_zero_enabled = _uses_sprite_zero(program)
     palette_runtime_enabled = _uses_runtime_palette(program)
+    background_features = detect_background_runtime_features(program)
+    background_queue_enabled = background_features.queue
+    background_shadow_enabled = background_features.shadow
     sprite_runtime_size = 5 if sprite_zero_enabled else 0
-    palette_runtime_size = 44 if palette_runtime_enabled else 0
-    required_runtime_size = sprite_runtime_size + palette_runtime_size
+    palette_runtime_size = 41 if palette_runtime_enabled else 0
+    ppu_state_size = 3 if palette_runtime_enabled or background_queue_enabled else 0
+    background_shadow_size = 960 if background_shadow_enabled else 0
+    background_runtime_size = (
+        (16 if background_features.queue else 0)
+        + (1 if background_features.overflow_flag else 0)
+        + (1 if background_features.cancellation_lock else 0)
+        + (2 if background_features.coordinate_inputs else 0)
+        + (1 if background_features.queue_writer else 0)
+        + (2 if background_features.tile_index else 0)
+    )
+    required_runtime_size = (
+        sprite_runtime_size
+        + palette_runtime_size
+        + ppu_state_size
+        + background_shadow_size
+        + background_runtime_size
+    )
     if settings.runtime_data_size < required_runtime_size:
         settings = replace(settings, runtime_data_size=required_runtime_size)
 
-    regions = _validated_regions(settings, source, filename)
+    regions = _validated_regions(
+        settings,
+        source,
+        filename,
+        oam_shadow_enabled=sprite_zero_enabled,
+    )
     (
         physical_ram,
         zero_page,
@@ -271,6 +341,87 @@ def build_memory_layout(
                 "Simplify nested expressions or loops. Mandatory temporary "
                 "allocations cannot borrow optional promotion space."
             ),
+        )
+
+    background_runtime_symbols: list[MemorySymbol] = []
+    next_background_address = (
+        runtime_data.start
+        + sprite_runtime_size
+        + palette_runtime_size
+        + ppu_state_size
+        + background_shadow_size
+    )
+
+    def add_background_symbol(name: str, size: int, purpose: str) -> None:
+        nonlocal next_background_address
+        background_runtime_symbols.append(
+            MemorySymbol(
+                name,
+                next_background_address,
+                size,
+                SymbolKind.RUNTIME,
+                runtime_data.name,
+                purpose,
+            )
+        )
+        next_background_address += size
+
+    if background_features.queue:
+        for field, purpose in (
+            ("ready", "atomic publication flags"),
+            ("high", "PPU address high bytes"),
+            ("low", "PPU address low bytes"),
+            ("value", "PPU data bytes"),
+        ):
+            add_background_symbol(
+                f"runtime_background_queue_{field}",
+                4,
+                f"four-slot background update queue {purpose}",
+            )
+    if background_features.overflow_flag:
+        add_background_symbol(
+            "runtime_background_queue_overflow",
+            1,
+            "sticky flag set when all four update slots are occupied",
+        )
+    if background_features.cancellation_lock:
+        add_background_symbol(
+            "runtime_background_queue_cancel_lock",
+            1,
+            "atomic cancellation lock checked by the NMI uploader",
+        )
+    if background_features.coordinate_inputs:
+        add_background_symbol(
+            "runtime_background_x",
+            1,
+            "background helper X input",
+        )
+        add_background_symbol(
+            "runtime_background_y",
+            1,
+            "background helper Y input",
+        )
+    if background_features.queue_writer:
+        add_background_symbol(
+            "runtime_background_pending_value",
+            1,
+            "background helper byte input",
+        )
+    if background_features.tile_index:
+        offset_purpose = "computed nametable tile offset"
+        page_purpose = "computed nametable address page"
+        if background_features.shadow:
+            offset_purpose += " and confirmed-shadow byte offset"
+            page_purpose += " and confirmed-shadow page index"
+        add_background_symbol(
+            "runtime_background_index_low",
+            1,
+            offset_purpose,
+        )
+        add_background_symbol(
+            "runtime_background_index_page",
+            1,
+            page_purpose,
         )
 
     runtime_symbols = (
@@ -346,13 +497,19 @@ def build_memory_layout(
             zero_page_runtime.name,
             "distinguishes an initial zero byte from a completed frame-zero poll",
         ),
-        MemorySymbol(
-            "runtime_oam_shadow",
-            oam_shadow.start,
-            oam_shadow.size,
-            SymbolKind.RUNTIME,
-            oam_shadow.name,
-            "256-byte page copied to PPU OAM by runtime sprite support",
+        *(
+            (
+                MemorySymbol(
+                    "runtime_oam_shadow",
+                    oam_shadow.start,
+                    oam_shadow.size,
+                    SymbolKind.RUNTIME,
+                    oam_shadow.name,
+                    "256-byte page copied to PPU OAM by runtime sprite support",
+                ),
+            )
+            if sprite_zero_enabled
+            else ()
         ),
         *(
             (
@@ -440,34 +597,61 @@ def build_memory_layout(
                     runtime_data.name,
                     "atomic publish flag for the universal background color",
                 ),
-                MemorySymbol(
-                    "runtime_ppuctrl_shadow",
-                    runtime_data.start + sprite_runtime_size + 41,
-                    1,
-                    SymbolKind.RUNTIME,
-                    runtime_data.name,
-                    "PPUCTRL value restored after runtime palette uploads",
-                ),
-                MemorySymbol(
-                    "runtime_scroll_x_shadow",
-                    runtime_data.start + sprite_runtime_size + 42,
-                    1,
-                    SymbolKind.RUNTIME,
-                    runtime_data.name,
-                    "horizontal scroll value restored after runtime palette uploads",
-                ),
-                MemorySymbol(
-                    "runtime_scroll_y_shadow",
-                    runtime_data.start + sprite_runtime_size + 43,
-                    1,
-                    SymbolKind.RUNTIME,
-                    runtime_data.name,
-                    "vertical scroll value restored after runtime palette uploads",
-                ),
             )
             if palette_runtime_enabled
             else ()
         ),
+        *(
+            tuple(
+                MemorySymbol(
+                    name,
+                    runtime_data.start
+                    + sprite_runtime_size
+                    + palette_runtime_size
+                    + index,
+                    1,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    purpose,
+                )
+                for index, (name, purpose) in enumerate(
+                    (
+                        (
+                            "runtime_ppuctrl_shadow",
+                            "PPUCTRL value restored after bounded PPU uploads",
+                        ),
+                        (
+                            "runtime_scroll_x_shadow",
+                            "horizontal scroll restored after bounded PPU uploads",
+                        ),
+                        (
+                            "runtime_scroll_y_shadow",
+                            "vertical scroll restored after bounded PPU uploads",
+                        ),
+                    )
+                )
+            )
+            if ppu_state_size
+            else ()
+        ),
+        *(
+            (
+                MemorySymbol(
+                    "runtime_background_shadow",
+                    runtime_data.start
+                    + sprite_runtime_size
+                    + palette_runtime_size
+                    + ppu_state_size,
+                    960,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "960-byte confirmed PPU tile shadow for nametable 0",
+                ),
+            )
+            if background_shadow_enabled
+            else ()
+        ),
+        *background_runtime_symbols,
     )
     temporary_symbols = tuple(
         MemorySymbol(
@@ -655,9 +839,10 @@ def generate_linker_config(layout: ProgramMemoryLayout) -> str:
         _linker_memory_line("ZP_EXPLICIT", layout.zero_page_explicit_reserve),
         _linker_memory_line("ZP_AUTO", layout.zero_page_automatic),
         _linker_memory_line("STACK", layout.hardware_stack),
-        _linker_memory_line("OAM", layout.oam_shadow),
         _linker_memory_line("RUNTIME", layout.runtime_data),
     ]
+    if layout.oam_shadow.size:
+        memory_lines.insert(5, _linker_memory_line("OAM", layout.oam_shadow))
     if layout.zero_page_unallocated.size:
         memory_lines.append(
             _linker_memory_line("ZP_FREE", layout.zero_page_unallocated)
@@ -678,9 +863,13 @@ def generate_linker_config(layout: ProgramMemoryLayout) -> str:
         "    ZERO_PAGE_RUNTIME:     load = ZP_RUNTIME, type = zp;",
         "    ZERO_PAGE_TEMPORARIES: load = ZP_TEMP,    type = zp;",
         "    ZERO_PAGE_VARIABLES:   load = ZP_AUTO,    type = zp;",
-        "    OAM_SHADOW:          load = OAM,    type = bss;",
         "    RUNTIME_DATA:        load = RUNTIME, type = bss;",
     ]
+    if layout.oam_shadow.size:
+        segment_lines.insert(
+            3,
+            "    OAM_SHADOW:          load = OAM,    type = bss;",
+        )
     segment_lines.extend(
         [
             "    USER_VARIABLES:      load = USER,   type = bss;",
@@ -811,6 +1000,8 @@ def _validated_regions(
     settings: MemoryLayoutSettings,
     source: str,
     filename: str,
+    *,
+    oam_shadow_enabled: bool,
 ) -> tuple[MemoryRange, ...]:
     if (
         settings.mapper_number != 0
@@ -943,7 +1134,7 @@ def _validated_regions(
     oam = MemoryRange(
         "OAM shadow",
         settings.oam_shadow_start,
-        settings.oam_shadow_size,
+        settings.oam_shadow_size if oam_shadow_enabled else 0,
         RegionKind.RUNTIME,
     )
     fixed_regions = (zero_page, stack, oam)
@@ -962,7 +1153,7 @@ def _validated_regions(
 
     runtime = MemoryRange(
         "Runtime data",
-        settings.general_ram_start,
+        settings.general_ram_start if oam_shadow_enabled else settings.oam_shadow_start,
         settings.runtime_data_size,
         RegionKind.RUNTIME,
     )
@@ -1135,6 +1326,107 @@ def _uses_runtime_palette(program: ResolvedProgram) -> bool:
     )
 
 
+def detect_background_runtime_features(
+    program: ResolvedProgram,
+) -> BackgroundRuntimeFeatures:
+    """Collect direct background API use before deriving runtime dependencies."""
+
+    used = {
+        "set_tile": False,
+        "get_tile": False,
+        "set_attribute": False,
+        "clear_updates": False,
+        "inspect_overflow": False,
+        "clear_overflow": False,
+    }
+
+    def visit_value(value: ResolvedValue) -> None:
+        if isinstance(value, ResolvedGetTile):
+            used["get_tile"] = True
+            visit_value(value.x)
+            visit_value(value.y)
+        elif isinstance(value, ResolvedBackgroundUpdatesOverflowed):
+            used["inspect_overflow"] = True
+        elif isinstance(
+            value,
+            (ResolvedUnaryExpression, ResolvedBooleanNotExpression),
+        ):
+            visit_value(value.operand)
+        elif isinstance(
+            value,
+            (
+                ResolvedBinaryExpression,
+                ResolvedComparisonExpression,
+                ResolvedBooleanBinaryExpression,
+            ),
+        ):
+            visit_value(value.left)
+            visit_value(value.right)
+
+    def visit_statements(statements: tuple[ResolvedStatement, ...]) -> None:
+        for statement in statements:
+            values: tuple[ResolvedValue, ...] = ()
+            if isinstance(statement, ResolvedSetTile):
+                used["set_tile"] = True
+            elif isinstance(statement, ResolvedSetAttribute):
+                used["set_attribute"] = True
+            elif isinstance(statement, ResolvedClearBackgroundUpdates):
+                used["clear_updates"] = True
+            elif isinstance(statement, ResolvedClearBackgroundUpdateOverflow):
+                used["clear_overflow"] = True
+            if isinstance(statement, ResolvedAssignment):
+                values = (statement.value,)
+            elif isinstance(statement, ResolvedSetBackgroundColor):
+                values = (statement.argument,)
+            elif isinstance(statement, ResolvedSetPalette):
+                values = statement.colors
+            elif isinstance(statement, ResolvedSetPaletteColor):
+                values = (statement.color,)
+            elif isinstance(statement, ResolvedSetSpriteZero):
+                values = (
+                    statement.x,
+                    statement.y,
+                    statement.tile,
+                    statement.attributes,
+                )
+            elif isinstance(statement, ResolvedSetTile):
+                values = (statement.x, statement.y, statement.tile)
+            elif isinstance(statement, ResolvedSetAttribute):
+                values = (statement.x, statement.y, statement.value)
+            elif isinstance(
+                statement,
+                (ResolvedIncrementStatement, ResolvedDecrementStatement),
+            ):
+                values = (statement.amount,) if statement.amount is not None else ()
+            elif isinstance(statement, ResolvedIfStatement):
+                visit_value(statement.condition)
+                visit_statements(statement.then_branch)
+                if statement.else_branch is not None:
+                    visit_statements(statement.else_branch)
+                continue
+            elif isinstance(
+                statement,
+                (ResolvedWhileStatement, ResolvedRepeatStatement),
+            ):
+                visit_value(statement.condition)
+                visit_statements(statement.body)
+                continue
+            elif isinstance(statement, ResolvedForStatement):
+                visit_value(statement.initial)
+                visit_value(statement.final)
+                visit_statements(statement.body)
+                continue
+            elif isinstance(statement, ResolvedProcedureCall):
+                values = tuple(argument.value for argument in statement.arguments)
+            for value in values:
+                visit_value(value)
+
+    visit_statements(program.statements)
+    for procedure in program.procedures:
+        visit_statements(procedure.body)
+    return BackgroundRuntimeFeatures(**used)
+
+
 def _count_statement_variable_references(
     statement: ResolvedStatement,
     counts: dict[str, int],
@@ -1156,6 +1448,12 @@ def _count_statement_variable_references(
             statement.tile,
             statement.attributes,
         ):
+            _count_value_variable_references(value, counts)
+    elif isinstance(statement, ResolvedSetTile):
+        for value in (statement.x, statement.y, statement.tile):
+            _count_value_variable_references(value, counts)
+    elif isinstance(statement, ResolvedSetAttribute):
+        for value in (statement.x, statement.y, statement.value):
             _count_value_variable_references(value, counts)
     elif isinstance(
         statement,
@@ -1194,6 +1492,9 @@ def _count_value_variable_references(
         _count_variable(value.variable, counts)
     elif isinstance(value, (ResolvedUnaryExpression, ResolvedBooleanNotExpression)):
         _count_value_variable_references(value.operand, counts)
+    elif isinstance(value, ResolvedGetTile):
+        _count_value_variable_references(value.x, counts)
+        _count_value_variable_references(value.y, counts)
     elif isinstance(
         value,
         (
@@ -1232,6 +1533,8 @@ def _temporary_symbol_names(program: ResolvedProgram) -> tuple[str, ...]:
 
 
 def _expression_depth(value: ResolvedValue) -> int:
+    if isinstance(value, ResolvedGetTile):
+        return max(_expression_depth(value.x), _expression_depth(value.y))
     if isinstance(value, (ResolvedBinaryExpression, ResolvedComparisonExpression)):
         return 1 + max(_expression_depth(value.left), _expression_depth(value.right))
     if isinstance(value, (ResolvedUnaryExpression, ResolvedBooleanNotExpression)):
@@ -1256,6 +1559,18 @@ def _statement_expression_depth(statement: ResolvedStatement) -> int:
             _expression_depth(statement.y),
             _expression_depth(statement.tile),
             _expression_depth(statement.attributes),
+        )
+    if isinstance(statement, ResolvedSetTile):
+        return max(
+            _expression_depth(statement.x),
+            _expression_depth(statement.y),
+            _expression_depth(statement.tile),
+        )
+    if isinstance(statement, ResolvedSetAttribute):
+        return max(
+            _expression_depth(statement.x),
+            _expression_depth(statement.y),
+            _expression_depth(statement.value),
         )
     if isinstance(statement, ResolvedIncrementStatement):
         return _expression_depth(statement.amount) if statement.amount else 0

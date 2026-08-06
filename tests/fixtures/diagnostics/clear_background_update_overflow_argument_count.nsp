@@ -1,0 +1,6 @@
+program InvalidClearBackgroundOverflowArguments;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+    nes.clear_background_update_overflow($00);
+end.

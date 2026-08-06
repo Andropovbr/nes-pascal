@@ -62,6 +62,14 @@ the range reserved for their category.
 | [E3035](semantic.md) | Semantic Analysis | Invalid background-load argument count |
 | [E3036](semantic.md) | Semantic Analysis | Background load after runtime start |
 | [E3037](semantic.md) | Semantic Analysis | Duplicate background load |
+| [E3038](semantic.md) | Semantic Analysis | Invalid set-tile argument count |
+| [E3039](semantic.md) | Semantic Analysis | Invalid get-tile argument count |
+| [E3040](semantic.md) | Semantic Analysis | Invalid set-attribute argument count |
+| [E3041](semantic.md) | Semantic Analysis | Invalid clear-background-updates argument count |
+| [E3042](semantic.md) | Semantic Analysis | Invalid tile coordinate |
+| [E3043](semantic.md) | Semantic Analysis | Invalid attribute coordinate |
+| [E3044](semantic.md) | Semantic Analysis | Invalid background-overflow query argument count |
+| [E3045](semantic.md) | Semantic Analysis | Invalid background-overflow clear argument count |
 | [E4001](type-system.md) | Type System | Unknown type |
 | [E4002](type-system.md) | Type System | Invalid `nes_color` value |
 | [E4003](type-system.md) | Type System | Invalid `byte` value |

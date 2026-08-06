@@ -34,8 +34,18 @@ end.
 """
 
 
+def sprite_program() -> str:
+    return """program SpriteMemory;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+    nes.set_sprite_zero($20, $30, $01, $00);
+end.
+"""
+
+
 class MemoryLayoutTests(unittest.TestCase):
-    def test_physical_and_reserved_ranges_match_nes_internal_ram(self) -> None:
+    def test_no_sprite_program_reuses_the_oam_page(self) -> None:
         layout = build_memory_layout(resolved_program(small_program()))
 
         self.assertEqual(
@@ -49,10 +59,28 @@ class MemoryLayoutTests(unittest.TestCase):
         )
         self.assertEqual(
             (layout.oam_shadow.start, layout.oam_shadow.end),
+            (0x0200, None),
+        )
+        self.assertEqual(layout.oam_shadow.size, 0)
+        self.assertEqual(layout.oam_shadow.start % 256, 0)
+        self.assertEqual(layout.runtime_data.start, 0x0200)
+        self.assertNotIn(
+            "runtime_oam_shadow",
+            {symbol.assembly_symbol for symbol in layout.runtime_symbols},
+        )
+
+    def test_sprite_program_retains_page_aligned_oam_shadow(self) -> None:
+        layout = build_memory_layout(resolved_program(sprite_program()))
+        self.assertEqual(
+            (layout.oam_shadow.start, layout.oam_shadow.end),
             (0x0200, 0x02FF),
         )
         self.assertEqual(layout.oam_shadow.size, 256)
-        self.assertEqual(layout.oam_shadow.start % 256, 0)
+        self.assertEqual(layout.runtime_data.start, 0x0300)
+        self.assertIn(
+            "runtime_oam_shadow",
+            {symbol.assembly_symbol for symbol in layout.runtime_symbols},
+        )
 
     def test_runtime_temporary_and_user_regions_are_deterministic(self) -> None:
         program = resolved_program(small_program(("First", "Second", "Third")))
@@ -60,7 +88,7 @@ class MemoryLayoutTests(unittest.TestCase):
         second = build_memory_layout(program)
 
         self.assertEqual(first, second)
-        self.assertEqual(first.runtime_data.start, 0x0300)
+        self.assertEqual(first.runtime_data.start, 0x0200)
         self.assertEqual(first.runtime_data.size, 0)
         self.assertEqual(
             (first.temporary_storage.start, first.temporary_storage.end),
@@ -68,7 +96,7 @@ class MemoryLayoutTests(unittest.TestCase):
         )
         self.assertEqual(
             [symbol.address for symbol in first.user_symbols],
-            [0x0300, 0x0301, 0x0302],
+            [0x0200, 0x0201, 0x0202],
         )
         runtime_addresses = {
             symbol.assembly_symbol: symbol.address
@@ -80,7 +108,7 @@ class MemoryLayoutTests(unittest.TestCase):
             runtime_addresses["runtime_last_processed_frame"],
             0x0002,
         )
-        self.assertEqual(runtime_addresses["runtime_oam_shadow"], 0x0200)
+        self.assertNotIn("runtime_oam_shadow", runtime_addresses)
 
     def test_nmi_state_is_isolated_from_expression_temporaries(self) -> None:
         path = ROOT / "examples" / "frame_synchronization.nsp"
@@ -160,7 +188,7 @@ class MemoryLayoutTests(unittest.TestCase):
                 self.assertLessEqual(symbol.address + symbol.size - 1, 0x001F)
         for symbol in layout.regular_user_symbols:
             with self.subTest(symbol=symbol.assembly_symbol):
-                self.assertGreaterEqual(symbol.address, 0x0300)
+                self.assertGreaterEqual(symbol.address, 0x0200)
                 self.assertLessEqual(symbol.address + symbol.size - 1, 0x07FF)
 
     def test_consecutive_user_allocations_do_not_overlap(self) -> None:
@@ -171,7 +199,7 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertEqual(addresses, list(range(addresses[0], addresses[0] + 3)))
 
     def test_exact_final_byte_succeeds_and_one_more_fails(self) -> None:
-        settings = MemoryLayoutSettings(runtime_data_size=1279)
+        settings = MemoryLayoutSettings(runtime_data_size=1535)
         one_source = small_program(("FinalByte",))
         layout = build_memory_layout(
             resolved_program(one_source),
@@ -201,7 +229,7 @@ class MemoryLayoutTests(unittest.TestCase):
         with self.assertRaises(CompilerError) as context:
             build_memory_layout(
                 resolved_program(source, str(path)),
-                MemoryLayoutSettings(runtime_data_size=1279),
+                MemoryLayoutSettings(runtime_data_size=1535),
                 source=source,
                 filename=str(path),
             )
@@ -232,7 +260,7 @@ class MemoryLayoutTests(unittest.TestCase):
         cases = (
             MemoryLayoutSettings(oam_shadow_start=0x0210),
             MemoryLayoutSettings(oam_shadow_start=0x0100),
-            MemoryLayoutSettings(runtime_data_size=1281),
+            MemoryLayoutSettings(runtime_data_size=1537),
             MemoryLayoutSettings(physical_ram_size=0x2000),
             MemoryLayoutSettings(mapper_number=1),
             MemoryLayoutSettings(zero_page_runtime_size=17),
@@ -272,13 +300,13 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertIn("ZP_EXPLICIT: start = $0020, size = $0060", config)
         self.assertIn("ZP_AUTO: start = $0080, size = $0080", config)
         self.assertIn("STACK:   start = $0100, size = $0100", config)
-        self.assertIn("OAM:     start = $0200, size = $0100", config)
-        self.assertIn("RUNTIME: start = $0300, size = $0000", config)
-        self.assertIn("USER:    start = $0300, size = $0500", config)
+        self.assertNotIn("OAM:", config)
+        self.assertIn("RUNTIME: start = $0200, size = $0000", config)
+        self.assertIn("USER:    start = $0200, size = $0600", config)
         self.assertIn("ZERO_PAGE_TEMPORARIES: load = ZP_TEMP", config)
         self.assertIn("ZERO_PAGE_RUNTIME:     load = ZP_RUNTIME", config)
         self.assertIn("ZERO_PAGE_VARIABLES:   load = ZP_AUTO", config)
-        self.assertIn("OAM_SHADOW:          load = OAM", config)
+        self.assertNotIn("OAM_SHADOW", config)
         self.assertIn("USER_VARIABLES:      load = USER", config)
 
         custom_layout = build_memory_layout(
@@ -286,10 +314,17 @@ class MemoryLayoutTests(unittest.TestCase):
             MemoryLayoutSettings(runtime_data_size=4, temporary_storage_size=8),
         )
         custom_config = generate_linker_config(custom_layout)
-        self.assertIn("RUNTIME: start = $0300, size = $0004", custom_config)
+        self.assertIn("RUNTIME: start = $0200, size = $0004", custom_config)
         self.assertIn("ZP_TEMP: start = $0010, size = $0008", custom_config)
         self.assertIn("ZP_AUTO: start = $0078, size = $0080", custom_config)
-        self.assertIn("USER:    start = $0304, size = $04FC", custom_config)
+        self.assertIn("USER:    start = $0204, size = $05FC", custom_config)
+
+        sprite_config = generate_linker_config(
+            build_memory_layout(resolved_program(sprite_program()))
+        )
+        self.assertIn("OAM:     start = $0200, size = $0100", sprite_config)
+        self.assertIn("OAM_SHADOW:          load = OAM", sprite_config)
+        self.assertIn("RUNTIME: start = $0300, size = $0005", sprite_config)
 
     def test_memory_map_contains_regions_totals_and_allocated_symbols(self) -> None:
         source = small_program(("Counter", "Limit"))
@@ -300,12 +335,12 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertIn("$0000  $000F    16  Runtime   Zero Page runtime", report)
         self.assertIn("$0010  $001F    16  Compiler  Zero Page temporaries", report)
         self.assertIn("$0080  $00FF   128  User      Automatic Zero Page", report)
-        self.assertIn("$0200  $02FF   256  Runtime   OAM shadow", report)
-        self.assertIn("$0300  ----      0  Runtime   Runtime data", report)
+        self.assertNotIn("OAM shadow", report)
+        self.assertIn("$0200  ----      0  Runtime   Runtime data", report)
         self.assertIn("General free RAM", report)
         self.assertIn("Counter", report)
         self.assertIn("variable_Counter", report)
-        self.assertIn("runtime_oam_shadow", report)
+        self.assertNotIn("runtime_oam_shadow", report)
         self.assertIn("runtime_frame_counter", report)
         self.assertIn("runtime_frame_ready", report)
         self.assertIn("runtime_last_processed_frame", report)
@@ -314,6 +349,12 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertIn("runtime_controller_polled_frame", report)
         self.assertIn("runtime_controller_poll_valid", report)
         self.assertIn("Available:", report)
+
+        sprite_report = generate_memory_map(
+            build_memory_layout(resolved_program(sprite_program()))
+        )
+        self.assertIn("$0200  $02FF   256  Runtime   OAM shadow", sprite_report)
+        self.assertIn("runtime_oam_shadow", sprite_report)
 
     def test_linker_configuration_and_memory_map_are_reproducible(self) -> None:
         program = resolved_program(small_program(("Counter", "Limit")))

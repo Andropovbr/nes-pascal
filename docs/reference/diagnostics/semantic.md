@@ -624,3 +624,91 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 - **Trigger:** Call `nes.load_background();` twice in the main block.
 - **Expected compiler output:** `E3037` points to the second call.
 - **Suggested fix:** Keep one initialization call and one configured asset.
+
+## E3038 - Invalid set-tile argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.set_tile` requires tile X, tile Y, and tile index.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/set_tile_argument_count.nsp`, or omit or add an
+  argument to `nes.set_tile`.
+- **Expected compiler output:** `E3038` reports the expected and actual count.
+- **Suggested fix:** Call `nes.set_tile(x, y, tile)` with three `byte` values.
+
+## E3039 - Invalid get-tile argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.get_tile` requires tile X and tile Y.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/get_tile_argument_count.nsp`, or omit or add an
+  argument to `nes.get_tile`.
+- **Expected compiler output:** `E3039` reports the expected and actual count.
+- **Suggested fix:** Call `nes.get_tile(x, y)` with two `byte` values.
+
+## E3040 - Invalid set-attribute argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.set_attribute` requires attribute X, attribute Y, and
+  one raw attribute byte.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/set_attribute_argument_count.nsp`.
+- **Expected compiler output:** `E3040` reports the expected and actual count.
+- **Suggested fix:** Call `nes.set_attribute(x, y, value)` with three `byte`
+  values.
+
+## E3041 - Invalid clear-background-updates argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.clear_background_updates()` takes no arguments.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/clear_background_updates_argument_count.nsp`.
+- **Expected compiler output:** `E3041` reports the provided count.
+- **Suggested fix:** Call `nes.clear_background_updates();` without arguments.
+
+## E3042 - Invalid tile coordinate
+
+- **Category:** Semantic Analysis
+- **Explanation:** A direct literal or constant tile coordinate is outside
+  nametable 0's logical 32-by-30 tile area.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/invalid_tile_coordinate.nsp`, use X above 31, or
+  use Y above 29 in `nes.set_tile` or `nes.get_tile`.
+- **Expected compiler output:** `E3042` identifies the coordinate and valid
+  range.
+- **Suggested fix:** Use X from 0 through 31 and Y from 0 through 29. Dynamic
+  coordinates are checked by the runtime.
+
+## E3043 - Invalid attribute coordinate
+
+- **Category:** Semantic Analysis
+- **Explanation:** A direct literal or constant attribute coordinate is outside
+  the hardware 8-by-8 attribute-entry grid for nametable 0.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/invalid_attribute_coordinate.nsp`, use X above 7,
+  or use Y above 7 in `nes.set_attribute`.
+- **Expected compiler output:** `E3043` identifies the coordinate and valid
+  range.
+- **Suggested fix:** Use X and Y from 0 through 7. Dynamic coordinates are
+  checked by the runtime.
+
+## E3044 - Invalid background-overflow query argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.background_updates_overflowed()` reads one fixed
+  runtime flag and takes no arguments.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/background_updates_overflowed_argument_count.nsp`.
+- **Expected compiler output:** `E3044` reports the provided count.
+- **Suggested fix:** Call `nes.background_updates_overflowed()` without
+  arguments and use its `boolean` result.
+
+## E3045 - Invalid background-overflow clear argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.clear_background_update_overflow()` clears one fixed
+  runtime flag and takes no arguments.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/clear_background_update_overflow_argument_count.nsp`.
+- **Expected compiler output:** `E3045` reports the provided count.
+- **Suggested fix:** Call `nes.clear_background_update_overflow();` without
+  arguments.

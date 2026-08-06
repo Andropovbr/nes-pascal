@@ -52,9 +52,10 @@ the supported language.
 - One raw, exactly 8 KiB CHR-ROM file is supported. CHR-RAM, multiple files or
   banks, graphics conversion, compression, and runtime CHR updates are not.
 - One raw 1 KiB nametable for nametable 0 is supported during initialization,
-  either combined or as 960 tile bytes plus 64 attribute bytes. Multiple
-  screens, runtime tile updates, generated nametables, alternate nametable
-  selection, and background scrolling are not supported.
+  either combined or as 960 tile bytes plus 64 attribute bytes, followed by at
+  most four queued tile or raw attribute-byte updates per frame. Multiple
+  screens, generated nametables, alternate nametable selection, background
+  scrolling, and streaming are not supported.
 - Standard controllers 1 and 2 are supported without remapping, Four Score,
   expansion devices, buffering, combos, turbo, or DMC-safe repeated reads.
 - General sprites, audio, and converted graphics assets are not supported.

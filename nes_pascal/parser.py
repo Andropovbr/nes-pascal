@@ -2,6 +2,7 @@
 
 from .ast import (
     Assignment,
+    BackgroundUpdatesOverflowed,
     BinaryExpression,
     BinaryOperator,
     BooleanBinaryExpression,
@@ -12,6 +13,8 @@ from .ast import (
     BuiltInType,
     CallbackKind,
     CallbackRegistration,
+    ClearBackgroundUpdates,
+    ClearBackgroundUpdateOverflow,
     ControllerQuery,
     ControllerQueryKind,
     ConstantDeclaration,
@@ -22,6 +25,7 @@ from .ast import (
     DecrementStatement,
     ForDirection,
     ForStatement,
+    GetTile,
     HexLiteral,
     IfStatement,
     IncrementStatement,
@@ -35,9 +39,11 @@ from .ast import (
     RepeatStatement,
     Run,
     SetBackgroundColor,
+    SetAttribute,
     SetPalette,
     SetPaletteColor,
     SetSpriteZero,
+    SetTile,
     SourcePosition,
     Statement,
     UnaryExpression,
@@ -356,6 +362,24 @@ class Parser:
                     "Expected ';' after 'nes.load_background()'.",
                 )
             return LoadBackground(
+                arguments,
+                SourcePosition(namespace.line, namespace.column),
+            )
+        background_update_commands = {
+            "nes.set_tile": SetTile,
+            "nes.set_attribute": SetAttribute,
+            "nes.clear_background_updates": ClearBackgroundUpdates,
+            "nes.clear_background_update_overflow": ClearBackgroundUpdateOverflow,
+        }
+        background_update = background_update_commands.get(normalized)
+        if background_update is not None:
+            arguments = self._parse_expression_arguments(normalized)
+            if consume_terminator:
+                self._expect(
+                    TokenKind.SEMICOLON,
+                    f"Expected ';' after '{normalized}(...)'.",
+                )
+            return background_update(
                 arguments,
                 SourcePosition(namespace.line, namespace.column),
             )
@@ -830,6 +854,16 @@ class Parser:
                         self._parse_expression_arguments(normalized),
                         position,
                     )
+                if normalized == "nes.get_tile":
+                    return GetTile(
+                        self._parse_expression_arguments(normalized),
+                        position,
+                    )
+                if normalized == "nes.background_updates_overflowed":
+                    return BackgroundUpdatesOverflowed(
+                        self._parse_expression_arguments(normalized),
+                        position,
+                    )
                 return ConstantReference(qualified_name, position)
             if token.text.lower() in (
                 self.variable_names | self.parameter_names
@@ -859,7 +893,8 @@ class Parser:
             f"Unknown command: {name}.",
             "Use an assignment, procedure call, inc/dec update, "
             "control-flow statement, "
-            "nes.load_background();, a nes.set_* palette call, "
+            "nes.load_background();, a background tile/attribute update, "
+            "a nes.set_* palette call, "
             "nes.set_sprite_zero(...);, "
             "nes.on_update(Procedure);, nes.on_vblank(Procedure);, "
             "nes.wait_frame;, or nes.run;.",

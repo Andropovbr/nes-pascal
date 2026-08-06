@@ -32,9 +32,6 @@ variable_BackgroundColor: .res 1 ; $0080: BackgroundColor: nes_color
 variable_FrameCounter: .res 1 ; $0081: FrameCounter: byte
 variable_NextFrameCounter: .res 1 ; $0082: NextFrameCounter: byte
 
-.segment "OAM_SHADOW"
-; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
-runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime sprite support
 
 .segment "RUNTIME_DATA"
 ; Runtime: regular-RAM state kept separate from user variables
@@ -42,11 +39,11 @@ runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
-variable_RenderingEnabled: .res 1 ; $0300: RenderingEnabled: boolean
-variable_ExpectedState: .res 1 ; $0301: ExpectedState: boolean
-parameter_InitializeCounters_Start: .res 1 ; $0302: InitializeCounters.Start: byte
-parameter_InitializeCounters_Increment: .res 1 ; $0303: InitializeCounters.Increment: byte
-parameter_InitializeCounters_EnabledValue: .res 1 ; $0304: InitializeCounters.EnabledValue: boolean
+variable_RenderingEnabled: .res 1 ; $0200: RenderingEnabled: boolean
+variable_ExpectedState: .res 1 ; $0201: ExpectedState: boolean
+parameter_InitializeCounters_Start: .res 1 ; $0202: InitializeCounters.Start: byte
+parameter_InitializeCounters_Increment: .res 1 ; $0203: InitializeCounters.Increment: byte
+parameter_InitializeCounters_EnabledValue: .res 1 ; $0204: InitializeCounters.EnabledValue: boolean
 
 .segment "CODE"
 

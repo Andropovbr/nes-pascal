@@ -28,6 +28,7 @@ python -m nes_pascal.cli examples/controller_input.nsp -o build/controller_input
 python -m nes_pascal.cli examples/chr_asset.nsp -o build/chr_asset.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/palette_support.nsp -o build/palette_support.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
+python -m nes_pascal.cli examples/background_updates.nsp -o build/background_updates.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
 ```
 
 The examples demonstrate:
@@ -60,6 +61,9 @@ The examples demonstrate:
   palettes, then a safely queued full and individual palette update.
 - `nametable_loading.nsp`: one project-relative raw 1 KiB nametable uploaded
   completely, including its attribute table, before rendering starts.
+- `background_updates.nsp`: bounded and repeated tile writes, confirmed-shadow
+  reads, rejected tile and attribute overflow, pending cancellation, explicit
+  overflow clearing, and one raw attribute update after runtime starts.
 
 The loop, counting, and procedure-parameter examples select background color
 `$21` only when their expected final states are reached.
@@ -108,6 +112,12 @@ The options are mutually exclusive forms. Split options must appear together.
 Paths follow the same source-relative and normalized rules as `--chr`. See
 [Background loading](../runtime/background-loading.md) for the raw layout,
 initialization behavior, and current single-screen limits.
+
+After `nes.run`, use `nes.set_tile`, `nes.get_tile`, `nes.set_attribute`,
+`nes.clear_background_updates`, `nes.background_updates_overflowed`, and
+`nes.clear_background_update_overflow` as described in
+[Runtime background updates](../runtime/background-updates.md). At most four
+tile or attribute bytes are uploaded during each VBlank.
 
 ## Running in Mesen
 

@@ -53,6 +53,9 @@ PPU address latch, selects `$2000`, and copies all four 256-byte pages through
 `$2007`. Later initialization commands may configure palettes. `nes.run` waits
 for VBlank, restores the current PPU state, and then enables rendering.
 
-This is initialization-only support for nametable 0. Runtime tile or attribute
-updates, multiple screens, mirroring selection, scrolling, and asset conversion
-belong to later milestones.
+This remains the initialization-only bulk upload for nametable 0. After
+`nes.run`, bounded single-byte tile and attribute changes use the
+[runtime background update APIs](background-updates.md). Multiple screens,
+mirroring selection, scrolling, and asset conversion remain unsupported.
+If `nes.get_tile` is linked without this command, RESET instead zeroes
+nametable 0 so the confirmed RAM shadow starts consistent with the PPU.

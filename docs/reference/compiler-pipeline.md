@@ -34,8 +34,8 @@ The compiler pipeline is deliberately separated:
   emits left-to-right argument copies before procedure calls. It also owns the
   initialization nametable upload, minimal NMI handler, VBlank-safe runtime
   transition, frame-counter wait sequence, persistent last-processed frame
-  state, isolated serial controller reader, guarded controller polling, and
-  direct static callback calls;
+  state, isolated serial controller reader, guarded controller polling, bounded
+  background queue, confirmed tile shadow, and direct static callback calls;
 - `cli.py` writes Assembly, the generated `.cfg` linker configuration, and the
   `.map` CPU memory report before coordinating ca65 and ld65.
 

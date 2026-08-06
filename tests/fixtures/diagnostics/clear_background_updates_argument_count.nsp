@@ -1,0 +1,6 @@
+program InvalidClearBackgroundUpdatesArguments;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+    nes.clear_background_updates($00);
+end.

@@ -37,9 +37,6 @@ variable_Counter: .res 1 ; $0080: Counter: byte
 variable_Sum: .res 1 ; $0081: Sum: byte
 variable_BackgroundColor: .res 1 ; $0082: BackgroundColor: nes_color
 
-.segment "OAM_SHADOW"
-; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
-runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime sprite support
 
 .segment "RUNTIME_DATA"
 ; Runtime: regular-RAM state kept separate from user variables
@@ -47,11 +44,11 @@ runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
-variable_Index: .res 1 ; $0300: Index: byte
-variable_Reverse: .res 1 ; $0301: Reverse: byte
-variable_Edge: .res 1 ; $0302: Edge: byte
-variable_Outer: .res 1 ; $0303: Outer: byte
-variable_Inner: .res 1 ; $0304: Inner: byte
+variable_Index: .res 1 ; $0200: Index: byte
+variable_Reverse: .res 1 ; $0201: Reverse: byte
+variable_Edge: .res 1 ; $0202: Edge: byte
+variable_Outer: .res 1 ; $0203: Outer: byte
+variable_Inner: .res 1 ; $0204: Inner: byte
 
 .segment "CODE"
 
