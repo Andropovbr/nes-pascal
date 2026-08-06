@@ -30,9 +30,6 @@ expression_temporary_1: .res 1 ; $0011: reusable expression evaluation byte
 ; Source: optional global-variable promotion with regular-RAM fallback
     ; no globals selected for automatic promotion
 
-.segment "OAM_SHADOW"
-; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
-runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime sprite support
 
 .segment "RUNTIME_DATA"
 ; Runtime: regular-RAM state kept separate from user variables
@@ -40,9 +37,9 @@ runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
-variable_Counter: .res 1 ; $0300: Counter: byte
-variable_Result: .res 1 ; $0301: Result: byte
-variable_BackgroundColor: .res 1 ; $0302: BackgroundColor: nes_color
+variable_Counter: .res 1 ; $0200: Counter: byte
+variable_Result: .res 1 ; $0201: Result: byte
+variable_BackgroundColor: .res 1 ; $0202: BackgroundColor: nes_color
 
 .segment "CODE"
 

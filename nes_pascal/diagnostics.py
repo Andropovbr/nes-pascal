@@ -55,6 +55,14 @@ class DiagnosticCode(StrEnum):
     INVALID_BACKGROUND_LOAD_ARGUMENT_COUNT = "E3035"
     BACKGROUND_LOAD_AFTER_RUN = "E3036"
     DUPLICATE_BACKGROUND_LOAD = "E3037"
+    INVALID_SET_TILE_ARGUMENT_COUNT = "E3038"
+    INVALID_GET_TILE_ARGUMENT_COUNT = "E3039"
+    INVALID_SET_ATTRIBUTE_ARGUMENT_COUNT = "E3040"
+    INVALID_CLEAR_BACKGROUND_UPDATES_ARGUMENT_COUNT = "E3041"
+    INVALID_TILE_COORDINATE = "E3042"
+    INVALID_ATTRIBUTE_COORDINATE = "E3043"
+    INVALID_BACKGROUND_OVERFLOW_QUERY_ARGUMENT_COUNT = "E3044"
+    INVALID_BACKGROUND_OVERFLOW_CLEAR_ARGUMENT_COUNT = "E3045"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -209,6 +217,36 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     DiagnosticCode.DUPLICATE_BACKGROUND_LOAD: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Duplicate background load"
     ),
+    DiagnosticCode.INVALID_SET_TILE_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid set-tile argument count"
+    ),
+    DiagnosticCode.INVALID_GET_TILE_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid get-tile argument count"
+    ),
+    DiagnosticCode.INVALID_SET_ATTRIBUTE_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid set-attribute argument count"
+    ),
+    DiagnosticCode.INVALID_CLEAR_BACKGROUND_UPDATES_ARGUMENT_COUNT:
+        DiagnosticDefinition(
+            DiagnosticCategory.SEMANTIC,
+            "Invalid clear-background-updates argument count",
+        ),
+    DiagnosticCode.INVALID_TILE_COORDINATE: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid tile coordinate"
+    ),
+    DiagnosticCode.INVALID_ATTRIBUTE_COORDINATE: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid attribute coordinate"
+    ),
+    DiagnosticCode.INVALID_BACKGROUND_OVERFLOW_QUERY_ARGUMENT_COUNT:
+        DiagnosticDefinition(
+            DiagnosticCategory.SEMANTIC,
+            "Invalid background-overflow query argument count",
+        ),
+    DiagnosticCode.INVALID_BACKGROUND_OVERFLOW_CLEAR_ARGUMENT_COUNT:
+        DiagnosticDefinition(
+            DiagnosticCategory.SEMANTIC,
+            "Invalid background-overflow clear argument count",
+        ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"
     ),

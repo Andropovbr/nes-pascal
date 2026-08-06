@@ -12,16 +12,20 @@ from .ast import (
     PaletteKind,
     ResolvedLoadBackground,
     ResolvedAssignment,
+    ResolvedBackgroundUpdatesOverflowed,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
     ResolvedBreakStatement,
     ResolvedCallbackRegistration,
+    ResolvedClearBackgroundUpdates,
+    ResolvedClearBackgroundUpdateOverflow,
     ResolvedComparisonExpression,
     ResolvedControllerQuery,
     ResolvedContinueStatement,
     ResolvedDecrementStatement,
     ResolvedForStatement,
+    ResolvedGetTile,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
     ResolvedProgram,
@@ -29,9 +33,11 @@ from .ast import (
     ResolvedProcedureCall,
     ResolvedRepeatStatement,
     ResolvedSetBackgroundColor,
+    ResolvedSetAttribute,
     ResolvedSetPalette,
     ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
+    ResolvedSetTile,
     ResolvedStatement,
     ResolvedUnaryExpression,
     ResolvedValue,
@@ -41,7 +47,12 @@ from .ast import (
     VariableValue,
     WaitFrame,
 )
-from .memory_layout import ProgramMemoryLayout, build_memory_layout
+from .memory_layout import (
+    BackgroundRuntimeFeatures,
+    ProgramMemoryLayout,
+    build_memory_layout,
+    detect_background_runtime_features,
+)
 
 
 def generate(
@@ -101,14 +112,10 @@ def generate(
         f" ; ${symbol.address:04X}: {symbol.source_name}: {symbol.type_name}"
         for symbol in layout.regular_user_symbols
     ] or ["    ; no user variables"]
-    oam_symbol = next(
+    oam_symbols = tuple(
         symbol
         for symbol in layout.runtime_symbols
         if symbol.region_name == layout.oam_shadow.name
-    )
-    oam_declaration = (
-        f"{oam_symbol.assembly_symbol}: .res {oam_symbol.size}"
-        f" ; ${oam_symbol.address:04X}: {oam_symbol.purpose}"
     )
     runtime_data_lines = [
         f"{symbol.assembly_symbol}: .res {symbol.size}"
@@ -124,6 +131,19 @@ def generate(
         symbol.assembly_symbol == "runtime_palette_shadow"
         for symbol in layout.runtime_symbols
     )
+    oam_storage = (
+        '.segment "OAM_SHADOW"\n'
+        f"; Runtime: page-aligned OAM DMA shadow at "
+        f"${layout.oam_shadow.start:04X}-${layout.oam_shadow.end:04X}\n"
+        f"{oam_symbols[0].assembly_symbol}: .res {oam_symbols[0].size}"
+        f" ; ${oam_symbols[0].address:04X}: {oam_symbols[0].purpose}\n"
+        if oam_symbols
+        else ""
+    )
+    background_features = detect_background_runtime_features(program)
+    background_shadow_enabled = background_features.shadow
+    background_queue_enabled = background_features.queue
+    ppu_state_enabled = palette_runtime_enabled or background_queue_enabled
     custom_sprite_palette_initialized = _has_initial_sprite_palette(
         program.statements
     )
@@ -137,6 +157,9 @@ def generate(
         for_counter,
         sprite_zero_enabled,
         palette_runtime_enabled,
+        background_queue_enabled,
+        background_shadow_enabled,
+        ppu_state_enabled,
         sprite_zero_enabled and not custom_sprite_palette_initialized,
     )
     procedure_lines = _generate_procedures(
@@ -145,6 +168,9 @@ def generate(
         for_counter,
         sprite_zero_enabled,
         palette_runtime_enabled,
+        background_queue_enabled,
+        background_shadow_enabled,
+        ppu_state_enabled,
         sprite_zero_enabled and not custom_sprite_palette_initialized,
     )
 
@@ -237,13 +263,30 @@ def generate(
         if palette_runtime_enabled
         else ""
     )
+    empty_background_initialization = (
+        _generate_empty_background_initialization()
+        if background_shadow_enabled and background_data is None
+        else ""
+    )
+    background_nmi_work = (
+        "\n\n    ; Runtime: consume at most four queued background writes in VBlank\n"
+        "    jsr runtime_upload_queued_background"
+        if background_queue_enabled
+        else ""
+    )
     nmi_work = (
-        f"{sprite_nmi_work}{palette_nmi_work}{vblank_callback_call}"
-        if palette_runtime_enabled
+        f"{sprite_nmi_work}{palette_nmi_work}"
+        f"{background_nmi_work}{vblank_callback_call}"
+        if ppu_state_enabled
         else f"{vblank_callback_call}{sprite_nmi_work}"
     )
     palette_runtime_routine = (
         _generate_palette_upload_routine() if palette_runtime_enabled else ""
+    )
+    background_runtime_routines = (
+        _generate_background_runtime_routines(background_features)
+        if background_queue_enabled or background_shadow_enabled
+        else ""
     )
     chr_storage = _generate_chr_storage(
         settings.chr_rom_size,
@@ -273,10 +316,7 @@ def generate(
 ; Source: optional global-variable promotion with regular-RAM fallback
 {promoted_user_storage}
 
-.segment "OAM_SHADOW"
-; Runtime: page-aligned OAM DMA shadow at ${layout.oam_shadow.start:04X}-${layout.oam_shadow.end:04X}
-{oam_declaration}
-
+{oam_storage}
 .segment "RUNTIME_DATA"
 ; Runtime: regular-RAM state kept separate from user variables
 {runtime_data_storage}
@@ -336,7 +376,7 @@ RESET:
 @wait_vblank_2:
     bit $2002
     bpl @wait_vblank_2
-{statements}
+{empty_background_initialization}{statements}
 
 {runtime_main_loop}
 
@@ -380,7 +420,7 @@ runtime_read_controller_ports:
     ror runtime_controller_2_current
     dex
     bne @read_controller_bits
-    rts{palette_runtime_routine}
+    rts{palette_runtime_routine}{background_runtime_routines}
 {procedures}{background_storage}
 
 .segment "VECTORS"
@@ -400,6 +440,9 @@ def _generate_statements(
     for_counter: list[int],
     sprite_zero_enabled: bool,
     palette_runtime_enabled: bool,
+    background_queue_enabled: bool,
+    background_shadow_enabled: bool,
+    ppu_state_enabled: bool,
     default_sprite_palette_enabled: bool,
 ) -> list[str]:
     statement_lines: list[str] = []
@@ -453,7 +496,9 @@ def _generate_statements(
                 )
             )
         elif isinstance(statement, ResolvedLoadBackground):
-            statement_lines.extend(_generate_background_upload())
+            statement_lines.extend(
+                _generate_background_upload(background_shadow_enabled)
+            )
         elif isinstance(statement, Run):
             wait_vblank_label = _new_label(
                 label_counter,
@@ -505,7 +550,7 @@ def _generate_statements(
                     "    lda runtime_ppuctrl_shadow",
                     "    sta $2000               ; enable NMI after initialization",
                 ]
-                if palette_runtime_enabled
+                if ppu_state_enabled
                 else [
                     "    lda #$00",
                     "    sta $2005               ; scroll X",
@@ -565,6 +610,66 @@ def _generate_statements(
                     "    sta runtime_sprite_zero_ready",
                 ]
             )
+        elif isinstance(statement, ResolvedSetTile):
+            statement_lines.extend(
+                [
+                    "",
+                    "; Source: nes.set_tile(x, y, tile)",
+                    *_load_value(statement.x, label_counter),
+                    "    pha                     ; preserve X across expressions",
+                    *_load_value(statement.y, label_counter),
+                    "    pha                     ; preserve Y across tile expression",
+                    *_load_value(statement.tile, label_counter),
+                    "    sta runtime_background_pending_value",
+                    "    pla",
+                    "    sta runtime_background_y",
+                    "    pla",
+                    "    sta runtime_background_x",
+                    "    jsr runtime_set_tile",
+                ]
+            )
+        elif isinstance(statement, ResolvedSetAttribute):
+            statement_lines.extend(
+                [
+                    "",
+                    "; Source: nes.set_attribute(x, y, value)",
+                    *_load_value(statement.x, label_counter),
+                    "    pha                     ; preserve X across expressions",
+                    *_load_value(statement.y, label_counter),
+                    "    pha                     ; preserve Y across value expression",
+                    *_load_value(statement.value, label_counter),
+                    "    sta runtime_background_pending_value",
+                    "    pla",
+                    "    sta runtime_background_y",
+                    "    pla",
+                    "    sta runtime_background_x",
+                    "    jsr runtime_set_attribute",
+                ]
+            )
+        elif isinstance(statement, ResolvedClearBackgroundUpdates):
+            statement_lines.extend(
+                [
+                    "",
+                    "; Source: nes.clear_background_updates()",
+                    "    lda #$01",
+                    "    sta runtime_background_queue_cancel_lock ; block whole-queue NMI consumption",
+                    "    lda #$00",
+                    "    sta runtime_background_queue_ready",
+                    "    sta runtime_background_queue_ready + 1",
+                    "    sta runtime_background_queue_ready + 2",
+                    "    sta runtime_background_queue_ready + 3",
+                    "    sta runtime_background_queue_cancel_lock ; release after every slot is cancelled",
+                ]
+            )
+        elif isinstance(statement, ResolvedClearBackgroundUpdateOverflow):
+            statement_lines.extend(
+                [
+                    "",
+                    "; Source: nes.clear_background_update_overflow()",
+                    "    lda #$00",
+                    "    sta runtime_background_queue_overflow",
+                ]
+            )
         elif isinstance(statement, ResolvedIfStatement):
             then_label = _new_label(label_counter, "if_then")
             end_label = _new_label(label_counter, "if_end")
@@ -589,6 +694,9 @@ def _generate_statements(
                         for_counter,
                         sprite_zero_enabled,
                         palette_runtime_enabled,
+                        background_queue_enabled,
+                        background_shadow_enabled,
+                        ppu_state_enabled,
                         default_sprite_palette_enabled,
                     ),
                 ]
@@ -605,6 +713,9 @@ def _generate_statements(
                             for_counter,
                             sprite_zero_enabled,
                             palette_runtime_enabled,
+                            background_queue_enabled,
+                            background_shadow_enabled,
+                            ppu_state_enabled,
                             default_sprite_palette_enabled,
                         ),
                     ]
@@ -631,6 +742,9 @@ def _generate_statements(
                         for_counter,
                         sprite_zero_enabled,
                         palette_runtime_enabled,
+                        background_queue_enabled,
+                        background_shadow_enabled,
+                        ppu_state_enabled,
                         default_sprite_palette_enabled,
                     ),
                     f"    jmp {condition_label}",
@@ -653,6 +767,9 @@ def _generate_statements(
                         for_counter,
                         sprite_zero_enabled,
                         palette_runtime_enabled,
+                        background_queue_enabled,
+                        background_shadow_enabled,
+                        ppu_state_enabled,
                         default_sprite_palette_enabled,
                     ),
                     f"{condition_label}:",
@@ -714,6 +831,9 @@ def _generate_statements(
                         for_counter,
                         sprite_zero_enabled,
                         palette_runtime_enabled,
+                        background_queue_enabled,
+                        background_shadow_enabled,
+                        ppu_state_enabled,
                         default_sprite_palette_enabled,
                     ),
                     f"{step_label}:",
@@ -1023,7 +1143,250 @@ def _generate_palette_upload_routine() -> str:
     return "\n".join(lines)
 
 
-def _generate_background_upload() -> list[str]:
+def _generate_background_runtime_routines(
+    features: BackgroundRuntimeFeatures,
+) -> str:
+    sections: list[str] = []
+    if features.queue:
+        shadow_confirmation = (
+            """
+    ; Confirm a tile only after its PPU write has completed.
+    lda runtime_background_queue_high, x
+    cmp #$23
+    bcc @confirm_tile_lower_page
+    bne @background_upload_next
+    lda runtime_background_queue_low, x
+    cmp #$C0
+    bcs @background_upload_next ; $23C0-$23FF contains attributes
+    ldy runtime_background_queue_low, x
+    lda runtime_background_queue_value, x
+    sta runtime_background_shadow + $0300, y
+    jmp @background_upload_next
+@confirm_tile_lower_page:
+    ldy runtime_background_queue_low, x
+    cmp #$20
+    beq @confirm_tile_page_0
+    cmp #$21
+    beq @confirm_tile_page_1
+    lda runtime_background_queue_value, x
+    sta runtime_background_shadow + $0200, y
+    jmp @background_upload_next
+@confirm_tile_page_0:
+    lda runtime_background_queue_value, x
+    sta runtime_background_shadow, y
+    jmp @background_upload_next
+@confirm_tile_page_1:
+    lda runtime_background_queue_value, x
+    sta runtime_background_shadow + $0100, y"""
+            if features.shadow
+            else ""
+        )
+        lock_check = (
+            "    lda runtime_background_queue_cancel_lock\n"
+            "    bne @background_upload_locked ; cancellation owns the whole queue\n"
+            if features.cancellation_lock
+            else ""
+        )
+        locked_label = (
+            "@background_upload_locked:\n"
+            if features.cancellation_lock
+            else ""
+        )
+        queue_writer_routine = (
+            """
+
+; Runtime: publish one PPU write only after every slot byte is complete
+runtime_queue_background_write:
+    ldx #$00
+@background_find_slot:
+    lda runtime_background_queue_ready, x
+    beq @background_slot_found
+    inx
+    cpx #$04
+    bne @background_find_slot
+    lda #$01
+    sta runtime_background_queue_overflow ; sticky until explicitly cleared
+    sec                     ; rejected: no queue slot was modified
+    rts
+@background_slot_found:
+    lda runtime_background_x
+    sta runtime_background_queue_high, x
+    lda runtime_background_y
+    sta runtime_background_queue_low, x
+    lda runtime_background_pending_value
+    sta runtime_background_queue_value, x
+    lda #$01
+    sta runtime_background_queue_ready, x ; atomic publication is last
+    clc                     ; accepted for the next NMI
+    rts"""
+            if features.queue_writer
+            else ""
+        )
+        sections.append(
+            f"""
+
+; Runtime: bounded four-slot background update uploader
+runtime_upload_queued_background:
+{lock_check}    ldx #$00
+@background_upload_loop:
+    lda runtime_background_queue_ready, x
+    beq @background_upload_next
+    lda #$00
+    sta runtime_background_queue_ready, x ; consume only a published slot
+    bit $2002               ; reset PPU address latch
+    lda runtime_background_queue_high, x
+    sta $2006
+    lda runtime_background_queue_low, x
+    sta $2006
+    lda runtime_background_queue_value, x
+    sta $2007{shadow_confirmation}
+@background_upload_next:
+    inx
+    cpx #$04
+    bne @background_upload_loop
+    lda runtime_ppuctrl_shadow
+    sta $2000               ; restore compiler-owned PPU state
+    lda runtime_scroll_x_shadow
+    sta $2005
+    lda runtime_scroll_y_shadow
+    sta $2005
+{locked_label}    rts{queue_writer_routine}"""
+        )
+
+    if features.tile_index:
+        sections.append(
+            """
+
+; Runtime: validate (x: 0..31, y: 0..29) and compute y * 32 + x
+runtime_prepare_tile_index:
+    lda runtime_background_y
+    cmp #$1E
+    bcs @tile_coordinate_invalid
+    and #$07
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    clc
+    adc runtime_background_x
+    sta runtime_background_index_low
+    lda runtime_background_x
+    cmp #$20
+    bcs @tile_coordinate_invalid
+    lda runtime_background_y
+    lsr a
+    lsr a
+    lsr a
+    sta runtime_background_index_page
+    clc
+    rts
+@tile_coordinate_invalid:
+    sec
+    rts"""
+        )
+
+    if features.set_tile:
+        sections.append(
+            """
+
+runtime_set_tile:
+    jsr runtime_prepare_tile_index
+    bcs @set_tile_done
+    lda runtime_background_index_page
+    clc
+    adc #$20
+    sta runtime_background_x ; queue PPU address high byte
+    lda runtime_background_index_low
+    sta runtime_background_y ; queue PPU address low byte
+    jsr runtime_queue_background_write
+@set_tile_done:
+    rts"""
+        )
+
+    if features.set_attribute:
+        sections.append(
+            """
+
+runtime_set_attribute:
+    lda runtime_background_x
+    cmp #$08
+    bcs @set_attribute_done
+    lda runtime_background_y
+    cmp #$08
+    bcs @set_attribute_done
+    asl a
+    asl a
+    asl a
+    clc
+    adc runtime_background_x
+    clc
+    adc #$C0
+    sta runtime_background_y ; queue PPU address low byte
+    lda #$23
+    sta runtime_background_x ; queue PPU address high byte
+    jsr runtime_queue_background_write
+@set_attribute_done:
+    rts"""
+        )
+
+    if features.get_tile:
+        sections.append(
+            """
+
+runtime_get_tile:
+    jsr runtime_prepare_tile_index
+    bcs @get_tile_invalid
+    ldx runtime_background_index_low
+    lda runtime_background_index_page
+    beq @get_tile_page_0
+    cmp #$01
+    beq @get_tile_page_1
+    cmp #$02
+    beq @get_tile_page_2
+    lda runtime_background_shadow + $0300, x
+    rts
+@get_tile_page_0:
+    lda runtime_background_shadow, x
+    rts
+@get_tile_page_1:
+    lda runtime_background_shadow + $0100, x
+    rts
+@get_tile_page_2:
+    lda runtime_background_shadow + $0200, x
+    rts
+@get_tile_invalid:
+    lda #$00
+    rts"""
+        )
+    return "".join(sections)
+
+
+def _generate_empty_background_initialization() -> str:
+    lines = [
+        "",
+        "; Runtime: establish a zeroed nametable matching the confirmed shadow",
+        "    bit $2002               ; reset PPU address latch",
+        "    lda #$20",
+        "    sta $2006",
+        "    lda #$00",
+        "    sta $2006",
+        "    ldx #$00",
+    ]
+    for page in range(4):
+        label = f"@clear_background_page_{page}"
+        lines.extend(
+            [
+                f"{label}:",
+                "    sta $2007",
+                "    inx",
+                f"    bne {label}",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def _generate_background_upload(background_shadow_enabled: bool) -> list[str]:
     lines = [
         "",
         "; Source: nes.load_background()",
@@ -1037,7 +1400,7 @@ def _generate_background_upload() -> list[str]:
         "    sta $2006               ; nametable 0 address, low byte",
         "    ldx #$00",
     ]
-    for page in range(4):
+    for page in range(3 if background_shadow_enabled else 4):
         offset = "" if page == 0 else f" + ${page * 0x100:04X}"
         label = f"@upload_background_page_{page}"
         lines.extend(
@@ -1045,8 +1408,30 @@ def _generate_background_upload() -> list[str]:
                 f"{label}:",
                 f"    lda background_nametable_data{offset}, x",
                 "    sta $2007",
+                *(
+                    [f"    sta runtime_background_shadow{offset}, x"]
+                    if background_shadow_enabled
+                    else []
+                ),
                 "    inx",
                 f"    bne {label}",
+            ]
+        )
+    if background_shadow_enabled:
+        lines.extend(
+            [
+                "@upload_background_page_3_tiles:",
+                "    lda background_nametable_data + $0300, x",
+                "    sta $2007",
+                "    sta runtime_background_shadow + $0300, x",
+                "    inx",
+                "    cpx #$C0",
+                "    bne @upload_background_page_3_tiles",
+                "@upload_background_attributes:",
+                "    lda background_nametable_data + $0300, x",
+                "    sta $2007",
+                "    inx",
+                "    bne @upload_background_attributes",
             ]
         )
     return lines
@@ -1074,6 +1459,9 @@ def _generate_procedures(
     for_counter: list[int],
     sprite_zero_enabled: bool,
     palette_runtime_enabled: bool,
+    background_queue_enabled: bool,
+    background_shadow_enabled: bool,
+    ppu_state_enabled: bool,
     default_sprite_palette_enabled: bool,
 ) -> list[str]:
     lines: list[str] = []
@@ -1091,6 +1479,9 @@ def _generate_procedures(
                     for_counter,
                     sprite_zero_enabled,
                     palette_runtime_enabled,
+                    background_queue_enabled,
+                    background_shadow_enabled,
+                    ppu_state_enabled,
                     default_sprite_palette_enabled,
                 ),
                 "    rts",
@@ -1151,6 +1542,13 @@ def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
         return [f"    lda {value.variable.label}"]
     if isinstance(value, ResolvedControllerQuery):
         return _load_controller_query(value, label_counter)
+    if isinstance(value, ResolvedBackgroundUpdatesOverflowed):
+        return [
+            "    ; nes.background_updates_overflowed(): sticky queue state",
+            "    lda runtime_background_queue_overflow",
+        ]
+    if isinstance(value, ResolvedGetTile):
+        return _load_get_tile(value, 0, label_counter)
     if isinstance(value, ResolvedUnaryExpression):
         lines = _load_value(value.operand, label_counter)
         if value.operator is UnaryOperator.PLUS:
@@ -1221,6 +1619,23 @@ def _load_controller_query(
     ]
 
 
+def _load_get_tile(
+    query: ResolvedGetTile,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
+    return [
+        "    ; nes.get_tile(x, y): read the confirmed PPU tile shadow",
+        *_load_value_at_depth(query.x, depth, label_counter),
+        "    pha                     ; preserve X across Y expression",
+        *_load_value_at_depth(query.y, depth, label_counter),
+        "    sta runtime_background_y",
+        "    pla",
+        "    sta runtime_background_x",
+        "    jsr runtime_get_tile",
+    ]
+
+
 def _load_binary_expression(
     expression: ResolvedBinaryExpression,
     depth: int,
@@ -1244,6 +1659,8 @@ def _load_value_at_depth(
     depth: int,
     label_counter: list[int],
 ) -> list[str]:
+    if isinstance(value, ResolvedGetTile):
+        return _load_get_tile(value, depth, label_counter)
     if isinstance(value, ResolvedBinaryExpression):
         return _load_binary_expression(value, depth, label_counter)
     if isinstance(value, ResolvedComparisonExpression):

@@ -1,0 +1,50 @@
+program BackgroundUpdates;
+
+var
+    ReadBack: byte;
+    ConfirmedReadBack: byte;
+    RepeatedReadBack: byte;
+    CancelledReadBack: byte;
+    Overflowed: boolean;
+    OverflowAfterCancel: boolean;
+    OverflowCleared: boolean;
+    AttributeOverflowed: boolean;
+
+begin
+    nes.load_background();
+    nes.set_background_palette($00, $0F, $01, $11, $21);
+    nes.set_background_color($0F);
+    nes.run;
+    nes.set_tile($00, $00, $01);
+    nes.set_tile($01, $00, $02);
+    nes.set_tile($02, $00, $03);
+    nes.set_tile($03, $00, $04);
+    nes.set_tile($04, $00, $05);
+    ReadBack := nes.get_tile($04, $00);
+    Overflowed := nes.background_updates_overflowed();
+    nes.wait_frame;
+    ConfirmedReadBack := nes.get_tile($00, $00);
+
+    nes.set_tile($05, $00, $06);
+    nes.set_tile($05, $00, $07);
+    nes.wait_frame;
+    RepeatedReadBack := nes.get_tile($05, $00);
+
+    nes.set_tile($06, $00, $08);
+    nes.set_attribute($00, $00, $E4);
+    nes.clear_background_updates();
+    OverflowAfterCancel := nes.background_updates_overflowed();
+    nes.wait_frame;
+    CancelledReadBack := nes.get_tile($06, $00);
+    nes.clear_background_update_overflow();
+    OverflowCleared := nes.background_updates_overflowed();
+
+    nes.set_tile($07, $00, $09);
+    nes.set_tile($08, $00, $0A);
+    nes.set_tile($09, $00, $0B);
+    nes.set_attribute($00, $00, $E4);
+    nes.set_attribute($00, $00, $1B);
+    AttributeOverflowed := nes.background_updates_overflowed();
+    nes.wait_frame;
+    nes.clear_background_update_overflow();
+end.

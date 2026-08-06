@@ -30,9 +30,6 @@ expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
 variable_Frames: .res 1 ; $0080: Frames: byte
 variable_Running: .res 1 ; $0081: Running: boolean
 
-.segment "OAM_SHADOW"
-; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
-runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime sprite support
 
 .segment "RUNTIME_DATA"
 ; Runtime: regular-RAM state kept separate from user variables

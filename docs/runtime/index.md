@@ -10,6 +10,8 @@ APIs are:
   palettes and queue runtime changes for VBlank;
 - [`nes.load_background`](background-loading.md) uploads one configured raw
   nametable and its attribute table during initialization;
+- [Background update APIs](background-updates.md) optionally maintain a confirmed tile
+  shadow and queue at most four tile or attribute writes for each VBlank;
 - [`nes.run`](run.md) completes initialization, enables NMI and rendering at
   VBlank, and starts the frame-synchronized runtime phase;
 - [`nes.wait_frame`](wait-frame.md) waits for the volatile NMI frame counter

@@ -154,6 +154,18 @@ class ControllerQuery:
     position: SourcePosition
 
 
+@dataclass(frozen=True, slots=True)
+class GetTile:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class BackgroundUpdatesOverflowed:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
 ValueExpression = (
     HexLiteral
     | BooleanLiteral
@@ -165,6 +177,8 @@ ValueExpression = (
     | BooleanNotExpression
     | BooleanBinaryExpression
     | ControllerQuery
+    | GetTile
+    | BackgroundUpdatesOverflowed
 )
 
 
@@ -197,6 +211,30 @@ class SetPaletteColor:
 
 @dataclass(frozen=True, slots=True)
 class LoadBackground:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class SetTile:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class SetAttribute:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class ClearBackgroundUpdates:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class ClearBackgroundUpdateOverflow:
     arguments: tuple[ValueExpression, ...]
     position: SourcePosition
 
@@ -302,6 +340,10 @@ Statement = (
     | SetPalette
     | SetPaletteColor
     | LoadBackground
+    | SetTile
+    | SetAttribute
+    | ClearBackgroundUpdates
+    | ClearBackgroundUpdateOverflow
     | Run
     | WaitFrame
     | CallbackRegistration
@@ -395,6 +437,17 @@ class ResolvedControllerQuery:
     button_name: str
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedGetTile:
+    x: ResolvedValue
+    y: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedBackgroundUpdatesOverflowed:
+    pass
+
+
 ResolvedValue = (
     ImmediateValue
     | VariableValue
@@ -404,6 +457,8 @@ ResolvedValue = (
     | ResolvedBooleanNotExpression
     | ResolvedBooleanBinaryExpression
     | ResolvedControllerQuery
+    | ResolvedGetTile
+    | ResolvedBackgroundUpdatesOverflowed
 )
 
 
@@ -438,6 +493,30 @@ class ResolvedSetPaletteColor:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedLoadBackground:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedSetTile:
+    x: ResolvedValue
+    y: ResolvedValue
+    tile: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedSetAttribute:
+    x: ResolvedValue
+    y: ResolvedValue
+    value: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedClearBackgroundUpdates:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedClearBackgroundUpdateOverflow:
     pass
 
 
@@ -525,6 +604,10 @@ ResolvedStatement = (
     | ResolvedSetPalette
     | ResolvedSetPaletteColor
     | ResolvedLoadBackground
+    | ResolvedSetTile
+    | ResolvedSetAttribute
+    | ResolvedClearBackgroundUpdates
+    | ResolvedClearBackgroundUpdateOverflow
     | Run
     | WaitFrame
     | ResolvedCallbackRegistration

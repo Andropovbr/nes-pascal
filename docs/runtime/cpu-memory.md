@@ -13,10 +13,12 @@ and are never treated as additional storage.
 | `$0020-$007F` | 96 bytes | Reserved | Stable space for future explicit Zero Page declarations |
 | `$0080-$00FF` | 128 bytes | User | Optional automatic global-variable promotion |
 | `$0100-$01FF` | 256 bytes | Reserved | 6502 hardware stack |
-| `$0200-$02FF` | 256 bytes | Runtime | Page-aligned OAM shadow, symbol `runtime_oam_shadow` |
-| `$0300-$0304` | 0 or 5 bytes | Runtime | Fixed sprite-0 staging record, allocated only when used |
-| `$0300-$032B` or `$0305-$0330` | 0 or 44 bytes | Runtime | Palette shadow, atomic dirty flags, and PPU restoration state, allocated only for runtime palette calls |
-| `$0300-$07FF` | up to 1,280 bytes | User/free | Non-promoted globals and all procedure parameters |
+| `$0200-$02FF` | 0 or 256 bytes | Runtime | Page-aligned OAM shadow, linked only when fixed sprite-zero support is used |
+| from `$0200` without sprites, otherwise `$0300` | 0 or 5 bytes | Runtime | Fixed sprite-0 staging record, allocated only when used |
+| after earlier runtime blocks | 0 or 44 bytes | Runtime | Palette shadow, atomic dirty flags, and PPU restoration state, allocated only for runtime palette calls |
+| after earlier runtime blocks | 0 or 960 bytes | Runtime | Confirmed tile shadow, linked only by `nes.get_tile` |
+| after the optional tile shadow | 0 to 23 bytes | Runtime | Conditionally selected background queue, flags, and helper state |
+| from `$0200` without sprites, otherwise `$0300` | up to 1,536 or 1,280 bytes | User/free | Non-promoted globals and all procedure parameters |
 
 The Zero Page partitions are fixed and non-overlapping. Runtime and compiler
 allocations are mandatory. They never borrow from optional promotion space.
@@ -28,10 +30,13 @@ compiler storage. The compiler places reusable expression slots and cached
 `for` limits in `$0010-$001F`. Needing more than 16 temporary bytes is a
 compilation error.
 
-The fixed controller-example sprite helper conditionally reserves five bytes
-at `$0300-$0304`: four staged fields and an atomic publish flag. General user
-RAM then begins at `$0305`. Programs that do not use the helper reserve no
-scalar runtime data and keep general user RAM at `$0300`.
+The fixed controller-example sprite helper conditionally links the page-aligned
+256-byte OAM shadow at `$0200-$02FF` and reserves five bytes at `$0300-$0304`:
+four staged fields and an atomic publish flag. General user RAM then begins at
+`$0305`. Programs without sprite or OAM operations omit the symbol, Assembly
+segment, linker region, DMA code, and staging record. Their regular runtime and
+user allocation starts at `$0200`, making that 256-byte page available instead
+of reserving it implicitly.
 
 Programs with runtime palette calls reserve a 32-byte palette shadow, four
 background-palette flags, four sprite-palette flags, one universal-color flag,
@@ -40,6 +45,29 @@ hold PPUCTRL, scroll X, and scroll Y. This 44-byte block starts at `$0300`, or
 `$0305` when fixed sprite-zero state is also present. It uses no additional
 Zero Page. User RAM begins immediately after the conditionally allocated
 runtime blocks.
+
+Tile-only writes reserve 16 bytes for four ready/address/value arrays, one
+sticky overflow flag, five helper bytes, and three PPUCTRL/scroll restoration
+bytes: 25 bytes total. Attribute-only writes omit the two tile-index helpers
+and need 23 bytes. `nes.clear_background_updates()` conditionally adds the
+one-byte cancellation lock; overflow-only APIs need only the sticky flag. The
+960-byte confirmed
+32-by-30 tile shadow is added only when `nes.get_tile()` is used. Queue plus
+shadow therefore reserves 985 bytes without cancellation and, without sprites,
+starts user RAM at `$05D9`. Adding cancellation raises that to 986 bytes and
+starts user RAM at `$05DA`. A
+`get_tile`-only program needs the shadow and four tile-index helper bytes but no
+queue or PPU restoration state, for 964 bytes total.
+
+With runtime palette support, the palette and queue share the three PPU state
+bytes. Palette, queue, and shadow reserve 1,026 bytes without cancellation or
+1,027 bytes with it, leaving 510 or 509 regular RAM bytes when no sprite helper
+is used. Fixed sprite-zero support also reserves the separate 256-byte OAM page
+and adds five scalar bytes, leaving 249 or 248 regular RAM bytes plus any
+available automatic Zero Page promotion space. The shadow
+remains the clearest implementation of confirmed random tile reads. Metatile
+maps, modified-tile dictionaries, and compact read caches are deferred because
+they would add lookup cost or runtime complexity.
 
 VBlank callback validation rejects any reachable operation that uses those
 shared compiler temporaries. The interrupt path therefore uses runtime-owned
@@ -89,10 +117,9 @@ $0010  $001F    16  Compiler  Zero Page temporaries (1 used, 15 reserved)
 $0020  $007F    96  Reserved  Future explicit Zero Page
 $0080  $00FF   128  User      Automatic Zero Page variables (2 used, 126 available)
 $0100  $01FF   256  Reserved  6502 hardware stack
-$0200  $02FF   256  Runtime   OAM shadow
-$0300  ----      0  Runtime   Runtime data
-$0300  $0300     1  User      Regular user variables
-$0301  $07FF  1279  Free      General free RAM
+$0200  ----      0  Runtime   Runtime data
+$0200  $0200     1  User      Regular user variables
+$0201  $07FF  1535  Free      General free RAM
 ```
 
 The generated `.cfg`, Assembly segments, and `.map` report all use the same
@@ -112,7 +139,8 @@ $0007       1  runtime_controller_polled_frame most recently polled frame
 $0008       1  runtime_controller_poll_valid distinguishes initial RAM from frame zero
 ```
 
-When fixed sprite 0 support is present, the same table reports
+When fixed sprite 0 support is present, the regions table adds the OAM shadow
+at `$0200-$02FF`, and the runtime-symbol table reports `runtime_oam_shadow` plus
 `runtime_sprite_zero_pending_x`, `runtime_sprite_zero_pending_y`,
 `runtime_sprite_zero_pending_tile`,
 `runtime_sprite_zero_pending_attributes`, and `runtime_sprite_zero_ready` at
@@ -124,3 +152,14 @@ When runtime palette support is present, the table also reports
 `runtime_palette_sprite_3_dirty`, `runtime_palette_universal_dirty`,
 `runtime_ppuctrl_shadow`, `runtime_scroll_x_shadow`, and
 `runtime_scroll_y_shadow`.
+
+When `nes.get_tile` is present, the table reports
+`runtime_background_shadow`. When queued updates are present, it reports the
+four-element `runtime_background_queue_ready`,
+`runtime_background_queue_high`, `runtime_background_queue_low`, and
+`runtime_background_queue_value` arrays. Writers and overflow APIs add
+`runtime_background_queue_overflow`; cancellation adds
+`runtime_background_queue_cancel_lock`. Coordinate, value, and tile-index
+helpers are reported only for entry points that use them. The PPU
+restoration symbols are allocated for palette or background uploads and shared
+when both features are present.

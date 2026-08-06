@@ -30,9 +30,6 @@ expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
 variable_Counter: .res 1 ; $0080: Counter: byte
 variable_BackgroundColor: .res 1 ; $0081: BackgroundColor: nes_color
 
-.segment "OAM_SHADOW"
-; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
-runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime sprite support
 
 .segment "RUNTIME_DATA"
 ; Runtime: regular-RAM state kept separate from user variables
@@ -40,7 +37,7 @@ runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
-variable_Enabled: .res 1 ; $0300: Enabled: boolean
+variable_Enabled: .res 1 ; $0200: Enabled: boolean
 
 .segment "CODE"
 

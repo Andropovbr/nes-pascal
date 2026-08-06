@@ -31,9 +31,6 @@ variable_Counter: .res 1 ; $0080: Counter: byte
 variable_InnerCounter: .res 1 ; $0081: InnerCounter: byte
 variable_BackgroundColor: .res 1 ; $0082: BackgroundColor: nes_color
 
-.segment "OAM_SHADOW"
-; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
-runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime sprite support
 
 .segment "RUNTIME_DATA"
 ; Runtime: regular-RAM state kept separate from user variables

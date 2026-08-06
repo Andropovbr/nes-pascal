@@ -29,9 +29,6 @@ expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
 ; Source: optional global-variable promotion with regular-RAM fallback
 variable_Counter: .res 1 ; $0080: Counter: byte
 
-.segment "OAM_SHADOW"
-; Runtime: page-aligned OAM DMA shadow at $0200-$02FF
-runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime sprite support
 
 .segment "RUNTIME_DATA"
 ; Runtime: regular-RAM state kept separate from user variables
@@ -39,14 +36,14 @@ runtime_oam_shadow: .res 256 ; $0200: 256-byte page copied to PPU OAM by runtime
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
-variable_Equal: .res 1 ; $0300: Equal: boolean
-variable_Different: .res 1 ; $0301: Different: boolean
-variable_Less: .res 1 ; $0302: Less: boolean
-variable_Greater: .res 1 ; $0303: Greater: boolean
-variable_LessOrEqual: .res 1 ; $0304: LessOrEqual: boolean
-variable_GreaterOrEqual: .res 1 ; $0305: GreaterOrEqual: boolean
-variable_Combined: .res 1 ; $0306: Combined: boolean
-variable_BackgroundColor: .res 1 ; $0307: BackgroundColor: nes_color
+variable_Equal: .res 1 ; $0200: Equal: boolean
+variable_Different: .res 1 ; $0201: Different: boolean
+variable_Less: .res 1 ; $0202: Less: boolean
+variable_Greater: .res 1 ; $0203: Greater: boolean
+variable_LessOrEqual: .res 1 ; $0204: LessOrEqual: boolean
+variable_GreaterOrEqual: .res 1 ; $0205: GreaterOrEqual: boolean
+variable_Combined: .res 1 ; $0206: Combined: boolean
+variable_BackgroundColor: .res 1 ; $0207: BackgroundColor: nes_color
 
 .segment "CODE"
 

@@ -1,0 +1,8 @@
+program InvalidBackgroundOverflowQueryArguments;
+var
+    Overflowed: boolean;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+    Overflowed := nes.background_updates_overflowed($00);
+end.

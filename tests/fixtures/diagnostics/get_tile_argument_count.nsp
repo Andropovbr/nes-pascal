@@ -1,0 +1,8 @@
+program InvalidGetTileArguments;
+var
+    Tile: byte;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+    Tile := nes.get_tile($00);
+end.

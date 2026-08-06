@@ -54,12 +54,12 @@ class BackendGoldenTests(unittest.TestCase):
         source = source_path.read_text(encoding="utf-8")
         filename = str(source_path)
         assembly = generate(analyze(parse(source, filename), source, filename))
-        self.assertIn('.segment "OAM_SHADOW"', assembly)
+        self.assertNotIn('.segment "OAM_SHADOW"', assembly)
         self.assertIn('.segment "ZERO_PAGE_RUNTIME": zeropage', assembly)
         self.assertIn('.segment "ZERO_PAGE_TEMPORARIES": zeropage', assembly)
         self.assertIn('.segment "ZERO_PAGE_VARIABLES": zeropage', assembly)
         self.assertIn('.segment "USER_VARIABLES"', assembly)
-        self.assertIn("runtime_oam_shadow: .res 256", assembly)
+        self.assertNotIn("runtime_oam_shadow", assembly)
         self.assertIn("runtime_frame_counter: .res 1", assembly)
         self.assertIn("runtime_frame_ready: .res 1", assembly)
         self.assertIn("runtime_last_processed_frame: .res 1", assembly)
@@ -231,7 +231,7 @@ end.
             encoding="utf-8"
         )
         self.assertEqual(actual, expected)
-        self.assertIn("runtime_oam_shadow: .res 256", actual)
+        self.assertNotIn("runtime_oam_shadow", actual)
         self.assertIn("; $0010: reusable expression evaluation byte", actual)
         self.assertIn("; $0080: BackgroundColor: nes_color", actual)
 
@@ -246,7 +246,7 @@ end.
         self.assertEqual(actual, expected)
         self.assertIn("; $0080: Counter: byte", actual)
         self.assertIn("; $0081: BackgroundColor: nes_color", actual)
-        self.assertIn("; $0300: Matches: boolean", actual)
+        self.assertIn("; $0200: Matches: boolean", actual)
 
     def test_frame_synchronization_program_matches_golden_assembly(self) -> None:
         source_path = ROOT / "examples" / "frame_synchronization.nsp"
