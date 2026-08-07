@@ -16,8 +16,8 @@ end
 
 local function validateFrameCallbacks()
     local runtimeCounter = emu.read(0x0000, emu.memType.nesDebug)
-    local updateCounter = emu.read(0x0200, emu.memType.nesDebug)
-    local vblankCounter = emu.read(0x0201, emu.memType.nesDebug)
+    local updateCounter = emu.read(0x0204, emu.memType.nesDebug)
+    local vblankCounter = emu.read(0x0205, emu.memType.nesDebug)
 
     if previousRuntime ~= nil then
         local runtimeDelta = byteDelta(runtimeCounter, previousRuntime)

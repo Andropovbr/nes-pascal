@@ -24,7 +24,8 @@ Initialization can embed and upload one complete raw nametable and attribute
 table before rendering begins, alongside configured CHR-ROM and palette data.
 After startup, a four-write VBlank queue supports bounded tile and raw
 attribute updates. `nes.get_tile` conditionally links a 960-byte confirmed PPU
-tile shadow. Programs without sprite operations also omit the 256-byte OAM
+tile shadow. `nes.set_scroll` atomically stages a fixed scroll pair, and the
+ROM header supports static horizontal or vertical mirroring. Programs without sprite operations also omit the 256-byte OAM
 shadow and reuse that RAM page for runtime state and variables.
 
 ## Documentation

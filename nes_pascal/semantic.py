@@ -62,6 +62,7 @@ from .ast import (
     ResolvedSetPalette,
     ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
+    ResolvedSetScroll,
     ResolvedSetTile,
     ResolvedStatement,
     ResolvedValue,
@@ -74,6 +75,7 @@ from .ast import (
     SetPalette,
     SetPaletteColor,
     SetSpriteZero,
+    SetScroll,
     SetTile,
     SourcePosition,
     Statement,
@@ -321,6 +323,7 @@ class SemanticAnalyzer:
             | LoadBackground
             | SetTile
             | SetAttribute
+            | SetScroll
             | ClearBackgroundUpdates
             | ClearBackgroundUpdateOverflow
             | Run
@@ -724,6 +727,26 @@ class SemanticAnalyzer:
                     DiagnosticCode.INVALID_ATTRIBUTE_COORDINATE,
                 )
                 resolved_statements.append(ResolvedSetAttribute(x, y, value))
+            elif isinstance(statement, SetScroll):
+                self._require_background_argument_count(
+                    statement.position,
+                    "nes.set_scroll",
+                    statement.arguments,
+                    2,
+                    DiagnosticCode.INVALID_SET_SCROLL_ARGUMENT_COUNT,
+                    "Pass horizontal and vertical scroll as byte values.",
+                )
+                x, y = (
+                    self._resolve_value(
+                        argument,
+                        BuiltInType.BYTE,
+                        constants,
+                        variables,
+                        current_assignments,
+                    )
+                    for argument in statement.arguments
+                )
+                resolved_statements.append(ResolvedSetScroll(x, y))
             elif isinstance(statement, ClearBackgroundUpdates):
                 self._require_background_argument_count(
                     statement.position,
@@ -1086,7 +1109,7 @@ class SemanticAnalyzer:
                 )
             if isinstance(
                 statement,
-                (SetBackgroundColor, SetPalette, SetPaletteColor),
+                (SetBackgroundColor, SetPalette, SetPaletteColor, SetScroll),
             ):
                 values = (
                     (statement.argument,)
@@ -1264,6 +1287,8 @@ class SemanticAnalyzer:
             return "nes.set_tile"
         if isinstance(statement, SetAttribute):
             return "nes.set_attribute"
+        if isinstance(statement, SetScroll):
+            return "nes.set_scroll"
         if isinstance(statement, ClearBackgroundUpdates):
             return "nes.clear_background_updates"
         if isinstance(statement, ClearBackgroundUpdateOverflow):

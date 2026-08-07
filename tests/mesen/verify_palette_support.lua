@@ -48,8 +48,9 @@ local function validatePaletteSupport()
             end
         end
         if emu.read(0x032E, emu.memType.nesDebug) ~= 0x80
-            or emu.read(0x032F, emu.memType.nesDebug) ~= 0x00
-            or emu.read(0x0330, emu.memType.nesDebug) ~= 0x00 then
+            or emu.read(0x032F, emu.memType.nesDebug) ~= 0x18
+            or emu.read(0x0330, emu.memType.nesDebug) ~= 0x00
+            or emu.read(0x0331, emu.memType.nesDebug) ~= 0x00 then
             fail("Palette upload did not preserve the compiler-owned PPU state.", 7)
             return
         end

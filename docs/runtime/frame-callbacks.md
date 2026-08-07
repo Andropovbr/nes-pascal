@@ -69,9 +69,10 @@ implicit update or idle loop.
 
 NMI always preserves A, X, and Y first. It then increments
 `runtime_frame_counter`, sets `runtime_frame_ready`, performs mandatory sprite
-work when enabled, uploads queued palette changes, and calls the VBlank
+work when enabled, uploads queued palette and background changes, and calls the VBlank
 procedure with direct `JSR`. The callback and any safe helper end with `RTS`;
-NMI restores registers and ends with `RTI`. Palette calls made by the VBlank
+NMI commits a pending scroll pair, performs the final PPU state restoration,
+restores registers, and ends with `RTI`. Palette calls made by the VBlank
 callback are published for the following NMI because this frame's upload has
 already completed. This ordering is fixed and deterministic.
 
@@ -95,6 +96,8 @@ every reachable procedure. The supported subset is:
   same rules.
 - palette calls with temporary-free values; these stage the following frame's
   bounded runtime upload.
+- `nes.set_scroll` with temporary-free byte values; the pair is committed by
+  the final state restoration in the same NMI.
 
 Arithmetic and comparison expressions, update amounts, all loops,
 `nes.wait_frame`, `nes.run`, registration commands, parameterized calls,

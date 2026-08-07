@@ -297,23 +297,21 @@ end;
         self.assertIn("sta runtime_palette_universal_dirty", uploader)
         self.assertEqual(uploader.count("jsr runtime_upload_palette_triplet"), 8)
 
-    def test_uploader_restores_compiler_owned_ppu_state(self) -> None:
+    def test_nmi_restores_compiler_owned_ppu_state_after_uploader(self) -> None:
         run_setup = self.assembly.split("; Source: nes.run", 1)[1]
         run_setup = run_setup.split("; Runtime: frame-synchronized", 1)[0]
         self.assertIn(
-            "lda #$00\n"
-            "    sta runtime_scroll_x_shadow ; current default scroll X\n"
-            "    sta runtime_scroll_y_shadow ; current default scroll Y\n"
-            "    lda #$80\n"
-            "    sta runtime_ppuctrl_shadow ; current default PPUCTRL",
+            "lda runtime_ppuctrl_shadow\n"
+            "    ora #$80\n"
+            "    sta runtime_ppuctrl_shadow ; preserve bits and enable NMI",
             run_setup,
         )
-
-        uploader = self.assembly.split("@skip_universal_palette_color:", 1)[1]
-        uploader = uploader.split("runtime_upload_palette_triplet:", 1)[0]
-        self.assertIn("lda runtime_ppuctrl_shadow\n    sta $2000", uploader)
-        self.assertIn("lda runtime_scroll_x_shadow\n    sta $2005", uploader)
-        self.assertIn("lda runtime_scroll_y_shadow\n    sta $2005", uploader)
+        nmi = self.assembly.split("NMI:", 1)[1].split("IRQ:", 1)[0]
+        self.assertLess(nmi.index("jsr procedure_VBlank"), nmi.index("lda runtime_ppuctrl_shadow"))
+        self.assertIn("lda runtime_ppuctrl_shadow\n    sta $2000", nmi)
+        self.assertIn("lda runtime_scroll_x_shadow\n    sta $2005", nmi)
+        self.assertIn("lda runtime_scroll_y_shadow\n    sta $2005", nmi)
+        self.assertIn("lda runtime_ppumask_shadow\n    sta $2001", nmi)
 
     def test_runtime_publication_invalidates_before_staging_and_publishes_last(self) -> None:
         procedure = self.assembly.split("procedure_Update:", 1)[1].split("    rts", 1)[0]
@@ -326,19 +324,20 @@ end;
         shadow = symbols["runtime_palette_shadow"]
         self.assertEqual(shadow.size, 32)
         self.assertEqual(shadow.region_name, self.layout.runtime_data.name)
-        self.assertEqual(self.layout.runtime_data.size, 44)
+        self.assertEqual(self.layout.runtime_data.size, 45)
         self.assertEqual(
             symbols["runtime_ppuctrl_shadow"].address,
             shadow.address + 41,
         )
         self.assertEqual(
-            symbols["runtime_scroll_x_shadow"].address,
+            symbols["runtime_ppumask_shadow"].address,
             shadow.address + 42,
         )
         self.assertEqual(
-            symbols["runtime_scroll_y_shadow"].address,
+            symbols["runtime_scroll_x_shadow"].address,
             shadow.address + 43,
         )
+        self.assertEqual(symbols["runtime_scroll_y_shadow"].address, shadow.address + 44)
         addresses = [
             (symbol.address, symbol.address + symbol.size)
             for symbol in self.layout.runtime_symbols

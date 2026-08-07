@@ -12,12 +12,11 @@ It must:
 - appear exactly once;
 - remain outside conditionals, loops, and procedures.
 
-The runtime waits for VBlank, initializes compiler-owned PPUCTRL and scroll
-shadows to the current `$80` and `($00, $00)` defaults, restores those values,
-enables NMI, and enables background rendering. The shadows exist so runtime
-palette uploads restore state rather than assume literal scroll values; they
-do not expose scrolling APIs. Runtime-owned state and initialization PPU writes
-are complete before NMI is enabled.
+The runtime waits for VBlank and enables NMI and background rendering through
+compiler-owned PPUCTRL and PPUMASK shadows. Scroll shadows retain their
+zero-filled `($00, $00)` defaults unless [`nes.set_scroll`](scrolling-and-ppu-state.md)
+stages a new pair. Runtime-owned state and initialization PPU writes are
+complete before NMI is enabled.
 
 When present, [`nes.load_background()`](background-loading.md) performs its
 complete 1 KiB PPU upload earlier in the initialization sequence with

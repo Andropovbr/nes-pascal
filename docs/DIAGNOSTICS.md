@@ -59,6 +59,7 @@ diagnostics section.
 | E3043 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E3044 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E3045 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3046 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E4001 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4002 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4003 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
@@ -81,3 +82,4 @@ diagnostics section.
 | E6007 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
 | E6008 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
 | E6009 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6010 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |

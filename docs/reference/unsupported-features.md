@@ -32,6 +32,7 @@ the supported language.
 - Statements are limited to assignment, `inc` and `dec`, `if`/`else`,
   supported loops, `break`, `continue`, procedure calls,
   the palette APIs, `nes.load_background`, `nes.set_background_color`,
+  `nes.set_scroll`,
   `nes.run`, `nes.wait_frame`,
   `nes.on_update`, `nes.on_vblank`, and the fixed controller-example
   `nes.set_sprite_zero` helper.
@@ -54,8 +55,9 @@ the supported language.
 - One raw 1 KiB nametable for nametable 0 is supported during initialization,
   either combined or as 960 tile bytes plus 64 attribute bytes, followed by at
   most four queued tile or raw attribute-byte updates per frame. Multiple
-  screens, generated nametables, alternate nametable selection, background
-  scrolling, and streaming are not supported.
+  screens, generated nametables, alternate nametable selection, scrolling
+  gameplay systems, and streaming are not supported. One fixed scroll pair
+  can be staged with `nes.set_scroll`.
 - Standard controllers 1 and 2 are supported without remapping, Four Score,
   expansion devices, buffering, combos, turbo, or DMC-safe repeated reads.
 - General sprites, audio, and converted graphics assets are not supported.

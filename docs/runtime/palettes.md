@@ -44,13 +44,11 @@ NMI checks a fixed set of nine flags. Unchanged palettes are skipped, dirty
 flags are cleared as they are consumed, and at most eight three-color uploads
 plus the universal color can run in one NMI. There is no dynamic command queue.
 
-Palette writes change the PPU address latch and may affect PPUCTRL state. After
-each scan, including a scan with no dirty colors, the uploader restores
-PPUCTRL and both scroll writes from compiler-owned runtime shadows. `nes.run`
-initializes those bytes to the current defaults: PPUCTRL `$80` and scroll
-`($00, $00)`. They are internal state, not scrolling APIs; future scrolling
-support must update the same shadows rather than reintroducing literal
-restoration values.
+Palette writes change the PPU address latch. After the uploader and optional
+user VBlank callback, one shared NMI epilogue resets the latch and restores
+PPUCTRL, scroll X/Y, and PPUMASK from compiler-owned shadows. This keeps palette
+work compatible with [`nes.set_scroll`](scrolling-and-ppu-state.md) and avoids
+duplicated uploader-local restoration.
 
 See [VBlank cycle budget](vblank-cycle-budget.md) for the bounded uploader's
 current cost and remaining capacity.

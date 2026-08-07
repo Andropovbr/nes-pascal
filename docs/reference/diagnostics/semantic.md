@@ -712,3 +712,13 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 - **Expected compiler output:** `E3045` reports the provided count.
 - **Suggested fix:** Call `nes.clear_background_update_overflow();` without
   arguments.
+## E3046 - Invalid set-scroll argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.set_scroll` requires exactly two arguments: horizontal
+  scroll and vertical scroll.
+- **Trigger:** Call `nes.set_scroll` with fewer or more than two arguments.
+- **Expected compiler output:** `E3046` followed by the expected and actual
+  argument counts.
+- **Suggested fix:** Pass exactly two `byte` values, for example
+  `nes.set_scroll($08, $04);`.

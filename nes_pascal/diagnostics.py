@@ -63,6 +63,7 @@ class DiagnosticCode(StrEnum):
     INVALID_ATTRIBUTE_COORDINATE = "E3043"
     INVALID_BACKGROUND_OVERFLOW_QUERY_ARGUMENT_COUNT = "E3044"
     INVALID_BACKGROUND_OVERFLOW_CLEAR_ARGUMENT_COUNT = "E3045"
+    INVALID_SET_SCROLL_ARGUMENT_COUNT = "E3046"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -85,6 +86,7 @@ class DiagnosticCode(StrEnum):
     BACKGROUND_ASSET_READ_FAILURE = "E6007"
     INVALID_BACKGROUND_ASSET_SIZE = "E6008"
     BACKGROUND_ASSET_REQUIRED = "E6009"
+    INVALID_MIRRORING_CONFIGURATION = "E6010"
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,6 +249,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
             DiagnosticCategory.SEMANTIC,
             "Invalid background-overflow clear argument count",
         ),
+    DiagnosticCode.INVALID_SET_SCROLL_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid set-scroll argument count"
+    ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"
     ),
@@ -312,6 +317,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.BACKGROUND_ASSET_REQUIRED: DiagnosticDefinition(
         DiagnosticCategory.RUNTIME, "Background asset required"
+    ),
+    DiagnosticCode.INVALID_MIRRORING_CONFIGURATION: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Invalid mirroring configuration"
     ),
 }
 

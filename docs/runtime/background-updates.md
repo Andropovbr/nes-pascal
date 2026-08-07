@@ -72,13 +72,13 @@ shadow while rendering and NMI are disabled. Thus the first `get_tile` result
 always represents the compiler-established PPU state.
 
 Write-only background programs omit the shadow. A tile-only program reserves
-25 bytes: 22 bytes for queue state and helpers plus three shared PPU
-restoration bytes. Attribute-only writes need 23 bytes because they do not use
+26 bytes: 22 bytes for queue state and helpers plus four shared PPU
+restoration bytes. Attribute-only writes need 24 bytes because they do not use
 the two tile-index helpers. The cancellation lock adds one byte only when
 `nes.clear_background_updates()` is present. A program combining tile writes
-with `nes.get_tile()` reserves 985 bytes without cancellation or 986 bytes with
+with `nes.get_tile()` reserves 986 bytes without cancellation or 987 bytes with
 it. A
-`get_tile`-only program reserves 964 bytes and does not install the NMI queue
+`get_tile`-only program reserves 968 bytes and does not install the NMI queue
 uploader. Programs using only the overflow inspection/clear APIs reserve only
 the one-byte sticky flag. The generated `.map` identifies each conditional
 block.
@@ -89,12 +89,10 @@ other entry points. The shared queue publisher, uploader, and tile-index helper
 remain present whenever a retained public entry point calls them; this is
 explicit dependency selection, not a general dead-code optimizer.
 
-The background uploader runs before the optional user VBlank callback and
-restores compiler-owned PPUCTRL and scroll shadows after its PPU writes. The
-current defaults remain `$80`, `$00`, and `$00`; scrolling APIs belong to the
-next milestone. Background operations and `nes.get_tile` are not permitted on
+The background uploader runs before the optional user VBlank callback. One
+shared NMI epilogue then restores PPUCTRL, scroll X/Y, and PPUMASK after all
+runtime and user VBlank work. Background operations and `nes.get_tile` are not permitted on
 a VBlank callback path because NMI owns queue consumption.
 
-This milestone supports only nametable 0, one-byte writes, and raw attribute
-entries. It does not add scrolling, multiple nametables, a generic PPU queue,
-or streaming.
+Background updates support only nametable 0, one-byte writes, and raw attribute
+entries. They do not add multiple nametables, a generic PPU queue, or streaming.

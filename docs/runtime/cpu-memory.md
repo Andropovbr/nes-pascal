@@ -32,38 +32,45 @@ compilation error.
 
 The fixed controller-example sprite helper conditionally links the page-aligned
 256-byte OAM shadow at `$0200-$02FF` and reserves five bytes at `$0300-$0304`:
-four staged fields and an atomic publish flag. General user RAM then begins at
-`$0305`. Programs without sprite or OAM operations omit the symbol, Assembly
+four staged fields and an atomic publish flag. Four authoritative PPU state
+bytes follow, so general user RAM begins at `$0309`. Programs without sprite
+or OAM operations omit the symbol, Assembly
 segment, linker region, DMA code, and staging record. Their regular runtime and
 user allocation starts at `$0200`, making that 256-byte page available instead
 of reserving it implicitly.
 
 Programs with runtime palette calls reserve a 32-byte palette shadow, four
 background-palette flags, four sprite-palette flags, one universal-color flag,
-and three PPU restoration bytes in regular runtime RAM. The restoration bytes
-hold PPUCTRL, scroll X, and scroll Y. This 44-byte block starts at `$0300`, or
-`$0305` when fixed sprite-zero state is also present. It uses no additional
+and four PPU restoration bytes in regular runtime RAM. The restoration bytes
+hold PPUCTRL, PPUMASK, scroll X, and scroll Y. This 45-byte block starts at
+`$0200`, or `$0305` when fixed sprite-zero state is also present. It uses no additional
 Zero Page. User RAM begins immediately after the conditionally allocated
 runtime blocks.
 
+Every program reserves four regular-RAM bytes for the authoritative PPUCTRL,
+PPUMASK, horizontal-scroll, and vertical-scroll shadows. A program that calls
+`nes.set_scroll` reserves three additional bytes for an atomically published
+pending pair. Programs without that call retain the zero scroll defaults and
+omit the staging record.
+
 Tile-only writes reserve 16 bytes for four ready/address/value arrays, one
-sticky overflow flag, five helper bytes, and three PPUCTRL/scroll restoration
-bytes: 25 bytes total. Attribute-only writes omit the two tile-index helpers
-and need 23 bytes. `nes.clear_background_updates()` conditionally adds the
+sticky overflow flag, five helper bytes, and four PPU state restoration bytes:
+26 bytes total. Attribute-only writes omit the two tile-index helpers and need
+24 bytes. `nes.clear_background_updates()` conditionally adds the
 one-byte cancellation lock; overflow-only APIs need only the sticky flag. The
 960-byte confirmed
 32-by-30 tile shadow is added only when `nes.get_tile()` is used. Queue plus
-shadow therefore reserves 985 bytes without cancellation and, without sprites,
-starts user RAM at `$05D9`. Adding cancellation raises that to 986 bytes and
-starts user RAM at `$05DA`. A
-`get_tile`-only program needs the shadow and four tile-index helper bytes but no
-queue or PPU restoration state, for 964 bytes total.
+shadow therefore reserves 986 bytes without cancellation and, without sprites,
+starts user RAM at `$05DA`. Adding cancellation raises that to 987 bytes and
+starts user RAM at `$05DB`. A
+`get_tile`-only program needs the shadow, four tile-index helper bytes, and the
+four PPU state bytes, for 968 bytes total.
 
-With runtime palette support, the palette and queue share the three PPU state
-bytes. Palette, queue, and shadow reserve 1,026 bytes without cancellation or
-1,027 bytes with it, leaving 510 or 509 regular RAM bytes when no sprite helper
+With runtime palette support, the palette and queue share the four PPU state
+bytes. Palette, queue, and shadow reserve 1,027 bytes without cancellation or
+1,028 bytes with it, leaving 509 or 508 regular RAM bytes when no sprite helper
 is used. Fixed sprite-zero support also reserves the separate 256-byte OAM page
-and adds five scalar bytes, leaving 249 or 248 regular RAM bytes plus any
+and adds five scalar bytes, leaving 248 or 247 regular RAM bytes plus any
 available automatic Zero Page promotion space. The shadow
 remains the clearest implementation of confirmed random tile reads. Metatile
 maps, modified-tile dictionaries, and compact read caches are deferred because

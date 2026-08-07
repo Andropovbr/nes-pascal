@@ -32,12 +32,15 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 
 .segment "RUNTIME_DATA"
 ; Runtime: regular-RAM state kept separate from user variables
-    ; no scalar regular-RAM runtime symbols required
+runtime_ppuctrl_shadow: .res 1 ; $0200: authoritative PPUCTRL value restored each NMI
+runtime_ppumask_shadow: .res 1 ; $0201: authoritative PPUMASK value restored each NMI
+runtime_scroll_x_shadow: .res 1 ; $0202: authoritative horizontal scroll restored each NMI
+runtime_scroll_y_shadow: .res 1 ; $0203: authoritative vertical scroll restored each NMI
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
-variable_UpdateFrames: .res 1 ; $0200: UpdateFrames: byte
-variable_VBlankFrames: .res 1 ; $0201: VBlankFrames: byte
+variable_UpdateFrames: .res 1 ; $0204: UpdateFrames: byte
+variable_VBlankFrames: .res 1 ; $0205: VBlankFrames: byte
 
 .segment "CODE"
 
@@ -55,6 +58,17 @@ NMI:
 
     ; Runtime: user VBlank callback after frame bookkeeping
     jsr procedure_VBlank
+
+    ; Runtime: authoritative final PPU state after all VBlank work
+    bit $2002               ; reset the shared PPU write latch
+    lda runtime_ppuctrl_shadow
+    sta $2000
+    lda runtime_scroll_x_shadow
+    sta $2005               ; scroll X (first write)
+    lda runtime_scroll_y_shadow
+    sta $2005               ; scroll Y (second write)
+    lda runtime_ppumask_shadow
+    sta $2001
 
     pla
     tay
@@ -128,13 +142,18 @@ RESET:
 @wait_render_vblank_0:
     bit $2002
     bpl @wait_render_vblank_0
-    lda #$00
-    sta $2005               ; scroll X
-    sta $2005               ; scroll Y
-    lda #$80
-    sta $2000               ; enable NMI after initialization
-    lda #$08
-    sta $2001               ; enable selected rendering layers
+    lda runtime_ppuctrl_shadow
+    ora #$80
+    sta runtime_ppuctrl_shadow ; preserve bits and enable NMI
+    sta $2000
+    lda runtime_scroll_x_shadow ; zero-filled default scroll X
+    sta $2005
+    lda runtime_scroll_y_shadow ; zero-filled default scroll Y
+    sta $2005
+    lda runtime_ppumask_shadow
+    ora #$08
+    sta runtime_ppumask_shadow ; preserve bits and enable rendering
+    sta $2001
 
 ; Runtime: frame-synchronized update callback loop
     ; Establish the frame baseline once when the callback loop starts.

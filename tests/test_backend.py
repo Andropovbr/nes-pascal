@@ -246,7 +246,7 @@ end.
         self.assertEqual(actual, expected)
         self.assertIn("; $0080: Counter: byte", actual)
         self.assertIn("; $0081: BackgroundColor: nes_color", actual)
-        self.assertIn("; $0200: Matches: boolean", actual)
+        self.assertIn("; $0204: Matches: boolean", actual)
 
     def test_frame_synchronization_program_matches_golden_assembly(self) -> None:
         source_path = ROOT / "examples" / "frame_synchronization.nsp"
@@ -279,7 +279,9 @@ end.
         self.assertIn("inc runtime_frame_counter", nmi_handler)
         self.assertIn("sta runtime_frame_ready", nmi_handler)
         self.assertNotIn("jsr", nmi_handler)
-        self.assertNotIn("$200", nmi_handler)
+        self.assertEqual(nmi_handler.count("sta $2005"), 2)
+        self.assertIn("sta $2000", nmi_handler)
+        self.assertIn("sta $2001", nmi_handler)
         self.assertNotIn("variable_", nmi_handler)
         self.assertIn("cmp runtime_frame_counter", actual)
         self.assertIn("beq @wait_frame_", actual)
