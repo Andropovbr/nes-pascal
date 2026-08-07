@@ -15,6 +15,10 @@ Generated programs target NTSC NES systems with mapper 0, NROM-256:
   support is used without a configured asset;
 - NMI, RESET, and IRQ vectors.
 
+The iNES header defaults to horizontal nametable mirroring. Pass
+`--mirroring vertical` for vertical mirroring; only these two static NROM
+choices are supported.
+
 The output image is 40,976 bytes: a 16-byte iNES header, 32 KiB of PRG-ROM,
 and 8 KiB of CHR-ROM.
 
@@ -28,8 +32,9 @@ before enabling NMI and rendering.
 
 Each NMI preserves A, X, Y, and stack balance, increments one volatile 8-bit
 frame counter, and sets an advisory frame-ready byte. If registered, one
-restricted VBlank callback runs next through direct `JSR`; its procedure ends
-with `RTS`, then NMI restores registers and owns the final `RTI`. Ordinary
+restricted VBlank callback runs through direct `JSR`; its procedure ends with
+`RTS`. NMI then restores the compiler-owned PPU state, restores registers, and
+owns the final `RTI`. Ordinary
 update logic runs only on the main thread. Its persistent last-processed frame
 byte preserves a pending NMI across slow callbacks and coalesces older backlog.
 The main thread polls standard controller ports once before each processed

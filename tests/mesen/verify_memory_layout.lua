@@ -34,15 +34,15 @@ local function validateMemoryLayout()
         return
     elseif not expectByte(0x0082, 0x06, "NextFrameCounter") then
         return
-    elseif not expectByte(0x0200, 0x01, "RenderingEnabled") then
+    elseif not expectByte(0x0204, 0x01, "RenderingEnabled") then
         return
-    elseif not expectByte(0x0201, 0x01, "ExpectedState") then
+    elseif not expectByte(0x0205, 0x01, "ExpectedState") then
         return
-    elseif not expectByte(0x0202, 0x00, "InitializeCounters.Start") then
+    elseif not expectByte(0x0206, 0x00, "InitializeCounters.Start") then
         return
-    elseif not expectByte(0x0203, 0x01, "InitializeCounters.Increment") then
+    elseif not expectByte(0x0207, 0x01, "InitializeCounters.Increment") then
         return
-    elseif not expectByte(0x0204, 0x01, "InitializeCounters.EnabledValue") then
+    elseif not expectByte(0x0208, 0x01, "InitializeCounters.EnabledValue") then
         return
     end
 

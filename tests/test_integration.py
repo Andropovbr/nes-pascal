@@ -47,7 +47,7 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def _assert_valid_nrom_image(
         self,
         example_name: str,
-        expected_vectors: tuple[int, int, int] = (0x8000, 0x8012, 0x8011),
+        expected_vectors: tuple[int, int, int] = (0x8000, 0x802D, 0x802C),
         expected_empty_chr: bool = True,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -108,7 +108,7 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_frame_callbacks_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image(
             "frame_callbacks",
-            expected_vectors=(0x8000, 0x8015, 0x8014),
+            expected_vectors=(0x8000, 0x8030, 0x802F),
         )
 
     def test_slow_update_callback_example_builds_valid_nrom_image(self) -> None:
@@ -117,7 +117,7 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_controller_input_example_builds_with_player_chr_asset(self) -> None:
         self._assert_valid_nrom_image(
             "controller_input",
-            expected_vectors=(0x8000, 0x803E, 0x803D),
+            expected_vectors=(0x8000, 0x8059, 0x8058),
             expected_empty_chr=False,
         )
 
@@ -622,6 +622,12 @@ class MesenIntegrationTests(unittest.TestCase):
             "verify_background_updates.lua",
             chr_path="assets/chr_asset.chr",
             nametable_path="assets/nametable_loading.nam",
+        )
+
+    def test_scroll_pairs_and_ppu_state_survive_palette_work(self) -> None:
+        self._run_mesen_test(
+            "scrolling_ppu_state",
+            "verify_scrolling_ppu_state.lua",
         )
 
 

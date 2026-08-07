@@ -43,6 +43,7 @@ from .ast import (
     SetPalette,
     SetPaletteColor,
     SetSpriteZero,
+    SetScroll,
     SetTile,
     SourcePosition,
     Statement,
@@ -380,6 +381,17 @@ class Parser:
                     f"Expected ';' after '{normalized}(...)'.",
                 )
             return background_update(
+                arguments,
+                SourcePosition(namespace.line, namespace.column),
+            )
+        if normalized == "nes.set_scroll":
+            arguments = self._parse_expression_arguments(normalized)
+            if consume_terminator:
+                self._expect(
+                    TokenKind.SEMICOLON,
+                    "Expected ';' after 'nes.set_scroll(...)'.",
+                )
+            return SetScroll(
                 arguments,
                 SourcePosition(namespace.line, namespace.column),
             )
@@ -895,6 +907,7 @@ class Parser:
             "control-flow statement, "
             "nes.load_background();, a background tile/attribute update, "
             "a nes.set_* palette call, "
+            "nes.set_scroll(...);, "
             "nes.set_sprite_zero(...);, "
             "nes.on_update(Procedure);, nes.on_vblank(Procedure);, "
             "nes.wait_frame;, or nes.run;.",

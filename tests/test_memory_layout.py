@@ -89,14 +89,14 @@ class MemoryLayoutTests(unittest.TestCase):
 
         self.assertEqual(first, second)
         self.assertEqual(first.runtime_data.start, 0x0200)
-        self.assertEqual(first.runtime_data.size, 0)
+        self.assertEqual(first.runtime_data.size, 4)
         self.assertEqual(
             (first.temporary_storage.start, first.temporary_storage.end),
             (0x0010, 0x001F),
         )
         self.assertEqual(
             [symbol.address for symbol in first.user_symbols],
-            [0x0200, 0x0201, 0x0202],
+            [0x0204, 0x0205, 0x0206],
         )
         runtime_addresses = {
             symbol.assembly_symbol: symbol.address
@@ -301,8 +301,8 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertIn("ZP_AUTO: start = $0080, size = $0080", config)
         self.assertIn("STACK:   start = $0100, size = $0100", config)
         self.assertNotIn("OAM:", config)
-        self.assertIn("RUNTIME: start = $0200, size = $0000", config)
-        self.assertIn("USER:    start = $0200, size = $0600", config)
+        self.assertIn("RUNTIME: start = $0200, size = $0004", config)
+        self.assertIn("USER:    start = $0204, size = $05FC", config)
         self.assertIn("ZERO_PAGE_TEMPORARIES: load = ZP_TEMP", config)
         self.assertIn("ZERO_PAGE_RUNTIME:     load = ZP_RUNTIME", config)
         self.assertIn("ZERO_PAGE_VARIABLES:   load = ZP_AUTO", config)
@@ -324,7 +324,7 @@ class MemoryLayoutTests(unittest.TestCase):
         )
         self.assertIn("OAM:     start = $0200, size = $0100", sprite_config)
         self.assertIn("OAM_SHADOW:          load = OAM", sprite_config)
-        self.assertIn("RUNTIME: start = $0300, size = $0005", sprite_config)
+        self.assertIn("RUNTIME: start = $0300, size = $0009", sprite_config)
 
     def test_memory_map_contains_regions_totals_and_allocated_symbols(self) -> None:
         source = small_program(("Counter", "Limit"))
@@ -336,7 +336,7 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertIn("$0010  $001F    16  Compiler  Zero Page temporaries", report)
         self.assertIn("$0080  $00FF   128  User      Automatic Zero Page", report)
         self.assertNotIn("OAM shadow", report)
-        self.assertIn("$0200  ----      0  Runtime   Runtime data", report)
+        self.assertIn("$0200  $0203     4  Runtime   Runtime data", report)
         self.assertIn("General free RAM", report)
         self.assertIn("Counter", report)
         self.assertIn("variable_Counter", report)

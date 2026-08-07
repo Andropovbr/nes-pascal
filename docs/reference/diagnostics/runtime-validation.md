@@ -107,3 +107,12 @@ Runtime-validation diagnostics use the E6000-E6999 range.
 - **Expected compiler output:** `E6009` identifies the missing configuration.
 - **Suggested fix:** Pass `--nametable`, or pass both
   `--nametable-tiles` and `--nametable-attributes`.
+
+## E6010 - Invalid mirroring configuration
+
+- **Category:** Runtime Validation
+- **Explanation:** NROM currently supports only static horizontal or vertical
+  nametable mirroring.
+- **Trigger:** Pass any other value to `--mirroring`.
+- **Expected compiler output:** `E6010` followed by the configured value.
+- **Suggested fix:** Use `--mirroring horizontal` or `--mirroring vertical`.

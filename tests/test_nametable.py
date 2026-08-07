@@ -356,7 +356,13 @@ class NametableBackendTests(unittest.TestCase):
         for page in range(4):
             self.assertIn(f"@upload_background_page_{page}:", upload)
         run = self.assembly.split("; Source: nes.run", 1)[1]
-        self.assertIn("lda #$08\n    sta $2001", run)
+        self.assertIn(
+            "lda runtime_ppumask_shadow\n"
+            "    ora #$08\n"
+            "    sta runtime_ppumask_shadow ; preserve bits and enable rendering\n"
+            "    sta $2001",
+            run,
+        )
         self.assertLess(
             self.assembly.index("; Source: nes.load_background()"),
             self.assembly.index("; Source: nes.run"),

@@ -29,6 +29,7 @@ python -m nes_pascal.cli examples/chr_asset.nsp -o build/chr_asset.nes --chr ass
 python -m nes_pascal.cli examples/palette_support.nsp -o build/palette_support.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
 python -m nes_pascal.cli examples/background_updates.nsp -o build/background_updates.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
+python -m nes_pascal.cli examples/scrolling_ppu_state.nsp -o build/scrolling_ppu_state.nes --mirroring horizontal
 ```
 
 The examples demonstrate:
@@ -43,6 +44,8 @@ The examples demonstrate:
   state, `JSR`/`RTS`, and a conditional inside a procedure;
 - `procedure_parameters.nsp`: typed value parameters, left-to-right argument
   copies, mutable local parameter values, and nested parameterized calls;
+- `scrolling_ppu_state.nsp`: one fixed nonzero scroll pair, a palette update,
+  and restoration to the default `($00, $00)` pair;
 - `memory_layout.nsp`: globals, procedure parameters, expressions, and a
   for-loop allocated through the deterministic runtime memory layout;
 - `zero_page.nsp`: mandatory Zero Page temporaries, promoted globals, and a

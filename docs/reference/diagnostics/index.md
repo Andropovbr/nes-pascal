@@ -70,6 +70,7 @@ the range reserved for their category.
 | [E3043](semantic.md) | Semantic Analysis | Invalid attribute coordinate |
 | [E3044](semantic.md) | Semantic Analysis | Invalid background-overflow query argument count |
 | [E3045](semantic.md) | Semantic Analysis | Invalid background-overflow clear argument count |
+| [E3046](semantic.md) | Semantic Analysis | Invalid set-scroll argument count |
 | [E4001](type-system.md) | Type System | Unknown type |
 | [E4002](type-system.md) | Type System | Invalid `nes_color` value |
 | [E4003](type-system.md) | Type System | Invalid `byte` value |
@@ -92,6 +93,7 @@ the range reserved for their category.
 | [E6007](runtime-validation.md) | Runtime Validation | Background asset read failure |
 | [E6008](runtime-validation.md) | Runtime Validation | Invalid background asset size |
 | [E6009](runtime-validation.md) | Runtime Validation | Background asset required |
+| [E6010](runtime-validation.md) | Runtime Validation | Invalid mirroring configuration |
 
 ## Warnings
 

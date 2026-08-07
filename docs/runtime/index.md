@@ -14,6 +14,8 @@ APIs are:
   shadow and queue at most four tile or attribute writes for each VBlank;
 - [`nes.run`](run.md) completes initialization, enables NMI and rendering at
   VBlank, and starts the frame-synchronized runtime phase;
+- [`nes.set_scroll`](scrolling-and-ppu-state.md) atomically stages a fixed
+  horizontal and vertical scroll pair for final NMI restoration;
 - [`nes.wait_frame`](wait-frame.md) waits for the volatile NMI frame counter
   to change;
 - [`nes.on_update`](frame-callbacks.md) statically registers one parameterless

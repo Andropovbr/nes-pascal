@@ -13,7 +13,9 @@ The generated NMI performs work in this fixed order:
 3. scan and upload queued palette changes when runtime palette calls exist;
 4. scan up to four queued background writes when runtime background calls exist;
 5. call the optional user VBlank callback;
-6. restore registers and return.
+6. commit a complete pending scroll pair when `nes.set_scroll` is linked;
+7. reset the PPU latch and restore PPUCTRL, scroll X/Y, and PPUMASK;
+8. restore registers and return.
 
 The 1 KiB `nes.load_background()` transfer is not part of this budget. Neither
 is the equivalent zero fill generated when `nes.get_tile` is used without a
@@ -29,15 +31,18 @@ code and should be updated when that code changes.
 | NMI component | Estimated CPU cycles |
 | --- | ---: |
 | Hardware entry, register save, frame bookkeeping, register restore, and `RTI` | 52 |
-| Palette scan with no dirty colors, including PPUCTRL and scroll restoration | 99 |
-| Palette scan with all eight triplets and the universal color dirty, including restoration | 808 |
+| Palette scan with no dirty colors | 75 |
+| Palette scan with all eight triplets and the universal color dirty | 784 |
 | Background uploader skipped while cancellation owns its lock | 19 |
-| Background queue scan with no published slots and no cancellation support | 91 |
-| Background queue scan with four write-only slots and no cancellation support | 227 |
-| Background queue scan with four confirmed tiles and no cancellation support | 359 |
+| Background queue scan with no published slots and no cancellation support | 67 |
+| Background queue scan with four write-only slots and no cancellation support | 203 |
+| Background queue scan with four confirmed tiles and no cancellation support | 335 |
 | Additional lock check when cancellation support is linked | 6 |
 | Sprite-zero commit plus OAM DMA | 569-570 |
 | Empty user VBlank callback dispatch (`JSR` plus `RTS`) | 12 |
+| Final PPU state restoration | 36 |
+| Linked scroll commit with no pending pair | 7 |
+| Linked scroll commit with a pending pair | 28 |
 
 The palette maximum writes 25 palette bytes: three independently visible
 colors for each of eight palettes plus the universal background color. Its
@@ -49,17 +54,19 @@ callback, are:
 
 | Enabled work | Estimated used | Approximate remainder of 2,273 |
 | --- | ---: | ---: |
-| Clean palette scan | 163 | 2,110 |
-| All palette colors dirty | 872 | 1,401 |
-| OAM DMA and all palette colors dirty | 1,442 | 831 |
-| Four background writes with confirmed shadow updates | 423 | 1,850 |
-| All palette colors dirty and four confirmed tile writes | 1,231 | 1,042 |
-| OAM DMA, all palette colors dirty, and four confirmed tile writes | 1,801 | 472 |
+| Clean palette scan | 175 | 2,098 |
+| All palette colors dirty | 884 | 1,389 |
+| OAM DMA and all palette colors dirty | 1,454 | 819 |
+| Four background writes with confirmed shadow updates | 435 | 1,838 |
+| All palette colors dirty and four confirmed tile writes | 1,219 | 1,054 |
+| OAM DMA, all palette colors dirty, and four confirmed tile writes | 1,789 | 484 |
 
 The remainder must cover the callback body, any procedures it calls, timing
 jitter, and a safety margin. A program without a registered callback omits the
 12-cycle dispatch. Linking cancellation adds six cycles to each row containing
-background work; the final row then becomes 1,807 used and 466 remaining.
+background work; the final row then becomes 1,795 used and 478 remaining.
+Linking `nes.set_scroll` adds seven cycles when no pair is pending or 28 cycles
+when NMI commits one, reducing the corresponding remainder by that amount.
 
 ## Scalability limits
 
@@ -70,8 +77,8 @@ The current all-dirty palette path, four confirmed tile writes, and OAM DMA
 consume about 80 percent of the nominal window before useful callback work. The
 background contribution is bounded by four single-byte PPU writes per frame;
 additional requests are rejected and set a sticky overflow flag. Write-only
-programs omit the shadow confirmation work and use a 227-cycle maximum, or 233
-cycles when cancellation support is linked.
+programs omit the shadow confirmation work and use a 203-cycle uploader
+maximum, or 209 cycles when cancellation support is linked.
 
 Only programs containing `nes.clear_background_updates()` link the one-byte
 cancellation lock and its uploader check. This adds six cycles to their normal
@@ -88,8 +95,8 @@ general sprite systems, audio DMA, or other PPU uploads would need a revised
 central budget and scheduling policy; none are implemented here. The figures
 are NTSC-only and do not claim PAL timing support.
 
-The palette uploader restores PPUCTRL and scroll X/Y from compiler-owned
-runtime shadows. `nes.run` initializes them to the current `$80`, `$00`, and
-`$00` defaults. This removes the uploader's former `(0, 0)` literal assumption
-without adding scrolling APIs. Any future code that changes those PPU values
-must update the shadows as part of that later feature.
+One shared epilogue restores PPUCTRL, scroll X/Y, and PPUMASK after every
+runtime uploader and the optional user callback. `nes.run` preserves bits while
+enabling the current `$80` PPUCTRL and `$08` or `$18` PPUMASK defaults; scroll
+starts at `($00, $00)`. This central cost replaces the former duplicate
+uploader-local restoration costs.

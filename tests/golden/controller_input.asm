@@ -44,6 +44,10 @@ runtime_sprite_zero_pending_y: .res 1 ; $0301: staged sprite 0 Y coordinate
 runtime_sprite_zero_pending_tile: .res 1 ; $0302: staged sprite 0 tile index
 runtime_sprite_zero_pending_attributes: .res 1 ; $0303: staged sprite 0 attributes
 runtime_sprite_zero_ready: .res 1 ; $0304: atomic sprite 0 staging commit flag
+runtime_ppuctrl_shadow: .res 1 ; $0305: authoritative PPUCTRL value restored each NMI
+runtime_ppumask_shadow: .res 1 ; $0306: authoritative PPUMASK value restored each NMI
+runtime_scroll_x_shadow: .res 1 ; $0307: authoritative horizontal scroll restored each NMI
+runtime_scroll_y_shadow: .res 1 ; $0308: authoritative vertical scroll restored each NMI
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
@@ -81,6 +85,17 @@ NMI:
     sta $2003               ; OAM address
     lda #>runtime_oam_shadow
     sta $4014               ; page-aligned OAM DMA
+
+    ; Runtime: authoritative final PPU state after all VBlank work
+    bit $2002               ; reset the shared PPU write latch
+    lda runtime_ppuctrl_shadow
+    sta $2000
+    lda runtime_scroll_x_shadow
+    sta $2005               ; scroll X (first write)
+    lda runtime_scroll_y_shadow
+    sta $2005               ; scroll Y (second write)
+    lda runtime_ppumask_shadow
+    sta $2001
 
     pla
     tay
@@ -189,13 +204,18 @@ RESET:
     sta $2007
     lda #$30
     sta $2007
-    lda #$00
-    sta $2005               ; scroll X
-    sta $2005               ; scroll Y
-    lda #$80
-    sta $2000               ; enable NMI after initialization
-    lda #$18
-    sta $2001               ; enable selected rendering layers
+    lda runtime_ppuctrl_shadow
+    ora #$80
+    sta runtime_ppuctrl_shadow ; preserve bits and enable NMI
+    sta $2000
+    lda runtime_scroll_x_shadow ; zero-filled default scroll X
+    sta $2005
+    lda runtime_scroll_y_shadow ; zero-filled default scroll Y
+    sta $2005
+    lda runtime_ppumask_shadow
+    ora #$18
+    sta runtime_ppumask_shadow ; preserve bits and enable rendering
+    sta $2001
 
 ; Runtime: frame-synchronized update callback loop
     ; Establish the frame baseline once when the callback loop starts.

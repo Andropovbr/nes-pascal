@@ -1,6 +1,7 @@
 """Command-line interface for the NES Pascal compiler."""
 
 import argparse
+from dataclasses import replace
 from pathlib import Path
 import shutil
 import subprocess
@@ -33,10 +34,25 @@ def compile_source(
     nametable_path: str | Path | None = None,
     nametable_tiles_path: str | Path | None = None,
     nametable_attributes_path: str | Path | None = None,
+    mirroring: str | None = None,
 ) -> tuple[Path, Path]:
     source_path = source_path.resolve()
     output_path = output_path.resolve()
     source = source_path.read_text(encoding="utf-8")
+    if mirroring is not None:
+        normalized_mirroring = mirroring.lower()
+        if normalized_mirroring not in ("horizontal", "vertical"):
+            raise CompilerError(
+                DiagnosticCode.INVALID_MIRRORING_CONFIGURATION,
+                f"Invalid mirroring configuration: {mirroring}.",
+                SourceLocation(str(source_path), 1, 1),
+                source.splitlines()[0] if source.splitlines() else "",
+                suggestion="Use --mirroring horizontal or --mirroring vertical.",
+            )
+        memory_settings = replace(
+            memory_settings,
+            horizontal_mirroring=normalized_mirroring == "horizontal",
+        )
     program = parse(source, str(source_path))
     resolved_program = analyze(program, source, str(source_path))
     chr_rom = load_chr_rom(chr_path, source_path, source)
@@ -157,6 +173,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
         type=str,
         help="64-byte attribute table used with --nametable-tiles",
     )
+    parser.add_argument(
+        "--mirroring",
+        type=str,
+        default="horizontal",
+        help="static nametable mirroring: horizontal (default) or vertical",
+    )
     return parser
 
 
@@ -170,6 +192,7 @@ def main(argv: list[str] | None = None) -> int:
             nametable_path=arguments.nametable,
             nametable_tiles_path=arguments.nametable_tiles,
             nametable_attributes_path=arguments.nametable_attributes,
+            mirroring=arguments.mirroring,
         )
     except (CompilerError, ToolchainError) as error:
         print(error, file=sys.stderr)

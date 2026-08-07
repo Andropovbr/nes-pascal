@@ -78,7 +78,7 @@ class ZeroPageAllocationTests(unittest.TestCase):
                 (symbol.source_name, symbol.address)
                 for symbol in layout.regular_user_symbols
             ],
-            [("Cold", 0x0200)],
+            [("Cold", 0x0204)],
         )
 
     def test_optional_promotion_falls_back_to_regular_ram(self) -> None:
@@ -89,9 +89,9 @@ class ZeroPageAllocationTests(unittest.TestCase):
 
         self.assertEqual(
             [(symbol.source_name, symbol.address) for symbol in layout.user_symbols],
-            [("First", 0x0080), ("Second", 0x0200), ("Cold", 0x0201)],
+            [("First", 0x0080), ("Second", 0x0204), ("Cold", 0x0205)],
         )
-        self.assertEqual(layout.free_ram.start, 0x0202)
+        self.assertEqual(layout.free_ram.start, 0x0206)
 
     def test_mandatory_temporaries_do_not_borrow_optional_space(self) -> None:
         path = ROOT / "examples" / "memory_layout.nsp"

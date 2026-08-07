@@ -164,8 +164,8 @@ class BackgroundUpdateBackendTests(unittest.TestCase):
             self.assertEqual(symbols[f"runtime_background_queue_{field}"].size, 4)
         self.assertEqual(symbols["runtime_background_queue_overflow"].size, 1)
         self.assertEqual(symbols["runtime_background_queue_cancel_lock"].size, 1)
-        self.assertEqual(self.layout.runtime_data.size, 986)
-        self.assertGreaterEqual(self.layout.user_capacity.start, 0x0200 + 986)
+        self.assertEqual(self.layout.runtime_data.size, 987)
+        self.assertGreaterEqual(self.layout.user_capacity.start, 0x0200 + 987)
 
     def test_queue_publishes_last_limits_to_four_and_marks_overflow(self) -> None:
         routine = self.assembly.split("runtime_queue_background_write:", 1)[1]
@@ -184,9 +184,10 @@ class BackgroundUpdateBackendTests(unittest.TestCase):
         uploader = uploader.split("runtime_queue_background_write:", 1)[0]
         self.assertIn("sta runtime_background_queue_ready, x", uploader)
         self.assertIn("sta $2007", uploader)
-        self.assertIn("lda runtime_ppuctrl_shadow", uploader)
-        self.assertIn("lda runtime_scroll_x_shadow", uploader)
-        self.assertIn("lda runtime_scroll_y_shadow", uploader)
+        self.assertNotIn("lda runtime_ppuctrl_shadow", uploader)
+        self.assertIn("lda runtime_ppuctrl_shadow", nmi)
+        self.assertIn("lda runtime_scroll_x_shadow", nmi)
+        self.assertIn("lda runtime_scroll_y_shadow", nmi)
         self.assertLess(
             uploader.index("sta $2007"),
             uploader.index("sta runtime_background_shadow"),
@@ -257,7 +258,7 @@ end.
         names = {symbol.assembly_symbol for symbol in layout.runtime_symbols}
         self.assertNotIn("runtime_background_shadow", names)
         self.assertIn("runtime_background_queue_ready", names)
-        self.assertEqual(layout.runtime_data.size, 25)
+        self.assertEqual(layout.runtime_data.size, 26)
         assembly = generate(program, layout)
         self.assertNotIn("runtime_background_shadow", assembly)
         self.assertNotIn("runtime_background_queue_cancel_lock", assembly)
@@ -278,7 +279,7 @@ end.
         assembly = generate(program, layout)
         report = generate_memory_map(layout)
 
-        self.assertEqual(layout.runtime_data.size, 25)
+        self.assertEqual(layout.runtime_data.size, 26)
         self.assertIn("runtime_upload_queued_background:", assembly)
         self.assertIn("runtime_queue_background_write:", assembly)
         self.assertIn("runtime_prepare_tile_index:", assembly)
@@ -304,7 +305,7 @@ end.
         layout = build_memory_layout(program)
         assembly = generate(program, layout)
 
-        self.assertEqual(layout.runtime_data.size, 23)
+        self.assertEqual(layout.runtime_data.size, 24)
         self.assertIn("runtime_upload_queued_background:", assembly)
         self.assertIn("runtime_queue_background_write:", assembly)
         self.assertIn("runtime_set_attribute:", assembly)
@@ -329,7 +330,7 @@ end.
         layout = build_memory_layout(program)
         assembly = generate(program, layout)
 
-        self.assertEqual(layout.runtime_data.size, 985)
+        self.assertEqual(layout.runtime_data.size, 986)
         self.assertIn("runtime_background_shadow", assembly)
         self.assertIn("sta runtime_background_shadow", assembly)
         self.assertIn("runtime_set_tile:", assembly)
@@ -350,7 +351,7 @@ end.
         layout = build_memory_layout(program)
         assembly = generate(program, layout)
 
-        self.assertEqual(layout.runtime_data.size, 26)
+        self.assertEqual(layout.runtime_data.size, 27)
         self.assertIn("runtime_background_queue_cancel_lock", assembly)
         self.assertIn("cancellation owns the whole queue", assembly)
         self.assertEqual(
@@ -376,7 +377,7 @@ end.
         assembly = generate(program, layout)
         names = {symbol.assembly_symbol for symbol in layout.runtime_symbols}
 
-        self.assertEqual(layout.runtime_data.size, 1)
+        self.assertEqual(layout.runtime_data.size, 5)
         self.assertIn("runtime_background_queue_overflow", names)
         self.assertNotIn("runtime_background_queue_ready", names)
         self.assertNotIn("runtime_background_queue_cancel_lock", names)
@@ -415,7 +416,7 @@ end.
                 symbols = {
                     symbol.assembly_symbol for symbol in layout.runtime_symbols
                 }
-                self.assertEqual(layout.runtime_data.size, 1)
+                self.assertEqual(layout.runtime_data.size, 5)
                 self.assertIn("runtime_background_queue_overflow", symbols)
                 self.assertNotIn("runtime_background_queue_ready", symbols)
                 self.assertNotIn(
@@ -439,7 +440,7 @@ end.
         names = {symbol.assembly_symbol for symbol in layout.runtime_symbols}
         self.assertIn("runtime_background_shadow", names)
         self.assertNotIn("runtime_background_queue_ready", names)
-        self.assertEqual(layout.runtime_data.size, 964)
+        self.assertEqual(layout.runtime_data.size, 968)
         report = generate_memory_map(layout)
         self.assertIn("runtime_background_shadow", report)
         self.assertNotIn("runtime_background_queue_ready", report)
@@ -490,7 +491,7 @@ class BackgroundUpdateIntegrationTests(unittest.TestCase):
     def test_focused_loaded_background_programs_compile(self) -> None:
         cases = {
             "tile_only": {
-                "runtime_size": "$0019",
+                "runtime_size": "$001A",
                 "present": ("runtime_set_tile:",),
                 "absent": (
                     "runtime_set_attribute:",
@@ -500,7 +501,7 @@ class BackgroundUpdateIntegrationTests(unittest.TestCase):
                 ),
             },
             "attribute_only": {
-                "runtime_size": "$0017",
+                "runtime_size": "$0018",
                 "present": ("runtime_set_attribute:",),
                 "absent": (
                     "runtime_set_tile:",
@@ -510,7 +511,7 @@ class BackgroundUpdateIntegrationTests(unittest.TestCase):
                 ),
             },
             "tile_cancellation": {
-                "runtime_size": "$001A",
+                "runtime_size": "$001B",
                 "present": (
                     "runtime_set_tile:",
                     "runtime_background_queue_cancel_lock",

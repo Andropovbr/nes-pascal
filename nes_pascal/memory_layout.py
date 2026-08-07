@@ -27,6 +27,7 @@ from .ast import (
     ResolvedSetPalette,
     ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
+    ResolvedSetScroll,
     ResolvedSetTile,
     ResolvedStatement,
     ResolvedUnaryExpression,
@@ -282,12 +283,14 @@ def build_memory_layout(
 
     sprite_zero_enabled = _uses_sprite_zero(program)
     palette_runtime_enabled = _uses_runtime_palette(program)
+    scroll_runtime_enabled = _uses_set_scroll(program)
     background_features = detect_background_runtime_features(program)
     background_queue_enabled = background_features.queue
     background_shadow_enabled = background_features.shadow
     sprite_runtime_size = 5 if sprite_zero_enabled else 0
     palette_runtime_size = 41 if palette_runtime_enabled else 0
-    ppu_state_size = 3 if palette_runtime_enabled or background_queue_enabled else 0
+    ppu_state_size = 4
+    scroll_staging_size = 3 if scroll_runtime_enabled else 0
     background_shadow_size = 960 if background_shadow_enabled else 0
     background_runtime_size = (
         (16 if background_features.queue else 0)
@@ -301,6 +304,7 @@ def build_memory_layout(
         sprite_runtime_size
         + palette_runtime_size
         + ppu_state_size
+        + scroll_staging_size
         + background_shadow_size
         + background_runtime_size
     )
@@ -349,6 +353,7 @@ def build_memory_layout(
         + sprite_runtime_size
         + palette_runtime_size
         + ppu_state_size
+        + scroll_staging_size
         + background_shadow_size
     )
 
@@ -618,20 +623,47 @@ def build_memory_layout(
                     (
                         (
                             "runtime_ppuctrl_shadow",
-                            "PPUCTRL value restored after bounded PPU uploads",
+                            "authoritative PPUCTRL value restored each NMI",
+                        ),
+                        (
+                            "runtime_ppumask_shadow",
+                            "authoritative PPUMASK value restored each NMI",
                         ),
                         (
                             "runtime_scroll_x_shadow",
-                            "horizontal scroll restored after bounded PPU uploads",
+                            "authoritative horizontal scroll restored each NMI",
                         ),
                         (
                             "runtime_scroll_y_shadow",
-                            "vertical scroll restored after bounded PPU uploads",
+                            "authoritative vertical scroll restored each NMI",
                         ),
                     )
                 )
             )
-            if ppu_state_size
+        ),
+        *(
+            tuple(
+                MemorySymbol(
+                    name,
+                    runtime_data.start
+                    + sprite_runtime_size
+                    + palette_runtime_size
+                    + ppu_state_size
+                    + index,
+                    1,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    purpose,
+                )
+                for index, (name, purpose) in enumerate(
+                    (
+                        ("runtime_scroll_pending_x", "staged horizontal scroll"),
+                        ("runtime_scroll_pending_y", "staged vertical scroll"),
+                        ("runtime_scroll_ready", "atomic scroll publication flag"),
+                    )
+                )
+            )
+            if scroll_staging_size
             else ()
         ),
         *(
@@ -641,7 +673,8 @@ def build_memory_layout(
                     runtime_data.start
                     + sprite_runtime_size
                     + palette_runtime_size
-                    + ppu_state_size,
+                    + ppu_state_size
+                    + scroll_staging_size,
                     960,
                     SymbolKind.RUNTIME,
                     runtime_data.name,
@@ -1005,7 +1038,6 @@ def _validated_regions(
 ) -> tuple[MemoryRange, ...]:
     if (
         settings.mapper_number != 0
-        or not settings.horizontal_mirroring
         or settings.prg_rom_banks != 2
         or settings.chr_rom_banks != 1
         or settings.prg_rom_start != 0x8000
@@ -1326,6 +1358,30 @@ def _uses_runtime_palette(program: ResolvedProgram) -> bool:
     )
 
 
+def _uses_set_scroll(program: ResolvedProgram) -> bool:
+    def contains(statements: tuple[ResolvedStatement, ...]) -> bool:
+        for statement in statements:
+            if isinstance(statement, ResolvedSetScroll):
+                return True
+            if isinstance(statement, ResolvedIfStatement):
+                if contains(statement.then_branch):
+                    return True
+                if statement.else_branch is not None and contains(
+                    statement.else_branch
+                ):
+                    return True
+            elif isinstance(
+                statement,
+                (ResolvedWhileStatement, ResolvedRepeatStatement, ResolvedForStatement),
+            ) and contains(statement.body):
+                return True
+        return False
+
+    return contains(program.statements) or any(
+        contains(procedure.body) for procedure in program.procedures
+    )
+
+
 def detect_background_runtime_features(
     program: ResolvedProgram,
 ) -> BackgroundRuntimeFeatures:
@@ -1393,6 +1449,8 @@ def detect_background_runtime_features(
                 values = (statement.x, statement.y, statement.tile)
             elif isinstance(statement, ResolvedSetAttribute):
                 values = (statement.x, statement.y, statement.value)
+            elif isinstance(statement, ResolvedSetScroll):
+                values = (statement.x, statement.y)
             elif isinstance(
                 statement,
                 (ResolvedIncrementStatement, ResolvedDecrementStatement),
@@ -1454,6 +1512,9 @@ def _count_statement_variable_references(
             _count_value_variable_references(value, counts)
     elif isinstance(statement, ResolvedSetAttribute):
         for value in (statement.x, statement.y, statement.value):
+            _count_value_variable_references(value, counts)
+    elif isinstance(statement, ResolvedSetScroll):
+        for value in (statement.x, statement.y):
             _count_value_variable_references(value, counts)
     elif isinstance(
         statement,
@@ -1572,6 +1633,8 @@ def _statement_expression_depth(statement: ResolvedStatement) -> int:
             _expression_depth(statement.y),
             _expression_depth(statement.value),
         )
+    if isinstance(statement, ResolvedSetScroll):
+        return max(_expression_depth(statement.x), _expression_depth(statement.y))
     if isinstance(statement, ResolvedIncrementStatement):
         return _expression_depth(statement.amount) if statement.amount else 0
     if isinstance(statement, ResolvedDecrementStatement):

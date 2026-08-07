@@ -28,11 +28,11 @@ local function validateFallback()
         return
     end
 
-    if not expectByte(0x0200, 0x01, "Counter") then
+    if not expectByte(0x0204, 0x01, "Counter") then
         return
-    elseif not expectByte(0x0201, 0x21, "BackgroundColor") then
+    elseif not expectByte(0x0205, 0x21, "BackgroundColor") then
         return
-    elseif not expectByte(0x0202, 0x01, "Matches") then
+    elseif not expectByte(0x0206, 0x01, "Matches") then
         return
     end
 

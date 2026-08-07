@@ -30,7 +30,7 @@ local function onLastProcessedWrite(address, value)
 end
 
 local function onUpdateActiveWrite(address, value)
-    local current = emu.read(0x0201, emu.memType.nesDebug)
+    local current = emu.read(0x0205, emu.memType.nesDebug)
     if value == 1 then
         if current ~= 0 then
             fail("Update was entered while a previous Update was active.")
@@ -49,7 +49,7 @@ end
 local function validateSlowUpdate()
     local runtimeCounter = emu.read(0x0000, emu.memType.nesDebug)
     local lastProcessed = emu.read(0x0002, emu.memType.nesDebug)
-    local updateActive = emu.read(0x0201, emu.memType.nesDebug)
+    local updateActive = emu.read(0x0205, emu.memType.nesDebug)
 
     if previousRuntimeCounter ~= nil and runtimeCounter ~= previousRuntimeCounter then
         observedRuntimeFrames = observedRuntimeFrames + 1
@@ -87,7 +87,7 @@ emu.addMemoryCallback(
 emu.addMemoryCallback(
     onUpdateActiveWrite,
     emu.callbackType.write,
-    0x0201
+    0x0205
 )
 emu.addEventCallback(
     validateSlowUpdate,

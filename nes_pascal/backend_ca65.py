@@ -37,6 +37,7 @@ from .ast import (
     ResolvedSetPalette,
     ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
+    ResolvedSetScroll,
     ResolvedSetTile,
     ResolvedStatement,
     ResolvedUnaryExpression,
@@ -143,7 +144,14 @@ def generate(
     background_features = detect_background_runtime_features(program)
     background_shadow_enabled = background_features.shadow
     background_queue_enabled = background_features.queue
-    ppu_state_enabled = palette_runtime_enabled or background_queue_enabled
+    ppu_state_enabled = any(
+        symbol.assembly_symbol == "runtime_ppuctrl_shadow"
+        for symbol in layout.runtime_symbols
+    )
+    scroll_runtime_enabled = any(
+        symbol.assembly_symbol == "runtime_scroll_ready"
+        for symbol in layout.runtime_symbols
+    )
     custom_sprite_palette_initialized = _has_initial_sprite_palette(
         program.statements
     )
@@ -274,11 +282,37 @@ def generate(
         if background_queue_enabled
         else ""
     )
+    scroll_commit = (
+        """
+
+    ; Runtime: atomically commit the latest complete scroll pair
+    lda runtime_scroll_ready
+    beq @skip_scroll_commit
+    lda #$00
+    sta runtime_scroll_ready
+    lda runtime_scroll_pending_x
+    sta runtime_scroll_x_shadow
+    lda runtime_scroll_pending_y
+    sta runtime_scroll_y_shadow
+@skip_scroll_commit:"""
+        if scroll_runtime_enabled
+        else ""
+    )
+    ppu_state_restore = """
+
+    ; Runtime: authoritative final PPU state after all VBlank work
+    bit $2002               ; reset the shared PPU write latch
+    lda runtime_ppuctrl_shadow
+    sta $2000
+    lda runtime_scroll_x_shadow
+    sta $2005               ; scroll X (first write)
+    lda runtime_scroll_y_shadow
+    sta $2005               ; scroll Y (second write)
+    lda runtime_ppumask_shadow
+    sta $2001"""
     nmi_work = (
-        f"{sprite_nmi_work}{palette_nmi_work}"
-        f"{background_nmi_work}{vblank_callback_call}"
-        if ppu_state_enabled
-        else f"{vblank_callback_call}{sprite_nmi_work}"
+        f"{sprite_nmi_work}{palette_nmi_work}{background_nmi_work}"
+        f"{vblank_callback_call}{scroll_commit}{ppu_state_restore}"
     )
     palette_runtime_routine = (
         _generate_palette_upload_routine() if palette_runtime_enabled else ""
@@ -536,29 +570,20 @@ def _generate_statements(
                 else []
             )
             rendering_mask = 0x18 if sprite_zero_enabled else 0x08
-            ppu_state_lines = (
-                [
-                    "    lda #$00",
-                    "    sta runtime_scroll_x_shadow ; current default scroll X",
-                    "    sta runtime_scroll_y_shadow ; current default scroll Y",
-                    "    lda #$80",
-                    "    sta runtime_ppuctrl_shadow ; current default PPUCTRL",
-                    "    lda runtime_scroll_x_shadow",
-                    "    sta $2005               ; scroll X",
-                    "    lda runtime_scroll_y_shadow",
-                    "    sta $2005               ; scroll Y",
-                    "    lda runtime_ppuctrl_shadow",
-                    "    sta $2000               ; enable NMI after initialization",
-                ]
-                if ppu_state_enabled
-                else [
-                    "    lda #$00",
-                    "    sta $2005               ; scroll X",
-                    "    sta $2005               ; scroll Y",
-                    "    lda #$80",
-                    "    sta $2000               ; enable NMI after initialization",
-                ]
-            )
+            ppu_state_lines = [
+                "    lda runtime_ppuctrl_shadow",
+                "    ora #$80",
+                "    sta runtime_ppuctrl_shadow ; preserve bits and enable NMI",
+                "    sta $2000",
+                "    lda runtime_scroll_x_shadow ; zero-filled default scroll X",
+                "    sta $2005",
+                "    lda runtime_scroll_y_shadow ; zero-filled default scroll Y",
+                "    sta $2005",
+                "    lda runtime_ppumask_shadow",
+                f"    ora #${rendering_mask:02X}",
+                "    sta runtime_ppumask_shadow ; preserve bits and enable rendering",
+                "    sta $2001",
+            ]
             statement_lines.extend(
                 [
                     "",
@@ -569,8 +594,6 @@ def _generate_statements(
                     f"    bpl {wait_vblank_label}",
                     *sprite_palette_lines,
                     *ppu_state_lines,
-                    f"    lda #${rendering_mask:02X}",
-                    "    sta $2001               ; enable selected rendering layers",
                 ]
             )
         elif isinstance(statement, WaitFrame):
@@ -644,6 +667,22 @@ def _generate_statements(
                     "    pla",
                     "    sta runtime_background_x",
                     "    jsr runtime_set_attribute",
+                ]
+            )
+        elif isinstance(statement, ResolvedSetScroll):
+            statement_lines.extend(
+                [
+                    "",
+                    "; Source: nes.set_scroll(x, y)",
+                    "; Runtime: invalidate, stage both axes, then publish atomically",
+                    "    lda #$00",
+                    "    sta runtime_scroll_ready",
+                    *_load_value(statement.x, label_counter),
+                    "    sta runtime_scroll_pending_x",
+                    *_load_value(statement.y, label_counter),
+                    "    sta runtime_scroll_pending_y",
+                    "    lda #$01",
+                    "    sta runtime_scroll_ready",
                 ]
             )
         elif isinstance(statement, ResolvedClearBackgroundUpdates):
@@ -1115,12 +1154,6 @@ def _generate_palette_upload_routine() -> str:
             "    lda runtime_palette_shadow",
             "    sta $2007",
             "@skip_universal_palette_color:",
-            "    lda runtime_ppuctrl_shadow",
-            "    sta $2000               ; restore compiler-owned PPU state",
-            "    lda runtime_scroll_x_shadow",
-            "    sta $2005",
-            "    lda runtime_scroll_y_shadow",
-            "    sta $2005",
             "    rts",
             "",
             "runtime_upload_palette_triplet:",
@@ -1244,12 +1277,6 @@ runtime_upload_queued_background:
     inx
     cpx #$04
     bne @background_upload_loop
-    lda runtime_ppuctrl_shadow
-    sta $2000               ; restore compiler-owned PPU state
-    lda runtime_scroll_x_shadow
-    sta $2005
-    lda runtime_scroll_y_shadow
-    sta $2005
 {locked_label}    rts{queue_writer_routine}"""
         )
 
@@ -1392,6 +1419,7 @@ def _generate_background_upload(background_shadow_enabled: bool) -> list[str]:
         "; Source: nes.load_background()",
         "; Initialization: upload one complete nametable while rendering is disabled",
         "    lda #$00",
+        "    sta runtime_ppumask_shadow ; keep authoritative mask disabled",
         "    sta $2001               ; keep rendering disabled during bulk upload",
         "    bit $2002               ; reset PPU address latch",
         "    lda #$20",

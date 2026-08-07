@@ -228,6 +228,12 @@ class SetAttribute:
 
 
 @dataclass(frozen=True, slots=True)
+class SetScroll:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
 class ClearBackgroundUpdates:
     arguments: tuple[ValueExpression, ...]
     position: SourcePosition
@@ -342,6 +348,7 @@ Statement = (
     | LoadBackground
     | SetTile
     | SetAttribute
+    | SetScroll
     | ClearBackgroundUpdates
     | ClearBackgroundUpdateOverflow
     | Run
@@ -511,6 +518,12 @@ class ResolvedSetAttribute:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedSetScroll:
+    x: ResolvedValue
+    y: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedClearBackgroundUpdates:
     pass
 
@@ -606,6 +619,7 @@ ResolvedStatement = (
     | ResolvedLoadBackground
     | ResolvedSetTile
     | ResolvedSetAttribute
+    | ResolvedSetScroll
     | ResolvedClearBackgroundUpdates
     | ResolvedClearBackgroundUpdateOverflow
     | Run

@@ -32,13 +32,16 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 
 .segment "RUNTIME_DATA"
 ; Runtime: regular-RAM state kept separate from user variables
-    ; no scalar regular-RAM runtime symbols required
+runtime_ppuctrl_shadow: .res 1 ; $0200: authoritative PPUCTRL value restored each NMI
+runtime_ppumask_shadow: .res 1 ; $0201: authoritative PPUMASK value restored each NMI
+runtime_scroll_x_shadow: .res 1 ; $0202: authoritative horizontal scroll restored each NMI
+runtime_scroll_y_shadow: .res 1 ; $0203: authoritative vertical scroll restored each NMI
 
 .segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
-variable_BackgroundColor: .res 1 ; $0200: BackgroundColor: nes_color
-variable_FrameCounter: .res 1 ; $0201: FrameCounter: byte
-variable_RenderingEnabled: .res 1 ; $0202: RenderingEnabled: boolean
+variable_BackgroundColor: .res 1 ; $0204: BackgroundColor: nes_color
+variable_FrameCounter: .res 1 ; $0205: FrameCounter: byte
+variable_RenderingEnabled: .res 1 ; $0206: RenderingEnabled: boolean
 
 .segment "CODE"
 
@@ -53,6 +56,17 @@ NMI:
     inc runtime_frame_counter ; volatile 8-bit counter, wraps modulo 256
     lda #$01
     sta runtime_frame_ready   ; advisory; frame counter is authoritative
+
+    ; Runtime: authoritative final PPU state after all VBlank work
+    bit $2002               ; reset the shared PPU write latch
+    lda runtime_ppuctrl_shadow
+    sta $2000
+    lda runtime_scroll_x_shadow
+    sta $2005               ; scroll X (first write)
+    lda runtime_scroll_y_shadow
+    sta $2005               ; scroll Y (second write)
+    lda runtime_ppumask_shadow
+    sta $2001
 
     pla
     tay
@@ -124,13 +138,18 @@ RESET:
 @wait_render_vblank_0:
     bit $2002
     bpl @wait_render_vblank_0
-    lda #$00
-    sta $2005               ; scroll X
-    sta $2005               ; scroll Y
-    lda #$80
-    sta $2000               ; enable NMI after initialization
-    lda #$08
-    sta $2001               ; enable selected rendering layers
+    lda runtime_ppuctrl_shadow
+    ora #$80
+    sta runtime_ppuctrl_shadow ; preserve bits and enable NMI
+    sta $2000
+    lda runtime_scroll_x_shadow ; zero-filled default scroll X
+    sta $2005
+    lda runtime_scroll_y_shadow ; zero-filled default scroll Y
+    sta $2005
+    lda runtime_ppumask_shadow
+    ora #$08
+    sta runtime_ppumask_shadow ; preserve bits and enable rendering
+    sta $2001
 
 ; Runtime: implicit stable loop after the main program finishes
 @runtime_idle_loop:

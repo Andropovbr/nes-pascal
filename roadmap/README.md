@@ -5,10 +5,10 @@ progression. Do not infer the current or next milestone from numbering alone.
 
 ## Current roadmap state
 
-- **Current release:** Release 0.4 — Background Graphics
-- **Last completed milestone:** [`0.4.4 — Runtime Background Updates`](0.md#runtime-background-updates)
-- **Next milestone:** [`0.4.5 — Scrolling and PPU State`](0.md#scrolling-and-ppu-state)
-- **Next milestone file:** [Version 0 roadmap](0.md#scrolling-and-ppu-state)
+- **Current release:** Release 0.5 — Sprites and Gameplay
+- **Last completed milestone:** [`0.4.5 — Scrolling and PPU State`](0.md#scrolling-and-ppu-state)
+- **Next milestone:** [`0.5.1 — Basic Sprite Support`](0.md#basic-sprite-support)
+- **Next milestone file:** [Version 0 roadmap](0.md#basic-sprite-support)
 
 ## Philosophy
 

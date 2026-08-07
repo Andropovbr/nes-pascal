@@ -32,7 +32,7 @@ local function validateZeroPage()
         return
     elseif not expectByte(0x0081, 0x21, "BackgroundColor") then
         return
-    elseif not expectByte(0x0200, 0x01, "Matches") then
+    elseif not expectByte(0x0204, 0x01, "Matches") then
         return
     end
 
