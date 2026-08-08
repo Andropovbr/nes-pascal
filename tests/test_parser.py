@@ -156,7 +156,7 @@ class ParserTests(unittest.TestCase):
             )
         self.assertEqual(context.exception.code, "E4001")
         self.assertIn(
-            "Supported types: nes_color, byte, boolean.",
+            "Supported types: nes_color, byte, boolean, sprite.",
             str(context.exception),
         )
 

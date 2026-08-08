@@ -38,9 +38,10 @@ owns the final `RTI`. Ordinary
 update logic runs only on the main thread. Its persistent last-processed frame
 byte preserves a pending NMI across slow callbacks and coalesces older backlog.
 The main thread polls standard controller ports once before each processed
-update. When fixed sprite 0 support is used, NMI commits a complete staging
-record and performs OAM DMA. There is no generic PPU command queue, sprite
-management, controller remapping, or audio.
+update. When sprite support is linked, NMI uploads the complete page-aligned
+OAM shadow by DMA; the legacy fixed sprite-0 helper first commits its complete
+staging record. There is no generic PPU command queue, metasprite/animation
+system, controller remapping, or audio.
 
 ## Memory
 

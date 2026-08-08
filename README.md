@@ -9,7 +9,8 @@ The compiler currently supports explicitly typed constants and global
 variables, exact-type assignments, one-byte arithmetic, comparisons,
 short-circuit Boolean expressions, structured conditionals and loops,
 increment and decrement operations, and acyclic procedures with `byte` and
-`boolean` value parameters. The deterministic memory layout places mandatory
+`boolean` value parameters. The one-byte `sprite` type strongly selects one of
+64 hardware OAM entries. The deterministic memory layout places mandatory
 compiler temporaries in Zero Page and conservatively promotes frequently
 referenced globals with safe regular-RAM fallback. Its runtime installs a
 minimal register-safe NMI handler, maintains an 8-bit frame counter, and
@@ -25,8 +26,10 @@ table before rendering begins, alongside configured CHR-ROM and palette data.
 After startup, a four-write VBlank queue supports bounded tile and raw
 attribute updates. `nes.get_tile` conditionally links a 960-byte confirmed PPU
 tile shadow. `nes.set_scroll` atomically stages a fixed scroll pair, and the
-ROM header supports static horizontal or vertical mirroring. Programs without sprite operations also omit the 256-byte OAM
-shadow and reuse that RAM page for runtime state and variables.
+ROM header supports static horizontal or vertical mirroring. Hardware sprite
+primitives maintain a page-aligned 256-byte OAM shadow, preserve attribute
+flags, and upload it through NMI DMA. Programs without sprite operations omit
+that shadow and reuse the RAM page for runtime state and variables.
 
 ## Documentation
 

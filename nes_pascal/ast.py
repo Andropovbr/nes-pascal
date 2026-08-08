@@ -16,6 +16,7 @@ class BuiltInType(Enum):
     NES_COLOR = "nes_color"
     BYTE = "byte"
     BOOLEAN = "boolean"
+    SPRITE = "sprite"
 
 
 class UnaryOperator(Enum):
@@ -56,6 +57,19 @@ class ControllerQueryKind(Enum):
 class PaletteKind(Enum):
     BACKGROUND = "background"
     SPRITE = "sprite"
+
+
+class SpriteOperationKind(Enum):
+    SET_X = "set_x"
+    SET_Y = "set_y"
+    SET_TILE = "set_tile"
+    SET_PALETTE = "set_palette"
+    SET_ATTRIBUTES = "set_attributes"
+    HIDE = "hide"
+    SHOW = "show"
+    SET_FLIP_HORIZONTAL = "set_flip_horizontal"
+    SET_FLIP_VERTICAL = "set_flip_vertical"
+    SET_BEHIND_BACKGROUND = "set_behind_background"
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +284,13 @@ class SetSpriteZero:
 
 
 @dataclass(frozen=True, slots=True)
+class SpriteOperation:
+    kind: SpriteOperationKind
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
 class IfStatement:
     condition: ValueExpression
     then_branch: tuple[Statement, ...]
@@ -355,6 +376,7 @@ Statement = (
     | WaitFrame
     | CallbackRegistration
     | SetSpriteZero
+    | SpriteOperation
     | IfStatement
     | WhileStatement
     | RepeatStatement
@@ -611,6 +633,13 @@ class ResolvedSetSpriteZero:
     attributes: ResolvedValue
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedSpriteOperation:
+    kind: SpriteOperationKind
+    sprite: ResolvedValue
+    value: ResolvedValue | None = None
+
+
 ResolvedStatement = (
     ResolvedAssignment
     | ResolvedSetBackgroundColor
@@ -626,6 +655,7 @@ ResolvedStatement = (
     | WaitFrame
     | ResolvedCallbackRegistration
     | ResolvedSetSpriteZero
+    | ResolvedSpriteOperation
     | ResolvedIfStatement
     | ResolvedWhileStatement
     | ResolvedRepeatStatement

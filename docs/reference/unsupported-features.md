@@ -7,7 +7,7 @@ the supported language.
 
 ## Language limitations
 
-- `nes_color`, `byte`, and `boolean` are the only built-in types.
+- `nes_color`, `byte`, `boolean`, and `sprite` are the only built-in types.
 - `type` declarations and user-defined types are not supported.
 - Constants cannot refer to other constants, and constant initializers cannot
   contain expressions.
@@ -32,7 +32,7 @@ the supported language.
 - Statements are limited to assignment, `inc` and `dec`, `if`/`else`,
   supported loops, `break`, `continue`, procedure calls,
   the palette APIs, `nes.load_background`, `nes.set_background_color`,
-  `nes.set_scroll`,
+  `nes.set_scroll`, the `nes.sprite_*` hardware sprite primitives,
   `nes.run`, `nes.wait_frame`,
   `nes.on_update`, `nes.on_vblank`, and the fixed controller-example
   `nes.set_sprite_zero` helper.
@@ -60,8 +60,11 @@ the supported language.
   can be staged with `nes.set_scroll`.
 - Standard controllers 1 and 2 are supported without remapping, Four Score,
   expansion devices, buffering, combos, turbo, or DMC-safe repeated reads.
-- General sprites, audio, and converted graphics assets are not supported.
-  `nes.set_sprite_zero` stages hardware sprite 0 only and is not a sprite API.
+- Hardware sprite primitives support all 64 OAM entries, individual fields,
+  palette/flip/priority attributes, deterministic hide/show, and NMI OAM DMA.
+  Metasprites, animations, collision, automatic allocation, sprite
+  multiplexing/flickering, sorting, and scanline-overflow mitigation are not
+  supported. `nes.set_sprite_zero` remains a legacy compatibility helper.
 - Callback registration is static. There is only one callback of each kind,
   with no parameters, return values, priorities, lists, removal, indirect
   calls, IRQ callbacks, or user-owned interrupt handlers.

@@ -67,7 +67,7 @@ NMI:
     lda #$01
     sta runtime_frame_ready   ; advisory; frame counter is authoritative
 
-    ; Runtime: commit a complete staged sprite 0, then upload OAM in VBlank
+    ; Runtime: commit the legacy helper's complete staged sprite 0
     lda runtime_sprite_zero_ready
     beq @skip_sprite_zero_commit
     lda #$00
@@ -81,6 +81,7 @@ NMI:
     lda runtime_sprite_zero_pending_x
     sta runtime_oam_shadow + 3
 @skip_sprite_zero_commit:
+    ; Runtime: upload the complete OAM shadow during VBlank
     lda #$00
     sta $2003               ; OAM address
     lda #>runtime_oam_shadow
@@ -141,6 +142,17 @@ RESET:
 @wait_vblank_2:
     bit $2002
     bpl @wait_vblank_2
+
+    ; Runtime: hide all 64 sprites before the first OAM DMA
+    lda #$FF
+    ldx #$00
+@hide_all_sprites:
+    sta runtime_oam_shadow, x
+    inx
+    inx
+    inx
+    inx
+    bne @hide_all_sprites
 
 ; Source: PlayerX := value
     lda #$78

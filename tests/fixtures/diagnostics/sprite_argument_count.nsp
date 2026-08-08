@@ -1,0 +1,6 @@
+program SpriteArgumentCount;
+begin
+    nes.sprite_set_x($00);
+    nes.set_background_color($0F);
+    nes.run;
+end.

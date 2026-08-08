@@ -46,6 +46,8 @@ from .ast import (
     SetScroll,
     SetTile,
     SourcePosition,
+    SpriteOperation,
+    SpriteOperationKind,
     Statement,
     UnaryExpression,
     UnaryOperator,
@@ -352,6 +354,35 @@ class Parser:
                     "Expected ';' after 'nes.set_sprite_zero(...)'.",
                 )
             return SetSpriteZero(
+                arguments,
+                SourcePosition(namespace.line, namespace.column),
+            )
+        sprite_commands = {
+            "nes.sprite_set_x": SpriteOperationKind.SET_X,
+            "nes.sprite_set_y": SpriteOperationKind.SET_Y,
+            "nes.sprite_set_tile": SpriteOperationKind.SET_TILE,
+            "nes.sprite_set_palette": SpriteOperationKind.SET_PALETTE,
+            "nes.sprite_set_attributes": SpriteOperationKind.SET_ATTRIBUTES,
+            "nes.sprite_hide": SpriteOperationKind.HIDE,
+            "nes.sprite_show": SpriteOperationKind.SHOW,
+            "nes.sprite_set_flip_horizontal": (
+                SpriteOperationKind.SET_FLIP_HORIZONTAL
+            ),
+            "nes.sprite_set_flip_vertical": SpriteOperationKind.SET_FLIP_VERTICAL,
+            "nes.sprite_set_behind_background": (
+                SpriteOperationKind.SET_BEHIND_BACKGROUND
+            ),
+        }
+        sprite_kind = sprite_commands.get(normalized)
+        if sprite_kind is not None:
+            arguments = self._parse_expression_arguments(normalized)
+            if consume_terminator:
+                self._expect(
+                    TokenKind.SEMICOLON,
+                    f"Expected ';' after '{normalized}(...)'.",
+                )
+            return SpriteOperation(
+                sprite_kind,
                 arguments,
                 SourcePosition(namespace.line, namespace.column),
             )
@@ -908,6 +939,7 @@ class Parser:
             "nes.load_background();, a background tile/attribute update, "
             "a nes.set_* palette call, "
             "nes.set_scroll(...);, "
+            "a nes.sprite_* call, "
             "nes.set_sprite_zero(...);, "
             "nes.on_update(Procedure);, nes.on_vblank(Procedure);, "
             "nes.wait_frame;, or nes.run;.",

@@ -27,6 +27,7 @@ from .ast import (
     ResolvedSetPalette,
     ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
+    ResolvedSpriteOperation,
     ResolvedSetScroll,
     ResolvedSetTile,
     ResolvedStatement,
@@ -173,6 +174,22 @@ class BackgroundRuntimeFeatures:
 
 
 @dataclass(frozen=True, slots=True)
+class SpriteRuntimeFeatures:
+    """Sprite entry points and the runtime storage they require."""
+
+    legacy_sprite_zero: bool = False
+    sprite_api: bool = False
+
+    @property
+    def oam_shadow(self) -> bool:
+        return self.legacy_sprite_zero or self.sprite_api
+
+    @property
+    def runtime_size(self) -> int:
+        return (5 if self.legacy_sprite_zero else 0) + (65 if self.sprite_api else 0)
+
+
+@dataclass(frozen=True, slots=True)
 class ProgramMemoryLayout:
     """Validated regions and concrete symbol allocations for one program."""
 
@@ -281,13 +298,16 @@ def build_memory_layout(
 ) -> ProgramMemoryLayout:
     """Validate settings and allocate every RAM-backed program symbol."""
 
-    sprite_zero_enabled = _uses_sprite_zero(program)
+    sprite_features = detect_sprite_runtime_features(program)
+    sprite_zero_enabled = sprite_features.legacy_sprite_zero
+    sprite_api_enabled = sprite_features.sprite_api
     palette_runtime_enabled = _uses_runtime_palette(program)
     scroll_runtime_enabled = _uses_set_scroll(program)
     background_features = detect_background_runtime_features(program)
     background_queue_enabled = background_features.queue
     background_shadow_enabled = background_features.shadow
-    sprite_runtime_size = 5 if sprite_zero_enabled else 0
+    sprite_zero_runtime_size = 5 if sprite_zero_enabled else 0
+    sprite_runtime_size = sprite_features.runtime_size
     palette_runtime_size = 41 if palette_runtime_enabled else 0
     ppu_state_size = 4
     scroll_staging_size = 3 if scroll_runtime_enabled else 0
@@ -315,7 +335,7 @@ def build_memory_layout(
         settings,
         source,
         filename,
-        oam_shadow_enabled=sprite_zero_enabled,
+        oam_shadow_enabled=sprite_features.oam_shadow,
     )
     (
         physical_ram,
@@ -513,7 +533,7 @@ def build_memory_layout(
                     "256-byte page copied to PPU OAM by runtime sprite support",
                 ),
             )
-            if sprite_zero_enabled
+            if sprite_features.oam_shadow
             else ()
         ),
         *(
@@ -560,6 +580,28 @@ def build_memory_layout(
                 ),
             )
             if sprite_zero_enabled
+            else ()
+        ),
+        *(
+            (
+                MemorySymbol(
+                    "runtime_sprite_logical_y",
+                    runtime_data.start + sprite_zero_runtime_size,
+                    64,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "logical Y coordinates restored by nes.sprite_show",
+                ),
+                MemorySymbol(
+                    "runtime_sprite_value",
+                    runtime_data.start + sprite_zero_runtime_size + 64,
+                    1,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "temporary property value for sprite runtime helpers",
+                ),
+            )
+            if sprite_api_enabled
             else ()
         ),
         *(
@@ -1307,27 +1349,35 @@ def _global_variable_reference_counts(program: ResolvedProgram) -> dict[str, int
     return counts
 
 
-def _uses_sprite_zero(program: ResolvedProgram) -> bool:
-    def contains(statements: tuple[ResolvedStatement, ...]) -> bool:
+def detect_sprite_runtime_features(program: ResolvedProgram) -> SpriteRuntimeFeatures:
+    """Collect legacy and general sprite entry-point use recursively."""
+
+    legacy_sprite_zero = False
+    sprite_api = False
+
+    def visit(statements: tuple[ResolvedStatement, ...]) -> None:
+        nonlocal legacy_sprite_zero, sprite_api
         for statement in statements:
             if isinstance(statement, ResolvedSetSpriteZero):
-                return True
+                legacy_sprite_zero = True
+            elif isinstance(statement, ResolvedSpriteOperation):
+                sprite_api = True
             if isinstance(statement, ResolvedIfStatement):
-                if contains(statement.then_branch):
-                    return True
-                if statement.else_branch is not None and contains(
-                    statement.else_branch
-                ):
-                    return True
+                visit(statement.then_branch)
+                if statement.else_branch is not None:
+                    visit(statement.else_branch)
             elif isinstance(
                 statement,
                 (ResolvedWhileStatement, ResolvedRepeatStatement, ResolvedForStatement),
-            ) and contains(statement.body):
-                return True
-        return False
+            ):
+                visit(statement.body)
 
-    return contains(program.statements) or any(
-        contains(procedure.body) for procedure in program.procedures
+    visit(program.statements)
+    for procedure in program.procedures:
+        visit(procedure.body)
+    return SpriteRuntimeFeatures(
+        legacy_sprite_zero=legacy_sprite_zero,
+        sprite_api=sprite_api,
     )
 
 
@@ -1445,6 +1495,12 @@ def detect_background_runtime_features(
                     statement.tile,
                     statement.attributes,
                 )
+            elif isinstance(statement, ResolvedSpriteOperation):
+                values = (
+                    (statement.sprite,)
+                    if statement.value is None
+                    else (statement.sprite, statement.value)
+                )
             elif isinstance(statement, ResolvedSetTile):
                 values = (statement.x, statement.y, statement.tile)
             elif isinstance(statement, ResolvedSetAttribute):
@@ -1507,6 +1563,10 @@ def _count_statement_variable_references(
             statement.attributes,
         ):
             _count_value_variable_references(value, counts)
+    elif isinstance(statement, ResolvedSpriteOperation):
+        _count_value_variable_references(statement.sprite, counts)
+        if statement.value is not None:
+            _count_value_variable_references(statement.value, counts)
     elif isinstance(statement, ResolvedSetTile):
         for value in (statement.x, statement.y, statement.tile):
             _count_value_variable_references(value, counts)
@@ -1620,6 +1680,11 @@ def _statement_expression_depth(statement: ResolvedStatement) -> int:
             _expression_depth(statement.y),
             _expression_depth(statement.tile),
             _expression_depth(statement.attributes),
+        )
+    if isinstance(statement, ResolvedSpriteOperation):
+        return max(
+            _expression_depth(statement.sprite),
+            _expression_depth(statement.value) if statement.value is not None else 0,
         )
     if isinstance(statement, ResolvedSetTile):
         return max(

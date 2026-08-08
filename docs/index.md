@@ -37,6 +37,7 @@ Planned work is tracked separately in the
 - [Target platform](runtime/target-platform.md)
 - [Frame callbacks](runtime/frame-callbacks.md)
 - [Controller input](runtime/controller-input.md)
+- [Hardware sprites](runtime/sprites.md)
 
 ## Reference
 

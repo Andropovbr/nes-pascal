@@ -35,7 +35,8 @@ The compiler pipeline is deliberately separated:
   initialization nametable upload, minimal NMI handler, VBlank-safe runtime
   transition, frame-counter wait sequence, persistent last-processed frame
   state, isolated serial controller reader, guarded controller polling, bounded
-  background queue, confirmed tile shadow, and direct static callback calls;
+  background queue, confirmed tile shadow, page-aligned OAM shadow, sprite
+  property helpers, OAM DMA, and direct static callback calls;
 - `cli.py` writes Assembly, the generated `.cfg` linker configuration, and the
   `.map` CPU memory report before coordinating ca65 and ld65.
 

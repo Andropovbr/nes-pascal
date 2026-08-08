@@ -9,7 +9,8 @@ cycle. Programs should retain margin rather than consume the estimate exactly.
 The generated NMI performs work in this fixed order:
 
 1. enter NMI, preserve A, X, and Y, and publish frame state;
-2. commit sprite-zero staging and run OAM DMA when that helper is used;
+2. commit legacy sprite-zero staging when present, then run OAM DMA when any
+   sprite operation is linked;
 3. scan and upload queued palette changes when runtime palette calls exist;
 4. scan up to four queued background writes when runtime background calls exist;
 5. call the optional user VBlank callback;
@@ -38,7 +39,8 @@ code and should be updated when that code changes.
 | Background queue scan with four write-only slots and no cancellation support | 203 |
 | Background queue scan with four confirmed tiles and no cancellation support | 335 |
 | Additional lock check when cancellation support is linked | 6 |
-| Sprite-zero commit plus OAM DMA | 569-570 |
+| General-sprite OAM DMA, including `$2003` reset | 525-526 |
+| Legacy sprite-zero commit plus OAM DMA | 569-570 |
 | Empty user VBlank callback dispatch (`JSR` plus `RTS`) | 12 |
 | Final PPU state restoration | 36 |
 | Linked scroll commit with no pending pair | 7 |
@@ -56,25 +58,28 @@ callback, are:
 | --- | ---: | ---: |
 | Clean palette scan | 175 | 2,098 |
 | All palette colors dirty | 884 | 1,389 |
-| OAM DMA and all palette colors dirty | 1,454 | 819 |
+| General OAM DMA and all palette colors dirty | 1,410 | 863 |
 | Four background writes with confirmed shadow updates | 435 | 1,838 |
 | All palette colors dirty and four confirmed tile writes | 1,219 | 1,054 |
-| OAM DMA, all palette colors dirty, and four confirmed tile writes | 1,789 | 484 |
+| General OAM DMA, all palette colors dirty, and four confirmed tile writes | 1,745 | 528 |
 
 The remainder must cover the callback body, any procedures it calls, timing
 jitter, and a safety margin. A program without a registered callback omits the
 12-cycle dispatch. Linking cancellation adds six cycles to each row containing
-background work; the final row then becomes 1,795 used and 478 remaining.
+background work; the final row then becomes 1,751 used and 522 remaining.
 Linking `nes.set_scroll` adds seven cycles when no pair is pending or 28 cycles
 when NMI commits one, reducing the corresponding remainder by that amount.
+Programs using the legacy `nes.set_sprite_zero` compatibility helper add up to
+44 cycles for its atomic record commit, reproducing the former 1,789-cycle
+combined worst case before cancellation or scroll work.
 
 ## Scalability limits
 
 The compiler checks whether VBlank callbacks use the supported interrupt-safe
 subset, but it does not calculate loop bounds, call-graph cycles, or reject an
 over-budget callback. A structurally valid callback can still overrun VBlank.
-The current all-dirty palette path, four confirmed tile writes, and OAM DMA
-consume about 80 percent of the nominal window before useful callback work. The
+The current all-dirty palette path, four confirmed tile writes, and general
+OAM DMA consume about 77 percent of the nominal window before useful callback work. The
 background contribution is bounded by four single-byte PPU writes per frame;
 additional requests are rejected and set a sticky overflow flag. Write-only
 programs omit the shadow confirmation work and use a 203-cycle uploader
@@ -91,7 +96,7 @@ clearing omit the background uploader entirely.
 
 This design scales only while additional fixed NMI tasks remain explicitly
 bounded and their combined worst case leaves margin. Nametable streaming,
-general sprite systems, audio DMA, or other PPU uploads would need a revised
+metasprites, audio DMA, or other PPU uploads would need a revised
 central budget and scheduling policy; none are implemented here. The figures
 are NTSC-only and do not claim PAL timing support.
 

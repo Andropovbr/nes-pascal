@@ -37,6 +37,7 @@ from .ast import (
     ResolvedSetPalette,
     ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
+    ResolvedSpriteOperation,
     ResolvedSetScroll,
     ResolvedSetTile,
     ResolvedStatement,
@@ -44,6 +45,7 @@ from .ast import (
     ResolvedValue,
     ResolvedWhileStatement,
     Run,
+    SpriteOperationKind,
     UnaryOperator,
     VariableValue,
     WaitFrame,
@@ -53,6 +55,7 @@ from .memory_layout import (
     ProgramMemoryLayout,
     build_memory_layout,
     detect_background_runtime_features,
+    detect_sprite_runtime_features,
 )
 
 
@@ -128,6 +131,9 @@ def generate(
         symbol.assembly_symbol == "runtime_sprite_zero_ready"
         for symbol in layout.runtime_symbols
     )
+    sprite_features = detect_sprite_runtime_features(program)
+    sprite_api_enabled = sprite_features.sprite_api
+    oam_enabled = bool(oam_symbols)
     palette_runtime_enabled = any(
         symbol.assembly_symbol == "runtime_palette_shadow"
         for symbol in layout.runtime_symbols
@@ -163,7 +169,7 @@ def generate(
         label_counter,
         (),
         for_counter,
-        sprite_zero_enabled,
+        oam_enabled,
         palette_runtime_enabled,
         background_queue_enabled,
         background_shadow_enabled,
@@ -174,7 +180,7 @@ def generate(
         program.procedures,
         label_counter,
         for_counter,
-        sprite_zero_enabled,
+        oam_enabled,
         palette_runtime_enabled,
         background_queue_enabled,
         background_shadow_enabled,
@@ -241,10 +247,10 @@ def generate(
     jsr {update_callback.procedure_label}
     jmp @runtime_update_loop"""
 
-    sprite_nmi_work = (
+    sprite_zero_commit = (
         """
 
-    ; Runtime: commit a complete staged sprite 0, then upload OAM in VBlank
+    ; Runtime: commit the legacy helper's complete staged sprite 0
     lda runtime_sprite_zero_ready
     beq @skip_sprite_zero_commit
     lda #$00
@@ -257,12 +263,34 @@ def generate(
     sta runtime_oam_shadow + 2
     lda runtime_sprite_zero_pending_x
     sta runtime_oam_shadow + 3
-@skip_sprite_zero_commit:
+@skip_sprite_zero_commit:"""
+        if sprite_zero_enabled
+        else ""
+    )
+    sprite_nmi_work = (
+        f"""{sprite_zero_commit}
+    ; Runtime: upload the complete OAM shadow during VBlank
     lda #$00
     sta $2003               ; OAM address
     lda #>runtime_oam_shadow
     sta $4014               ; page-aligned OAM DMA"""
-        if sprite_zero_enabled
+        if oam_enabled
+        else ""
+    )
+    oam_initialization = (
+        """
+    ; Runtime: hide all 64 sprites before the first OAM DMA
+    lda #$FF
+    ldx #$00
+@hide_all_sprites:
+    sta runtime_oam_shadow, x
+    inx
+    inx
+    inx
+    inx
+    bne @hide_all_sprites
+"""
+        if oam_enabled
         else ""
     )
     palette_nmi_work = (
@@ -321,6 +349,9 @@ def generate(
         _generate_background_runtime_routines(background_features)
         if background_queue_enabled or background_shadow_enabled
         else ""
+    )
+    sprite_runtime_routines = (
+        _generate_sprite_runtime_routines() if sprite_api_enabled else ""
     )
     chr_storage = _generate_chr_storage(
         settings.chr_rom_size,
@@ -410,7 +441,7 @@ RESET:
 @wait_vblank_2:
     bit $2002
     bpl @wait_vblank_2
-{empty_background_initialization}{statements}
+{oam_initialization}{empty_background_initialization}{statements}
 
 {runtime_main_loop}
 
@@ -454,7 +485,7 @@ runtime_read_controller_ports:
     ror runtime_controller_2_current
     dex
     bne @read_controller_bits
-    rts{palette_runtime_routine}{background_runtime_routines}
+    rts{sprite_runtime_routines}{palette_runtime_routine}{background_runtime_routines}
 {procedures}{background_storage}
 
 .segment "VECTORS"
@@ -632,6 +663,10 @@ def _generate_statements(
                     "    lda #$01",
                     "    sta runtime_sprite_zero_ready",
                 ]
+            )
+        elif isinstance(statement, ResolvedSpriteOperation):
+            statement_lines.extend(
+                _generate_sprite_operation(statement, label_counter)
             )
         elif isinstance(statement, ResolvedSetTile):
             statement_lines.extend(
@@ -951,6 +986,219 @@ def _has_initial_sprite_palette(
         ) and _has_initial_sprite_palette(statement.body):
             return True
     return False
+
+
+def _generate_sprite_operation(
+    statement: ResolvedSpriteOperation,
+    label_counter: list[int],
+) -> list[str]:
+    command = f"nes.sprite_{statement.kind.value}"
+    lines = ["", f"; Source: {command}(...)"]
+    if statement.value is not None:
+        lines.extend(
+            [
+                *_load_value(statement.value, label_counter),
+                "    sta runtime_sprite_value ; evaluate the property once",
+            ]
+        )
+
+    if not isinstance(statement.sprite, ImmediateValue):
+        lines.extend(
+            [
+                *_load_value(statement.sprite, label_counter),
+                f"    jsr runtime_sprite_{statement.kind.value}",
+            ]
+        )
+        return lines
+
+    sprite_index = statement.sprite.value
+    oam_offset = sprite_index * 4
+    oam = (
+        "runtime_oam_shadow"
+        if oam_offset == 0
+        else f"runtime_oam_shadow + {oam_offset}"
+    )
+    logical_y = (
+        "runtime_sprite_logical_y"
+        if sprite_index == 0
+        else f"runtime_sprite_logical_y + {sprite_index}"
+    )
+    kind = statement.kind
+    if kind is SpriteOperationKind.SET_X:
+        lines.extend(["    lda runtime_sprite_value", f"    sta {oam} + 3"])
+    elif kind is SpriteOperationKind.SET_TILE:
+        lines.extend(["    lda runtime_sprite_value", f"    sta {oam} + 1"])
+    elif kind is SpriteOperationKind.SET_ATTRIBUTES:
+        lines.extend(["    lda runtime_sprite_value", f"    sta {oam} + 2"])
+    elif kind is SpriteOperationKind.SET_Y:
+        skip = _new_label(label_counter, "sprite_hidden")
+        lines.extend(
+            [
+                "    lda runtime_sprite_value",
+                f"    sta {logical_y}",
+                f"    lda {oam}",
+                "    cmp #$FF",
+                f"    beq {skip}",
+                "    lda runtime_sprite_value",
+                f"    sta {oam}",
+                f"{skip}:",
+            ]
+        )
+    elif kind is SpriteOperationKind.HIDE:
+        skip = _new_label(label_counter, "sprite_already_hidden")
+        lines.extend(
+            [
+                f"    lda {oam}",
+                "    cmp #$FF",
+                f"    beq {skip}",
+                f"    sta {logical_y}",
+                "    lda #$FF",
+                f"    sta {oam}",
+                f"{skip}:",
+            ]
+        )
+    elif kind is SpriteOperationKind.SHOW:
+        lines.extend([f"    lda {logical_y}", f"    sta {oam}"])
+    elif kind is SpriteOperationKind.SET_PALETTE:
+        skip = _new_label(label_counter, "sprite_invalid_palette")
+        lines.extend(
+            [
+                "    lda runtime_sprite_value",
+                "    cmp #$04",
+                f"    bcs {skip}             ; ignore invalid dynamic palettes",
+                f"    lda {oam} + 2",
+                "    and #$FC               ; preserve priority and flip bits",
+                "    ora runtime_sprite_value",
+                f"    sta {oam} + 2",
+                f"{skip}:",
+            ]
+        )
+    else:
+        masks = {
+            SpriteOperationKind.SET_FLIP_HORIZONTAL: 0x40,
+            SpriteOperationKind.SET_FLIP_VERTICAL: 0x80,
+            SpriteOperationKind.SET_BEHIND_BACKGROUND: 0x20,
+        }
+        mask = masks[kind]
+        clear = _new_label(label_counter, "sprite_clear_attribute")
+        store = _new_label(label_counter, "sprite_store_attribute")
+        lines.extend(
+            [
+                "    lda runtime_sprite_value",
+                "    beq " + clear,
+                f"    lda {oam} + 2",
+                f"    ora #${mask:02X}",
+                f"    jmp {store}",
+                f"{clear}:",
+                f"    lda {oam} + 2",
+                f"    and #${0xFF ^ mask:02X}",
+                f"{store}:",
+                f"    sta {oam} + 2",
+            ]
+        )
+    return lines
+
+
+def _generate_sprite_runtime_routines() -> str:
+    """Generate bounded helpers for dynamic hardware-sprite indexes."""
+
+    def offset_prelude() -> list[str]:
+        return [
+            "    asl a                   ; sprite index * 4",
+            "    asl a",
+            "    tax",
+        ]
+
+    lines = [
+        "",
+        "",
+        "; Runtime: hardware sprite primitives over the OAM shadow",
+        "runtime_sprite_set_x:",
+        *offset_prelude(),
+        "    lda runtime_sprite_value",
+        "    sta runtime_oam_shadow + 3, x",
+        "    rts",
+        "",
+        "runtime_sprite_set_tile:",
+        *offset_prelude(),
+        "    lda runtime_sprite_value",
+        "    sta runtime_oam_shadow + 1, x",
+        "    rts",
+        "",
+        "runtime_sprite_set_attributes:",
+        *offset_prelude(),
+        "    lda runtime_sprite_value",
+        "    sta runtime_oam_shadow + 2, x",
+        "    rts",
+        "",
+        "runtime_sprite_set_y:",
+        "    tay                     ; retain sprite index for logical Y",
+        *offset_prelude(),
+        "    lda runtime_sprite_value",
+        "    sta runtime_sprite_logical_y, y",
+        "    lda runtime_oam_shadow, x",
+        "    cmp #$FF",
+        "    beq @sprite_set_y_done  ; setting Y does not implicitly show",
+        "    lda runtime_sprite_value",
+        "    sta runtime_oam_shadow, x",
+        "@sprite_set_y_done:",
+        "    rts",
+        "",
+        "runtime_sprite_hide:",
+        "    tay                     ; retain sprite index for logical Y",
+        *offset_prelude(),
+        "    lda runtime_oam_shadow, x",
+        "    cmp #$FF",
+        "    beq @sprite_hide_done",
+        "    sta runtime_sprite_logical_y, y",
+        "    lda #$FF",
+        "    sta runtime_oam_shadow, x",
+        "@sprite_hide_done:",
+        "    rts",
+        "",
+        "runtime_sprite_show:",
+        "    tay                     ; retain sprite index for logical Y",
+        *offset_prelude(),
+        "    lda runtime_sprite_logical_y, y",
+        "    sta runtime_oam_shadow, x",
+        "    rts",
+        "",
+        "runtime_sprite_set_palette:",
+        *offset_prelude(),
+        "    lda runtime_sprite_value",
+        "    cmp #$04",
+        "    bcs @sprite_palette_done ; reject invalid dynamic palettes",
+        "    lda runtime_oam_shadow + 2, x",
+        "    and #$FC                 ; preserve priority and flip bits",
+        "    ora runtime_sprite_value",
+        "    sta runtime_oam_shadow + 2, x",
+        "@sprite_palette_done:",
+        "    rts",
+    ]
+    for name, mask in (
+        ("set_flip_horizontal", 0x40),
+        ("set_flip_vertical", 0x80),
+        ("set_behind_background", 0x20),
+    ):
+        lines.extend(
+            [
+                "",
+                f"runtime_sprite_{name}:",
+                *offset_prelude(),
+                "    lda runtime_sprite_value",
+                f"    beq @sprite_{name}_clear",
+                "    lda runtime_oam_shadow + 2, x",
+                f"    ora #${mask:02X}",
+                f"    jmp @sprite_{name}_store",
+                f"@sprite_{name}_clear:",
+                "    lda runtime_oam_shadow + 2, x",
+                f"    and #${0xFF ^ mask:02X}",
+                f"@sprite_{name}_store:",
+                "    sta runtime_oam_shadow + 2, x",
+                "    rts",
+            ]
+        )
+    return "\n".join(lines)
 
 
 def _palette_shadow_base(kind: PaletteKind, palette_index: int) -> int:

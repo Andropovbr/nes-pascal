@@ -71,6 +71,8 @@ the range reserved for their category.
 | [E3044](semantic.md) | Semantic Analysis | Invalid background-overflow query argument count |
 | [E3045](semantic.md) | Semantic Analysis | Invalid background-overflow clear argument count |
 | [E3046](semantic.md) | Semantic Analysis | Invalid set-scroll argument count |
+| [E3047](semantic.md) | Semantic Analysis | Invalid sprite API argument count |
+| [E3048](semantic.md) | Semantic Analysis | Invalid hardware sprite palette |
 | [E4001](type-system.md) | Type System | Unknown type |
 | [E4002](type-system.md) | Type System | Invalid `nes_color` value |
 | [E4003](type-system.md) | Type System | Invalid `byte` value |
@@ -78,6 +80,7 @@ the range reserved for their category.
 | [E4005](type-system.md) | Type System | Unsupported parameter type |
 | [E4006](type-system.md) | Type System | Invalid controller argument type |
 | [E4007](type-system.md) | Type System | Invalid palette argument type |
+| [E4008](type-system.md) | Type System | Invalid `sprite` value |
 | [E5001](code-generation.md) | Code Generation | Missing toolchain |
 | [E5002](code-generation.md) | Code Generation | Toolchain failure |
 | [E5003](code-generation.md) | Code Generation | User RAM exhausted |
