@@ -37,6 +37,7 @@ from .ast import (
     ResolvedSetPalette,
     ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
+    ResolvedSpriteCreate,
     ResolvedSpriteOperation,
     ResolvedSetScroll,
     ResolvedSetTile,
@@ -351,7 +352,9 @@ def generate(
         else ""
     )
     sprite_runtime_routines = (
-        _generate_sprite_runtime_routines() if sprite_api_enabled else ""
+        _generate_sprite_runtime_routines(sprite_features.set_position)
+        if sprite_api_enabled
+        else ""
     )
     chr_storage = _generate_chr_storage(
         settings.chr_rom_size,
@@ -1001,8 +1004,15 @@ def _generate_sprite_operation(
                 "    sta runtime_sprite_value ; evaluate the property once",
             ]
         )
+    if statement.secondary_value is not None:
+        lines.extend(
+            [
+                *_load_value(statement.secondary_value, label_counter),
+                "    sta runtime_sprite_secondary_value ; evaluate Y once",
+            ]
+        )
 
-    if not isinstance(statement.sprite, ImmediateValue):
+    if not isinstance(statement.sprite, (ImmediateValue, ResolvedSpriteCreate)):
         lines.extend(
             [
                 *_load_value(statement.sprite, label_counter),
@@ -1011,7 +1021,11 @@ def _generate_sprite_operation(
         )
         return lines
 
-    sprite_index = statement.sprite.value
+    sprite_index = (
+        statement.sprite.value
+        if isinstance(statement.sprite, ImmediateValue)
+        else statement.sprite.index
+    )
     oam_offset = sprite_index * 4
     oam = (
         "runtime_oam_shadow"
@@ -1024,7 +1038,23 @@ def _generate_sprite_operation(
         else f"runtime_sprite_logical_y + {sprite_index}"
     )
     kind = statement.kind
-    if kind is SpriteOperationKind.SET_X:
+    if kind is SpriteOperationKind.SET_POSITION:
+        skip = _new_label(label_counter, "sprite_hidden")
+        lines.extend(
+            [
+                "    lda runtime_sprite_value",
+                f"    sta {oam} + 3",
+                "    lda runtime_sprite_secondary_value",
+                f"    sta {logical_y}",
+                f"    lda {oam}",
+                "    cmp #$FF",
+                f"    beq {skip}",
+                "    lda runtime_sprite_secondary_value",
+                f"    sta {oam}",
+                f"{skip}:",
+            ]
+        )
+    elif kind is SpriteOperationKind.SET_X:
         lines.extend(["    lda runtime_sprite_value", f"    sta {oam} + 3"])
     elif kind is SpriteOperationKind.SET_TILE:
         lines.extend(["    lda runtime_sprite_value", f"    sta {oam} + 1"])
@@ -1099,7 +1129,7 @@ def _generate_sprite_operation(
     return lines
 
 
-def _generate_sprite_runtime_routines() -> str:
+def _generate_sprite_runtime_routines(set_position: bool) -> str:
     """Generate bounded helpers for dynamic hardware-sprite indexes."""
 
     def offset_prelude() -> list[str]:
@@ -1175,6 +1205,26 @@ def _generate_sprite_runtime_routines() -> str:
         "@sprite_palette_done:",
         "    rts",
     ]
+    if set_position:
+        lines.extend(
+            [
+                "",
+                "runtime_sprite_set_position:",
+                "    tay                     ; retain sprite index for logical Y",
+                *offset_prelude(),
+                "    lda runtime_sprite_value",
+                "    sta runtime_oam_shadow + 3, x",
+                "    lda runtime_sprite_secondary_value",
+                "    sta runtime_sprite_logical_y, y",
+                "    lda runtime_oam_shadow, x",
+                "    cmp #$FF",
+                "    beq @sprite_set_position_done",
+                "    lda runtime_sprite_secondary_value",
+                "    sta runtime_oam_shadow, x",
+                "@sprite_set_position_done:",
+                "    rts",
+            ]
+        )
     for name, mask in (
         ("set_flip_horizontal", 0x40),
         ("set_flip_vertical", 0x80),
@@ -1809,6 +1859,10 @@ def _generate_decrement(
 
 
 def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
+    if isinstance(value, ResolvedSpriteCreate):
+        return [
+            f"    lda #${value.index:02X}              ; static sprite reservation"
+        ]
     if isinstance(value, ImmediateValue):
         if value.type is BuiltInType.BOOLEAN:
             description = "true" if value.value else "false"

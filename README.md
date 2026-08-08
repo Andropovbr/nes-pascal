@@ -28,8 +28,11 @@ attribute updates. `nes.get_tile` conditionally links a 960-byte confirmed PPU
 tile shadow. `nes.set_scroll` atomically stages a fixed scroll pair, and the
 ROM header supports static horizontal or vertical mirroring. Hardware sprite
 primitives maintain a page-aligned 256-byte OAM shadow, preserve attribute
-flags, and upload it through NMI DMA. Programs without sprite operations omit
-that shadow and reuse the RAM page for runtime state and variables.
+flags, and upload it through NMI DMA. `nes.sprite_create()` reserves distinct
+hardware entries statically, while `nes.sprite_set_position()` updates both
+coordinates with one indexed-address calculation. Programs without sprite
+operations omit that shadow and reuse the RAM page for runtime state and
+variables.
 
 ## Documentation
 

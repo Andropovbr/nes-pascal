@@ -60,6 +60,7 @@ class PaletteKind(Enum):
 
 
 class SpriteOperationKind(Enum):
+    SET_POSITION = "set_position"
     SET_X = "set_x"
     SET_Y = "set_y"
     SET_TILE = "set_tile"
@@ -169,6 +170,12 @@ class ControllerQuery:
 
 
 @dataclass(frozen=True, slots=True)
+class SpriteCreate:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
 class GetTile:
     arguments: tuple[ValueExpression, ...]
     position: SourcePosition
@@ -191,6 +198,7 @@ ValueExpression = (
     | BooleanNotExpression
     | BooleanBinaryExpression
     | ControllerQuery
+    | SpriteCreate
     | GetTile
     | BackgroundUpdatesOverflowed
 )
@@ -467,6 +475,11 @@ class ResolvedControllerQuery:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedSpriteCreate:
+    index: int
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedGetTile:
     x: ResolvedValue
     y: ResolvedValue
@@ -486,6 +499,7 @@ ResolvedValue = (
     | ResolvedBooleanNotExpression
     | ResolvedBooleanBinaryExpression
     | ResolvedControllerQuery
+    | ResolvedSpriteCreate
     | ResolvedGetTile
     | ResolvedBackgroundUpdatesOverflowed
 )
@@ -638,6 +652,21 @@ class ResolvedSpriteOperation:
     kind: SpriteOperationKind
     sprite: ResolvedValue
     value: ResolvedValue | None = None
+    secondary_value: ResolvedValue | None = None
+
+
+class OamOwnerKind(Enum):
+    """Compile-time ownership classes for physical hardware-sprite slots."""
+
+    INDIVIDUAL_EXPLICIT = "individual_explicit"
+    INDIVIDUAL_CREATED = "individual_created"
+
+
+@dataclass(frozen=True, slots=True)
+class OamReservation:
+    index: int
+    owner: OamOwnerKind
+    position: SourcePosition | None = field(default=None, compare=False)
 
 
 ResolvedStatement = (
@@ -682,3 +711,4 @@ class ResolvedProgram:
     variables: tuple[ResolvedVariable, ...]
     procedures: tuple[ResolvedProcedure, ...]
     statements: tuple[ResolvedStatement, ...]
+    oam_reservations: tuple[OamReservation, ...] = ()

@@ -26,7 +26,9 @@ Controller tests verify serial bit order, independent current/previous state,
 compile-time arguments, transition masking, one guarded poll per processed
 frame, Zero Page opcodes, fixed sprite staging, general sprite setters,
 attribute preservation, visibility state, OAM initialization and DMA, and
-deterministic Assembly.
+deterministic Assembly. Sprite-management tests additionally cover static OAM
+ownership, explicit-index coexistence, 64-entry exhaustion, and the combined
+position setter.
 Toolchain tests are skipped with an explicit message when `ca65` or `ld65` is
 unavailable.
 

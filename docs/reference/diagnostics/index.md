@@ -73,6 +73,8 @@ the range reserved for their category.
 | [E3046](semantic.md) | Semantic Analysis | Invalid set-scroll argument count |
 | [E3047](semantic.md) | Semantic Analysis | Invalid sprite API argument count |
 | [E3048](semantic.md) | Semantic Analysis | Invalid hardware sprite palette |
+| [E3049](semantic.md) | Semantic Analysis | Invalid sprite-create argument count |
+| [E3050](semantic.md) | Semantic Analysis | OAM hardware-sprite capacity exhausted |
 | [E4001](type-system.md) | Type System | Unknown type |
 | [E4002](type-system.md) | Type System | Invalid `nes_color` value |
 | [E4003](type-system.md) | Type System | Invalid `byte` value |

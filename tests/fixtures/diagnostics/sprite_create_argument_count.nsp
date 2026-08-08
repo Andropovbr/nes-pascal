@@ -1,0 +1,10 @@
+program SpriteCreateArgumentCount;
+
+var
+    Player: sprite;
+
+begin
+    Player := nes.sprite_create($00);
+    nes.set_background_color($0F);
+    nes.run;
+end.

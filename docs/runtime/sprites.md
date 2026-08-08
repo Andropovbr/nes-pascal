@@ -1,9 +1,10 @@
 # Hardware sprites
 
-NES Pascal exposes the NES's 64 hardware OAM entries as small runtime
-primitives. This is not a sprite-object system: there is no allocation,
-metasprite composition, animation, collision, sorting, flickering, or
-8-sprites-per-scanline mitigation.
+NES Pascal exposes the NES's 64 hardware OAM entries as individually managed
+hardware sprites. One `sprite` value identifies exactly one four-byte OAM
+entry; it is not a game entity or a multi-tile metasprite. Metasprite
+composition belongs to milestone 0.5.3. There is no animation, collision,
+sorting, flickering, or 8-sprites-per-scanline mitigation yet.
 
 ## Sprite indexes
 
@@ -13,12 +14,49 @@ Its valid range is `$00..$3F`, selecting hardware sprites 0 through 63.
 ```pascal
 const
     PlayerSprite: sprite = $00;
+
+var
+    EnemySprite: sprite;
 ```
 
 There is no implicit conversion between `sprite` and `byte`. Direct
 hexadecimal literals are accepted where a sprite argument is expected and are
 checked against the 64-entry limit. `sprite` procedure parameters are not yet
 supported.
+
+## Static allocation and ownership
+
+`nes.sprite_create()` is a compile-time reservation expression:
+
+```pascal
+PlayerSprite := nes.sprite_create();
+EnemySprite := nes.sprite_create();
+```
+
+Each syntactically distinct call site owns one hardware sprite for the whole
+program. The compiler processes sites in source order and assigns the lowest
+unreserved OAM index. Repeated execution of the same site, including a site in
+a loop or repeatedly called procedure, produces the same index; it is not a
+runtime allocation. Conditional sites reserve their slot whether or not the
+branch executes. There is no runtime bitmap, free list, `destroy`, or reuse.
+
+Explicit ownership is established by `sprite` constants, direct sprite
+literal assignments, direct literal/constant sprite API arguments, and the
+legacy sprite-zero helper. These indexes are reserved before automatic
+allocation, regardless of their source order. Multiple explicit references
+may intentionally alias one hardware sprite, but `sprite_create()` never
+selects an explicitly owned or previously created slot.
+
+The resolved program records each reserved OAM index as either
+`individual_explicit` or `individual_created`. This metadata costs no runtime
+RAM. Milestone 0.5.3 can allocate metasprite components only from the
+unreserved complement of that same 64-entry table, so individual sprites and
+future metasprites share one ownership model.
+
+If a creation site would exceed the remaining capacity, compilation stops
+with E3050. Allocation never wraps, aliases, overwrites another owner, or
+returns a sentinel. `nes.sprite_create()` takes no arguments and E3049 reports
+an invalid argument list.
 
 ## OAM layout and API
 
@@ -36,6 +74,7 @@ The public operations are:
 ```pascal
 nes.sprite_set_x(PlayerSprite, $78);
 nes.sprite_set_y(PlayerSprite, $70);
+nes.sprite_set_position(PlayerSprite, $78, $70);
 nes.sprite_set_tile(PlayerSprite, $01);
 nes.sprite_set_palette(PlayerSprite, $02);
 nes.sprite_set_attributes(PlayerSprite, $00);
@@ -50,6 +89,11 @@ X, Y, tile, and raw attributes are `byte` values. The flip, priority, and
 visibility helpers operate independently. A compile-time sprite palette above
 3 produces E3048. A dynamic `byte` palette outside `0..3` is ignored at
 runtime, leaving the existing attributes unchanged.
+
+`nes.sprite_set_position(sprite, x, y)` is equivalent to the separate X and Y
+setters. For a dynamic sprite value, its OAM offset is calculated once before
+both coordinates are written. The operation also updates logical Y and does
+not implicitly show a hidden sprite.
 
 ## Attribute byte
 

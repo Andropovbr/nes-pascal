@@ -6,9 +6,9 @@ progression. Do not infer the current or next milestone from numbering alone.
 ## Current roadmap state
 
 - **Current release:** Release 0.5 — Sprites and Gameplay
-- **Last completed milestone:** [`0.5.1 — Basic Sprite Support`](0.md#basic-sprite-support)
-- **Next milestone:** [`0.5.2 — Sprite Management API`](0.md#sprite-management-api)
-- **Next milestone file:** [Version 0 roadmap](0.md#sprite-management-api)
+- **Last completed milestone:** [`0.5.2 — Sprite Management API`](0.md#sprite-management-api)
+- **Next milestone:** [`0.5.3 — Metasprites`](0.md#metasprites)
+- **Next milestone file:** [Version 0 roadmap](0.md#metasprites)
 
 ## Philosophy
 

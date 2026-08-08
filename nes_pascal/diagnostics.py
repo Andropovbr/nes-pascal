@@ -66,6 +66,8 @@ class DiagnosticCode(StrEnum):
     INVALID_SET_SCROLL_ARGUMENT_COUNT = "E3046"
     INVALID_SPRITE_ARGUMENT_COUNT = "E3047"
     INVALID_SPRITE_PALETTE = "E3048"
+    INVALID_SPRITE_CREATE_ARGUMENT_COUNT = "E3049"
+    OAM_SPRITE_CAPACITY_EXHAUSTED = "E3050"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -260,6 +262,12 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INVALID_SPRITE_PALETTE: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Invalid hardware sprite palette"
+    ),
+    DiagnosticCode.INVALID_SPRITE_CREATE_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid sprite-create argument count"
+    ),
+    DiagnosticCode.OAM_SPRITE_CAPACITY_EXHAUSTED: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "OAM hardware-sprite capacity exhausted"
     ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"

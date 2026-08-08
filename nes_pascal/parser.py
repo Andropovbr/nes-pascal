@@ -46,6 +46,7 @@ from .ast import (
     SetScroll,
     SetTile,
     SourcePosition,
+    SpriteCreate,
     SpriteOperation,
     SpriteOperationKind,
     Statement,
@@ -358,6 +359,7 @@ class Parser:
                 SourcePosition(namespace.line, namespace.column),
             )
         sprite_commands = {
+            "nes.sprite_set_position": SpriteOperationKind.SET_POSITION,
             "nes.sprite_set_x": SpriteOperationKind.SET_X,
             "nes.sprite_set_y": SpriteOperationKind.SET_Y,
             "nes.sprite_set_tile": SpriteOperationKind.SET_TILE,
@@ -894,6 +896,11 @@ class Parser:
                 if query_kind is not None:
                     return ControllerQuery(
                         query_kind,
+                        self._parse_expression_arguments(normalized),
+                        position,
+                    )
+                if normalized == "nes.sprite_create":
+                    return SpriteCreate(
                         self._parse_expression_arguments(normalized),
                         position,
                     )
