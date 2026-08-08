@@ -15,7 +15,7 @@ and are never treated as additional storage.
 | `$0100-$01FF` | 256 bytes | Reserved | 6502 hardware stack |
 | `$0200-$02FF` | 0 or 256 bytes | Runtime | Page-aligned OAM shadow, linked by general or legacy sprite operations |
 | from `$0200` without sprites, otherwise `$0300` | 0 or 5 bytes | Runtime | Legacy fixed sprite-0 staging record, allocated only when used |
-| after earlier runtime blocks | 0 or 65 bytes | Runtime | General sprite logical-Y table and one helper byte |
+| after earlier runtime blocks | 0, 65, or 66 bytes | Runtime | General sprite logical-Y table and one or two helper bytes |
 | after earlier runtime blocks | 4 bytes | Runtime | Authoritative PPUCTRL, PPUMASK, and scroll state |
 | after earlier runtime blocks | 0 or 41 bytes | Runtime | Palette shadow and atomic dirty flags, allocated only for runtime palette calls |
 | after earlier runtime blocks | 0 or 960 bytes | Runtime | Confirmed tile shadow, linked only by `nes.get_tile` |
@@ -34,11 +34,13 @@ compilation error.
 
 General sprite operations conditionally link the page-aligned 256-byte OAM
 shadow at `$0200-$02FF`. They reserve `runtime_sprite_logical_y` at
-`$0300-$033F` and `runtime_sprite_value` at `$0340`; the four authoritative PPU
-state bytes then occupy `$0341-$0344`. The logical-Y table lets hide/show
+`$0300-$033F` and `runtime_sprite_value` at `$0340`.
+`nes.sprite_set_position` conditionally adds
+`runtime_sprite_secondary_value` at `$0341`; the four authoritative PPU state
+bytes therefore begin at `$0341` or `$0342`. The logical-Y table lets hide/show
 restore one position for each of 64 sprites. The legacy controller-example
 helper instead reserves a five-byte staging record; when both APIs are used,
-that record precedes the 65-byte general-sprite state.
+that record precedes the 65- or 66-byte general-sprite state.
 
 Programs without sprite or OAM operations omit the OAM symbol, Assembly
 segment, linker region, DMA code, and sprite state. Their regular runtime and
@@ -49,8 +51,9 @@ Programs with runtime palette calls reserve a 32-byte palette shadow, four
 background-palette flags, four sprite-palette flags, one universal-color flag,
 and four PPU restoration bytes in regular runtime RAM. The restoration bytes
 hold PPUCTRL, PPUMASK, scroll X, and scroll Y. This 45-byte block starts at
-`$0200` without sprites, `$0305` after legacy fixed-sprite staging, `$0341`
-after the general API, or `$0346` when both APIs are linked. It uses no
+`$0200` without sprites, `$0305` after legacy fixed-sprite staging,
+`$0341-$0342` after the general API, or `$0346-$0347` when both APIs are
+linked. It uses no
 additional Zero Page. User RAM begins immediately after the conditionally
 allocated runtime blocks.
 
@@ -78,8 +81,9 @@ bytes. Palette, queue, and shadow reserve 1,027 bytes without cancellation or
 1,028 bytes with it, leaving 509 or 508 regular RAM bytes when no sprite helper
 is used. Legacy fixed-sprite support reserves the 256-byte OAM page and five
 scalar bytes, leaving 248 or 247 bytes. The general sprite API reserves that
-page plus 65 bytes, leaving 188 or 187 bytes; linking both leaves 183 or 182
-bytes. Automatic Zero Page promotion space remains available independently. The shadow
+page plus 65 bytes, or 66 with `nes.sprite_set_position`, leaving 188 down to
+186 bytes; linking both leaves 183 down to 181 bytes. Automatic Zero Page
+promotion space remains available independently. The shadow
 remains the clearest implementation of confirmed random tile reads. Metatile
 maps, modified-tile dictionaries, and compact read caches are deferred because
 they would add lookup cost or runtime complexity.
@@ -156,7 +160,9 @@ $0008       1  runtime_controller_poll_valid distinguishes initial RAM from fram
 
 When general sprite support is present, the regions table adds the OAM shadow
 at `$0200-$02FF`, and the runtime-symbol table reports `runtime_oam_shadow`,
-`runtime_sprite_logical_y`, and `runtime_sprite_value`. The five
+`runtime_sprite_logical_y`, and `runtime_sprite_value`.
+`runtime_sprite_secondary_value` appears only with
+`nes.sprite_set_position`. The five
 `runtime_sprite_zero_*` symbols are additionally reported only for the legacy
 fixed sprite-0 compatibility helper.
 

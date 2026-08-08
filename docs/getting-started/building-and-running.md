@@ -60,8 +60,8 @@ The examples demonstrate:
 - `controller_input.nsp`: controller 1 movement, held A speed, B press/release
   appearance, Start reset, Select mode toggle, safe sprite-0 staging, OAM DMA,
   and two small embedded CHR tiles.
-- `sprite_support.nsp`: one strongly typed hardware sprite configured through
-  the OAM-shadow API and uploaded by NMI OAM DMA.
+- `sprite_support.nsp`: one statically allocated, strongly typed hardware
+  sprite positioned through the OAM-shadow API and uploaded by NMI OAM DMA.
 - `chr_asset.nsp`: inclusion of one project-relative raw CHR-ROM asset.
 - `palette_support.nsp`: custom CHR data, initialized background and sprite
   palettes, then a safely queued full and individual palette update.

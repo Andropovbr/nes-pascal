@@ -1,17 +1,18 @@
 program SpriteSupport;
 
-const
-    PlayerSprite: sprite = $00;
+var
+    PlayerSprite: sprite;
 
 begin
+    PlayerSprite := nes.sprite_create();
     nes.set_sprite_palette($02, $0F, $16, $27, $30);
-    nes.sprite_set_x(PlayerSprite, $78);
-    nes.sprite_set_y(PlayerSprite, $70);
+    nes.sprite_set_position(PlayerSprite, $78, $70);
     nes.sprite_set_tile(PlayerSprite, $01);
     nes.sprite_set_palette(PlayerSprite, $02);
     nes.sprite_set_flip_horizontal(PlayerSprite, true);
     nes.sprite_set_flip_vertical(PlayerSprite, false);
     nes.sprite_set_behind_background(PlayerSprite, false);
+    nes.sprite_hide(PlayerSprite);
     nes.sprite_show(PlayerSprite);
     nes.set_background_color($0F);
     nes.run;

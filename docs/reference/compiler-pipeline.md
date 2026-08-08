@@ -22,7 +22,9 @@ The compiler pipeline is deliberately separated:
 - `parser.py` validates grammar and builds the parsed AST in `ast.py`;
 - `semantic.py` validates declarations, resolves references and procedure
   calls, checks exact types, enforces interprocedural definite assignment, and
-  validates controller intrinsics and the complete VBlank callback call graph;
+  validates controller intrinsics and the complete VBlank callback call graph.
+  It also builds deterministic per-slot OAM ownership before resolving static
+  `nes.sprite_create()` expressions;
 - `assets.py` resolves configured paths from the source directory and validates
   raw CHR-ROM, combined nametable, and split tile/attribute byte counts;
 - `memory_layout.py` owns physical RAM ranges, allocation, bounds and overlap

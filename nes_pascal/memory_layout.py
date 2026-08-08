@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from .ast import (
+    OamOwnerKind,
     ResolvedAssignment,
     ResolvedBackgroundUpdatesOverflowed,
     ResolvedBinaryExpression,
@@ -36,6 +37,7 @@ from .ast import (
     ResolvedVariable,
     ResolvedWhileStatement,
     SourcePosition,
+    SpriteOperationKind,
     VariableValue,
 )
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
@@ -179,6 +181,7 @@ class SpriteRuntimeFeatures:
 
     legacy_sprite_zero: bool = False
     sprite_api: bool = False
+    set_position: bool = False
 
     @property
     def oam_shadow(self) -> bool:
@@ -186,7 +189,11 @@ class SpriteRuntimeFeatures:
 
     @property
     def runtime_size(self) -> int:
-        return (5 if self.legacy_sprite_zero else 0) + (65 if self.sprite_api else 0)
+        return (
+            (5 if self.legacy_sprite_zero else 0)
+            + (65 if self.sprite_api else 0)
+            + (1 if self.set_position else 0)
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -599,6 +606,20 @@ def build_memory_layout(
                     SymbolKind.RUNTIME,
                     runtime_data.name,
                     "temporary property value for sprite runtime helpers",
+                ),
+                *(
+                    (
+                        MemorySymbol(
+                            "runtime_sprite_secondary_value",
+                            runtime_data.start + sprite_zero_runtime_size + 65,
+                            1,
+                            SymbolKind.RUNTIME,
+                            runtime_data.name,
+                            "second property value for nes.sprite_set_position",
+                        ),
+                    )
+                    if sprite_features.set_position
+                    else ()
                 ),
             )
             if sprite_api_enabled
@@ -1353,15 +1374,21 @@ def detect_sprite_runtime_features(program: ResolvedProgram) -> SpriteRuntimeFea
     """Collect legacy and general sprite entry-point use recursively."""
 
     legacy_sprite_zero = False
-    sprite_api = False
+    sprite_api = any(
+        reservation.owner is OamOwnerKind.INDIVIDUAL_CREATED
+        for reservation in program.oam_reservations
+    )
+    set_position = False
 
     def visit(statements: tuple[ResolvedStatement, ...]) -> None:
-        nonlocal legacy_sprite_zero, sprite_api
+        nonlocal legacy_sprite_zero, sprite_api, set_position
         for statement in statements:
             if isinstance(statement, ResolvedSetSpriteZero):
                 legacy_sprite_zero = True
             elif isinstance(statement, ResolvedSpriteOperation):
                 sprite_api = True
+                if statement.kind is SpriteOperationKind.SET_POSITION:
+                    set_position = True
             if isinstance(statement, ResolvedIfStatement):
                 visit(statement.then_branch)
                 if statement.else_branch is not None:
@@ -1378,6 +1405,7 @@ def detect_sprite_runtime_features(program: ResolvedProgram) -> SpriteRuntimeFea
     return SpriteRuntimeFeatures(
         legacy_sprite_zero=legacy_sprite_zero,
         sprite_api=sprite_api,
+        set_position=set_position,
     )
 
 
@@ -1496,10 +1524,14 @@ def detect_background_runtime_features(
                     statement.attributes,
                 )
             elif isinstance(statement, ResolvedSpriteOperation):
-                values = (
-                    (statement.sprite,)
-                    if statement.value is None
-                    else (statement.sprite, statement.value)
+                values = tuple(
+                    value
+                    for value in (
+                        statement.sprite,
+                        statement.value,
+                        statement.secondary_value,
+                    )
+                    if value is not None
                 )
             elif isinstance(statement, ResolvedSetTile):
                 values = (statement.x, statement.y, statement.tile)
@@ -1567,6 +1599,8 @@ def _count_statement_variable_references(
         _count_value_variable_references(statement.sprite, counts)
         if statement.value is not None:
             _count_value_variable_references(statement.value, counts)
+        if statement.secondary_value is not None:
+            _count_value_variable_references(statement.secondary_value, counts)
     elif isinstance(statement, ResolvedSetTile):
         for value in (statement.x, statement.y, statement.tile):
             _count_value_variable_references(value, counts)
@@ -1685,6 +1719,9 @@ def _statement_expression_depth(statement: ResolvedStatement) -> int:
         return max(
             _expression_depth(statement.sprite),
             _expression_depth(statement.value) if statement.value is not None else 0,
+            _expression_depth(statement.secondary_value)
+            if statement.secondary_value is not None
+            else 0,
         )
     if isinstance(statement, ResolvedSetTile):
         return max(

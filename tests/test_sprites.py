@@ -42,6 +42,7 @@ var
     Current: sprite;
 begin
     Current := First;
+    nes.sprite_set_position(Current, $08, $18);
     nes.sprite_set_x(Current, $10);
     nes.sprite_set_y(Current, $20);
     nes.sprite_set_tile(Current, $03);
@@ -75,7 +76,7 @@ end.
             for statement in resolved.statements
             if isinstance(statement, ResolvedSpriteOperation)
         ]
-        self.assertEqual(len(resolved_operations), 10)
+        self.assertEqual(len(resolved_operations), 11)
 
     def test_accepts_sprite_boundaries_and_palette_boundaries(self) -> None:
         source = sprite_program(
@@ -150,6 +151,10 @@ class SpriteMemoryAndBackendTests(unittest.TestCase):
         self.assertEqual(symbols["runtime_oam_shadow"], (0x0200, 256))
         self.assertEqual(symbols["runtime_sprite_logical_y"], (0x0300, 64))
         self.assertEqual(symbols["runtime_sprite_value"], (0x0340, 1))
+        self.assertEqual(
+            symbols["runtime_sprite_secondary_value"],
+            (0x0341, 1),
+        )
 
     def test_reset_hides_every_sprite_before_source_initialization(self) -> None:
         reset = self.assembly.split("RESET:", 1)[1].split(

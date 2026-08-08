@@ -1,6 +1,7 @@
 """Semantic validation, name resolution, and strict type checking."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, is_dataclass
+from typing import Iterator
 
 from .ast import (
     Assignment,
@@ -29,6 +30,8 @@ from .ast import (
     ImmediateValue,
     IncrementStatement,
     LoadBackground,
+    OamOwnerKind,
+    OamReservation,
     PaletteKind,
     Program,
     ProcedureCall,
@@ -62,6 +65,7 @@ from .ast import (
     ResolvedSetPalette,
     ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
+    ResolvedSpriteCreate,
     ResolvedSpriteOperation,
     ResolvedSetScroll,
     ResolvedSetTile,
@@ -79,6 +83,7 @@ from .ast import (
     SetScroll,
     SetTile,
     SourcePosition,
+    SpriteCreate,
     SpriteOperation,
     SpriteOperationKind,
     Statement,
@@ -124,6 +129,14 @@ class ProcedureSummary:
     procedure: ResolvedProcedure
 
 
+@dataclass(frozen=True, slots=True)
+class SpriteAllocationPlan:
+    """Static OAM ownership shared by individual hardware-sprite features."""
+
+    create_indexes: dict[SourcePosition, int]
+    reservations: tuple[OamReservation, ...]
+
+
 class SemanticAnalyzer:
     def __init__(self, source: str, filename: str = "<input>") -> None:
         self.source_lines = source.splitlines()
@@ -134,6 +147,7 @@ class SemanticAnalyzer:
             CallbackKind, CallbackRegistration
         ] = {}
         self.callback_symbols: dict[CallbackKind, ProcedureSymbol] = {}
+        self.sprite_allocation_plan = SpriteAllocationPlan({}, ())
 
     def analyze(self, program: Program) -> ResolvedProgram:
         constants: dict[str, TypedConstant] = {
@@ -172,6 +186,12 @@ class SemanticAnalyzer:
             variables[normalized_name] = variable
             resolved_variables.append(variable)
             declared_names.add(normalized_name)
+
+        self.sprite_allocation_plan = self._plan_sprite_ownership(
+            program,
+            constants,
+            variables,
+        )
 
         procedures: dict[str, ProcedureSymbol] = {}
         for declaration in program.procedures:
@@ -314,7 +334,131 @@ class SemanticAnalyzer:
                 for declaration in program.procedures
             ),
             resolved_statements,
+            self.sprite_allocation_plan.reservations,
         )
+
+    def _plan_sprite_ownership(
+        self,
+        program: Program,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+    ) -> SpriteAllocationPlan:
+        """Reserve physical OAM slots before control-flow resolution.
+
+        Explicit individual-sprite indexes have priority. Each syntactic
+        ``nes.sprite_create()`` site then receives the lowest remaining slot.
+        This makes allocation independent of runtime branches, loops, and call
+        counts while leaving an explicit reservation table for metasprites.
+        """
+
+        explicit_positions: dict[int, SourcePosition] = {}
+        for declaration in program.constants:
+            if declaration.type is BuiltInType.SPRITE:
+                explicit_positions.setdefault(
+                    declaration.value.value,
+                    declaration.value.position,
+                )
+
+        for node in self._walk_ast_nodes(program):
+            if isinstance(node, SetSpriteZero):
+                explicit_positions.setdefault(0, node.position)
+            elif isinstance(node, SpriteOperation) and node.arguments:
+                explicit = self._explicit_sprite_index(
+                    node.arguments[0],
+                    constants,
+                )
+                if explicit is not None:
+                    explicit_positions.setdefault(
+                        explicit,
+                        node.arguments[0].position,
+                    )
+            elif isinstance(node, Assignment):
+                target = variables.get(node.target.lower())
+                if target is not None and target.type is BuiltInType.SPRITE:
+                    explicit = self._explicit_sprite_index(node.value, constants)
+                    if explicit is not None:
+                        explicit_positions.setdefault(explicit, node.value.position)
+
+        create_sites = sorted(
+            (
+                node
+                for node in self._walk_ast_nodes(program)
+                if isinstance(node, SpriteCreate)
+            ),
+            key=lambda create: (create.position.line, create.position.column),
+        )
+        for create in create_sites:
+            if create.arguments:
+                self._error(
+                    create.position,
+                    DiagnosticCode.INVALID_SPRITE_CREATE_ARGUMENT_COUNT,
+                    "nes.sprite_create expects exactly 0 arguments, but "
+                    f"{len(create.arguments)} were provided.",
+                    "Call nes.sprite_create() without arguments.",
+                    len("nes.sprite_create"),
+                )
+
+        available = [
+            index for index in range(64) if index not in explicit_positions
+        ]
+        create_indexes: dict[SourcePosition, int] = {}
+        created_reservations: list[OamReservation] = []
+        for allocation_number, create in enumerate(create_sites):
+            if allocation_number >= len(available):
+                self._error(
+                    create.position,
+                    DiagnosticCode.OAM_SPRITE_CAPACITY_EXHAUSTED,
+                    "nes.sprite_create cannot reserve another hardware sprite: "
+                    "all 64 OAM entries are already owned.",
+                    "Remove an individual sprite reservation or creation site. "
+                    "The NES has exactly 64 hardware sprites.",
+                    len("nes.sprite_create"),
+                )
+            index = available[allocation_number]
+            create_indexes[create.position] = index
+            created_reservations.append(
+                OamReservation(
+                    index,
+                    OamOwnerKind.INDIVIDUAL_CREATED,
+                    create.position,
+                )
+            )
+
+        reservations = [
+            OamReservation(
+                index,
+                OamOwnerKind.INDIVIDUAL_EXPLICIT,
+                position,
+            )
+            for index, position in explicit_positions.items()
+        ]
+        reservations.extend(created_reservations)
+        reservations.sort(key=lambda reservation: reservation.index)
+        return SpriteAllocationPlan(create_indexes, tuple(reservations))
+
+    @staticmethod
+    def _explicit_sprite_index(
+        expression: ValueExpression,
+        constants: dict[str, TypedConstant],
+    ) -> int | None:
+        if isinstance(expression, HexLiteral):
+            return expression.value if expression.value <= 0x3F else None
+        if isinstance(expression, ConstantReference):
+            constant = constants.get(expression.name.lower())
+            if constant is not None and constant.type is BuiltInType.SPRITE:
+                return constant.value
+        return None
+
+    def _walk_ast_nodes(self, value: object) -> Iterator[object]:
+        if isinstance(value, tuple):
+            for item in value:
+                yield from self._walk_ast_nodes(item)
+            return
+        if not is_dataclass(value):
+            return
+        yield value
+        for field in fields(value):
+            yield from self._walk_ast_nodes(getattr(value, field.name))
 
     def _resolve_statements(
         self,
@@ -656,7 +800,10 @@ class SemanticAnalyzer:
                     SpriteOperationKind.HIDE,
                     SpriteOperationKind.SHOW,
                 )
-                expected_count = 1 if unary else 2
+                set_position = (
+                    statement.kind is SpriteOperationKind.SET_POSITION
+                )
+                expected_count = 1 if unary else (3 if set_position else 2)
                 if len(statement.arguments) != expected_count:
                     self._error(
                         statement.position,
@@ -666,7 +813,14 @@ class SemanticAnalyzer:
                         (
                             "Pass one sprite value."
                             if unary
-                            else "Pass one sprite value followed by the property value."
+                            else (
+                            "Pass one sprite value followed by x and y."
+                            if set_position
+                            else (
+                                "Pass one sprite value followed by the property "
+                                "value."
+                            )
+                            )
                         ),
                         len(command),
                     )
@@ -678,6 +832,7 @@ class SemanticAnalyzer:
                     current_assignments,
                 )
                 value: ResolvedValue | None = None
+                secondary_value: ResolvedValue | None = None
                 if not unary:
                     value_type = (
                         BuiltInType.BOOLEAN
@@ -696,13 +851,25 @@ class SemanticAnalyzer:
                         variables,
                         current_assignments,
                     )
+                    if set_position:
+                        secondary_value = self._resolve_value(
+                            statement.arguments[2],
+                            BuiltInType.BYTE,
+                            constants,
+                            variables,
+                            current_assignments,
+                        )
                     if (
                         statement.kind is SpriteOperationKind.SET_PALETTE
                         and isinstance(value, ImmediateValue)
                         and value.value > 3
                     ):
                         argument = statement.arguments[1]
-                        text = getattr(argument, "text", getattr(argument, "name", str(value.value)))
+                        text = getattr(
+                            argument,
+                            "text",
+                            getattr(argument, "name", str(value.value)),
+                        )
                         self._error(
                             argument.position,
                             DiagnosticCode.INVALID_SPRITE_PALETTE,
@@ -711,7 +878,12 @@ class SemanticAnalyzer:
                             len(text),
                         )
                 resolved_statements.append(
-                    ResolvedSpriteOperation(statement.kind, sprite, value)
+                    ResolvedSpriteOperation(
+                        statement.kind,
+                        sprite,
+                        value,
+                        secondary_value,
+                    )
                 )
             elif isinstance(statement, SetBackgroundColor):
                 resolved_statements.append(
@@ -1670,6 +1842,25 @@ class SemanticAnalyzer:
         assigned_variables: set[str],
         assignment_target: ResolvedVariable | None = None,
     ) -> ResolvedValue:
+        if isinstance(expression, SpriteCreate):
+            self._require_expression_result_type(
+                expression.position,
+                BuiltInType.SPRITE,
+                expected_type,
+                "nes.sprite_create result",
+                assignment_target,
+            )
+            if expression.arguments:
+                self._error(
+                    expression.position,
+                    DiagnosticCode.INVALID_SPRITE_CREATE_ARGUMENT_COUNT,
+                    "nes.sprite_create expects exactly 0 arguments, but "
+                    f"{len(expression.arguments)} were provided.",
+                    "Call nes.sprite_create() without arguments.",
+                    len("nes.sprite_create"),
+                )
+            index = self.sprite_allocation_plan.create_indexes[expression.position]
+            return ResolvedSpriteCreate(index)
         if isinstance(expression, BackgroundUpdatesOverflowed):
             self._require_expression_result_type(
                 expression.position,
@@ -2398,6 +2589,8 @@ class SemanticAnalyzer:
                 if isinstance(expression, GetTile)
                 else BuiltInType.BOOLEAN
             )
+        if isinstance(expression, SpriteCreate):
+            return BuiltInType.SPRITE
         if isinstance(expression, (UnaryExpression, BinaryExpression)):
             return BuiltInType.BYTE
         if isinstance(expression, HexLiteral):

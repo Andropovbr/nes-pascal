@@ -15,6 +15,10 @@ local function validateSpriteSupport()
         fail("NMI frame bookkeeping did not advance.", 6)
         return
     end
+    if emu.read(0x0080, emu.memType.nesDebug) ~= 0x00 then
+        fail("The first static sprite reservation was not OAM index 0.", 7)
+        return
+    end
 
     local y = emu.read(0x0200, emu.memType.nesDebug)
     local tile = emu.read(0x0201, emu.memType.nesDebug)
@@ -44,7 +48,7 @@ local function validateSpriteSupport()
         end
     end
 
-    emu.log("Basic sprite shadow, initialization, attributes, and DMA passed.")
+    emu.log("Static sprite allocation, combined positioning, and OAM DMA passed.")
     emu.stop(0)
 end
 

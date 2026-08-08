@@ -747,3 +747,29 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
   greater as a compile-time palette value.
 - **Expected compiler output:** `E3048` identifies the value and valid range.
 - **Suggested fix:** Use sprite palette `$00`, `$01`, `$02`, or `$03`.
+
+## E3049 - Invalid sprite-create argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.sprite_create()` is a parameterless compile-time OAM
+  reservation expression.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/sprite_create_argument_count.nsp` or pass any
+  argument to `nes.sprite_create`.
+- **Expected compiler output:** `E3049` reports that zero arguments were
+  expected and identifies the provided count.
+- **Suggested fix:** Call `nes.sprite_create()` with empty parentheses.
+
+## E3050 - OAM hardware-sprite capacity exhausted
+
+- **Category:** Semantic Analysis
+- **Explanation:** Explicit individual-sprite reservations and distinct
+  `nes.sprite_create()` sites share the NES's fixed 64-entry OAM capacity.
+  Static allocation cannot reserve another non-conflicting entry.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/sprite_capacity_exhausted.nsp` or otherwise
+  reserve all 64 indexes before another creation site.
+- **Expected compiler output:** `E3050` identifies the creation site that
+  cannot receive an OAM entry.
+- **Suggested fix:** Remove an individual sprite reservation or creation site.
+  Allocation never wraps, aliases an owner, or returns a sentinel.

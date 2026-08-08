@@ -67,13 +67,19 @@ Assignments and operator operands must obey the exact type rules described in
 allowed values are `$00..$3F`, selecting the NES's 64 hardware sprites.
 
 ```pascal
-const
-    PlayerSprite: sprite = $00;
+var
+    PlayerSprite: sprite;
+
+begin
+    PlayerSprite := nes.sprite_create();
+end;
 ```
 
 A value above `$3F` produces E4008. `sprite` is not implicitly interchangeable
 with `byte`, does not support arithmetic or `inc`/`dec`, and is passed directly
-to the [hardware sprite API](../runtime/sprites.md).
+to the [hardware sprite API](../runtime/sprites.md). `nes.sprite_create()`
+produces a statically reserved `sprite` value; it is not a general function or
+runtime object allocation.
 
 Procedure value parameters currently support only `byte` and `boolean`.
 `nes_color` and `sprite` remain valid for constants and global variables but

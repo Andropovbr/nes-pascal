@@ -18,9 +18,9 @@ the supported language.
 - Equality and inequality require matching types; ordered comparisons are
   limited to `byte`.
 - Boolean expressions support only `not`, `and`, and `or`.
-- `case`, arrays, records, functions, runtime strings, and inline Assembly are
-  not supported. The three fixed controller query intrinsics are the only
-  function-shaped expressions.
+- `case`, arrays, records, general functions, runtime strings, and inline
+  Assembly are not supported. A small fixed set of built-in query expressions
+  and the statically resolved `nes.sprite_create()` intrinsic are supported.
 - Procedure parameters are limited to `byte` and `boolean` values. There are
   no reference parameters, default values, return values, or general local
   variables.
@@ -61,8 +61,9 @@ the supported language.
 - Standard controllers 1 and 2 are supported without remapping, Four Score,
   expansion devices, buffering, combos, turbo, or DMC-safe repeated reads.
 - Hardware sprite primitives support all 64 OAM entries, individual fields,
-  palette/flip/priority attributes, deterministic hide/show, and NMI OAM DMA.
-  Metasprites, animations, collision, automatic allocation, sprite
+  palette/flip/priority attributes, deterministic hide/show, static individual
+  allocation, and NMI OAM DMA. Runtime creation/destruction, metasprites,
+  animations, collision, sprite
   multiplexing/flickering, sorting, and scanline-overflow mitigation are not
   supported. `nes.set_sprite_zero` remains a legacy compatibility helper.
 - Callback registration is static. There is only one callback of each kind,
