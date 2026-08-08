@@ -24,8 +24,9 @@ loop, persistent pending-frame detection, VBlank-gated rendering startup, and
 the separation of main-thread update calls from the restricted NMI callback.
 Controller tests verify serial bit order, independent current/previous state,
 compile-time arguments, transition masking, one guarded poll per processed
-frame, Zero Page opcodes, fixed sprite staging, OAM DMA, and deterministic
-Assembly.
+frame, Zero Page opcodes, fixed sprite staging, general sprite setters,
+attribute preservation, visibility state, OAM initialization and DMA, and
+deterministic Assembly.
 Toolchain tests are skipped with an explicit message when `ca65` or `ld65` is
 unavailable.
 
@@ -39,7 +40,8 @@ update and VBlank callback progress across 8-bit frame-counter wraparound, and
 slow-update pending-frame behavior without nested calls, and the universal
 background color. The controller ROM additionally drives both virtual ports,
 checks every direction and button behavior, verifies OAM consistency, and
-runs across an 8-bit frame-counter wrap:
+runs across an 8-bit frame-counter wrap. The sprite ROM verifies one visible
+sprite, 63 hidden entries, attribute composition, and DMA page selection:
 
 ```powershell
 $env:MESEN_PATH = "C:\path\to\Mesen.exe"

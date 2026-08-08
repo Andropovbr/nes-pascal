@@ -1,0 +1,7 @@
+program InvalidSpriteValue;
+const
+    InvalidSprite: sprite = $40;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+end.

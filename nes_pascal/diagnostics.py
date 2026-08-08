@@ -64,6 +64,8 @@ class DiagnosticCode(StrEnum):
     INVALID_BACKGROUND_OVERFLOW_QUERY_ARGUMENT_COUNT = "E3044"
     INVALID_BACKGROUND_OVERFLOW_CLEAR_ARGUMENT_COUNT = "E3045"
     INVALID_SET_SCROLL_ARGUMENT_COUNT = "E3046"
+    INVALID_SPRITE_ARGUMENT_COUNT = "E3047"
+    INVALID_SPRITE_PALETTE = "E3048"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -71,6 +73,7 @@ class DiagnosticCode(StrEnum):
     UNSUPPORTED_PARAMETER_TYPE = "E4005"
     INVALID_CONTROLLER_ARGUMENT_TYPE = "E4006"
     INVALID_PALETTE_ARGUMENT_TYPE = "E4007"
+    INVALID_SPRITE_VALUE = "E4008"
     MISSING_TOOLCHAIN = "E5001"
     TOOLCHAIN_FAILURE = "E5002"
     USER_RAM_EXHAUSTED = "E5003"
@@ -252,6 +255,12 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     DiagnosticCode.INVALID_SET_SCROLL_ARGUMENT_COUNT: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Invalid set-scroll argument count"
     ),
+    DiagnosticCode.INVALID_SPRITE_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid sprite API argument count"
+    ),
+    DiagnosticCode.INVALID_SPRITE_PALETTE: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid hardware sprite palette"
+    ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"
     ),
@@ -272,6 +281,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INVALID_PALETTE_ARGUMENT_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Invalid palette argument type"
+    ),
+    DiagnosticCode.INVALID_SPRITE_VALUE: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Invalid sprite value"
     ),
     DiagnosticCode.MISSING_TOOLCHAIN: DiagnosticDefinition(
         DiagnosticCategory.CODE_GENERATION, "Missing toolchain"

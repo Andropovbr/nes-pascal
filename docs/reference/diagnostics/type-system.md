@@ -21,7 +21,7 @@ Type-system diagnostics use the E4000-E4999 range.
   Unknown type: word.
   ```
 
-- **Suggested fix:** Use `nes_color`, `byte`, or `boolean`.
+- **Suggested fix:** Use `nes_color`, `byte`, `boolean`, or `sprite`.
 
 ## E4002 - Invalid `nes_color` value
 
@@ -105,8 +105,9 @@ Type-system diagnostics use the E4000-E4999 range.
 
 - **Category:** Type System
 - **Explanation:** The current value-parameter calling convention supports
-  only `byte` and `boolean`. Although `nes_color` remains a valid type for
-  constants and global variables, it cannot be used for a parameter yet.
+  only `byte` and `boolean`. Although `nes_color` and `sprite` remain valid
+  types for constants and global variables, they cannot be used for a
+  parameter yet.
 - **Trigger:**
 
   ```pascal
@@ -149,3 +150,15 @@ Type-system diagnostics use the E4000-E4999 range.
   and required type.
 - **Suggested fix:** Use a `byte` constant for indexes and an assigned
   `nes_color` value for colors.
+
+## E4008 - Invalid `sprite` value
+
+- **Category:** Type System
+- **Explanation:** A `sprite` is a strongly typed hardware OAM index and must
+  select one of the NES's 64 entries.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/invalid_sprite_value.nsp`, or declare or assign
+  a `sprite` value above `$3F`.
+- **Expected compiler output:** `E4008` identifies the invalid literal and the
+  supported `$00..$3F` range.
+- **Suggested fix:** Use a sprite index from `$00` through `$3F`.

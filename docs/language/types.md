@@ -1,6 +1,6 @@
 # Built-in types
 
-NES Pascal provides three built-in types. Each occupies one byte, but the
+NES Pascal provides four built-in types. Each occupies one byte, but the
 types are distinct and are not implicitly converted.
 
 ## `nes_color`
@@ -61,6 +61,20 @@ const
 Assignments and operator operands must obey the exact type rules described in
 [Assignments](assignments.md) and [Expressions](expressions.md).
 
+## `sprite`
+
+`sprite` is a strongly typed hardware OAM index. It occupies one byte, but its
+allowed values are `$00..$3F`, selecting the NES's 64 hardware sprites.
+
+```pascal
+const
+    PlayerSprite: sprite = $00;
+```
+
+A value above `$3F` produces E4008. `sprite` is not implicitly interchangeable
+with `byte`, does not support arithmetic or `inc`/`dec`, and is passed directly
+to the [hardware sprite API](../runtime/sprites.md).
+
 Procedure value parameters currently support only `byte` and `boolean`.
-`nes_color` remains valid for constants and global variables but produces
-E4005 when used as a parameter type.
+`nes_color` and `sprite` remain valid for constants and global variables but
+produce E4005 when used as a parameter type.

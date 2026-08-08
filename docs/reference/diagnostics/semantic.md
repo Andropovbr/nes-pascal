@@ -722,3 +722,28 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
   argument counts.
 - **Suggested fix:** Pass exactly two `byte` values, for example
   `nes.set_scroll($08, $04);`.
+
+## E3047 - Invalid sprite API argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** Sprite property setters require a `sprite` index and one
+  property value. `nes.sprite_hide` and `nes.sprite_show` require only the
+  sprite index.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/sprite_argument_count.nsp`, or omit or add an
+  argument to a `nes.sprite_*` statement.
+- **Expected compiler output:** `E3047` reports the command's expected and
+  actual argument counts.
+- **Suggested fix:** Pass exactly the arguments documented for the sprite API.
+
+## E3048 - Invalid hardware sprite palette
+
+- **Category:** Semantic Analysis
+- **Explanation:** OAM attribute bits 0-1 select one of four sprite palettes.
+  A direct literal or constant passed to `nes.sprite_set_palette` must be in
+  `$00..$03`.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/invalid_sprite_palette.nsp`, or pass `$04` or
+  greater as a compile-time palette value.
+- **Expected compiler output:** `E3048` identifies the value and valid range.
+- **Suggested fix:** Use sprite palette `$00`, `$01`, `$02`, or `$03`.

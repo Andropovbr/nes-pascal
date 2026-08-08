@@ -25,8 +25,10 @@ APIs are:
 - [`nes.controller_down`, `nes.controller_pressed`, and
   `nes.controller_released`](controller-input.md) query stable state from
   standard controllers 1 and 2.
+- [Hardware sprite primitives](sprites.md) maintain 64 OAM entries in a
+  page-aligned CPU shadow and upload them through NMI OAM DMA.
 - `nes.set_sprite_zero` is the fixed, example-only OAM staging helper described
-  in the controller documentation; it is not a general sprite API.
+  in the controller documentation; it remains as a compatibility helper.
 
 `nes.load_background()` and direct initialization palette commands belong
 before `nes.run`; palette calls in procedures or after `nes.run` are queued

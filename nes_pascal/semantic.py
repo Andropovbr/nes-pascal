@@ -62,6 +62,7 @@ from .ast import (
     ResolvedSetPalette,
     ResolvedSetPaletteColor,
     ResolvedSetSpriteZero,
+    ResolvedSpriteOperation,
     ResolvedSetScroll,
     ResolvedSetTile,
     ResolvedStatement,
@@ -78,6 +79,8 @@ from .ast import (
     SetScroll,
     SetTile,
     SourcePosition,
+    SpriteOperation,
+    SpriteOperationKind,
     Statement,
     UnaryExpression,
     ValueExpression,
@@ -330,6 +333,7 @@ class SemanticAnalyzer:
             | WaitFrame
             | CallbackRegistration
             | SetSpriteZero
+            | SpriteOperation
             | IfStatement
             | WhileStatement
             | RepeatStatement
@@ -645,6 +649,69 @@ class SemanticAnalyzer:
                 )
                 resolved_statements.append(
                     ResolvedSetSpriteZero(x, y, tile, attributes)
+                )
+            elif isinstance(statement, SpriteOperation):
+                command = f"nes.sprite_{statement.kind.value}"
+                unary = statement.kind in (
+                    SpriteOperationKind.HIDE,
+                    SpriteOperationKind.SHOW,
+                )
+                expected_count = 1 if unary else 2
+                if len(statement.arguments) != expected_count:
+                    self._error(
+                        statement.position,
+                        DiagnosticCode.INVALID_SPRITE_ARGUMENT_COUNT,
+                        f"{command} expects exactly {expected_count} argument(s), "
+                        f"but {len(statement.arguments)} were provided.",
+                        (
+                            "Pass one sprite value."
+                            if unary
+                            else "Pass one sprite value followed by the property value."
+                        ),
+                        len(command),
+                    )
+                sprite = self._resolve_value(
+                    statement.arguments[0],
+                    BuiltInType.SPRITE,
+                    constants,
+                    variables,
+                    current_assignments,
+                )
+                value: ResolvedValue | None = None
+                if not unary:
+                    value_type = (
+                        BuiltInType.BOOLEAN
+                        if statement.kind
+                        in (
+                            SpriteOperationKind.SET_FLIP_HORIZONTAL,
+                            SpriteOperationKind.SET_FLIP_VERTICAL,
+                            SpriteOperationKind.SET_BEHIND_BACKGROUND,
+                        )
+                        else BuiltInType.BYTE
+                    )
+                    value = self._resolve_value(
+                        statement.arguments[1],
+                        value_type,
+                        constants,
+                        variables,
+                        current_assignments,
+                    )
+                    if (
+                        statement.kind is SpriteOperationKind.SET_PALETTE
+                        and isinstance(value, ImmediateValue)
+                        and value.value > 3
+                    ):
+                        argument = statement.arguments[1]
+                        text = getattr(argument, "text", getattr(argument, "name", str(value.value)))
+                        self._error(
+                            argument.position,
+                            DiagnosticCode.INVALID_SPRITE_PALETTE,
+                            f"Sprite palette {text} is outside the valid range $00..$03.",
+                            "Use sprite palette $00, $01, $02, or $03.",
+                            len(text),
+                        )
+                resolved_statements.append(
+                    ResolvedSpriteOperation(statement.kind, sprite, value)
                 )
             elif isinstance(statement, SetBackgroundColor):
                 resolved_statements.append(
@@ -1107,9 +1174,25 @@ class SemanticAnalyzer:
                     "commits it safely during NMI.",
                     len("nes.set_sprite_zero"),
                 )
+            if isinstance(statement, SpriteOperation):
+                command = f"nes.sprite_{statement.kind.value}"
+                self._error(
+                    statement.position,
+                    DiagnosticCode.VBLANK_UNSAFE_OPERATION,
+                    f"VBlank callback path through {owner} reaches unsupported "
+                    f"operation {command}.",
+                    "Update the OAM shadow from main code or the update callback; "
+                    "NMI owns OAM DMA.",
+                    len(command),
+                )
             if isinstance(
                 statement,
-                (SetBackgroundColor, SetPalette, SetPaletteColor, SetScroll),
+                (
+                    SetBackgroundColor,
+                    SetPalette,
+                    SetPaletteColor,
+                    SetScroll,
+                ),
             ):
                 values = (
                     (statement.argument,)
@@ -1281,6 +1364,8 @@ class SemanticAnalyzer:
             return f"nes.set_{statement.kind.value}_palette_color"
         if isinstance(statement, SetSpriteZero):
             return "nes.set_sprite_zero"
+        if isinstance(statement, SpriteOperation):
+            return f"nes.sprite_{statement.kind.value}"
         if isinstance(statement, LoadBackground):
             return "nes.load_background"
         if isinstance(statement, SetTile):
@@ -2408,6 +2493,14 @@ class SemanticAnalyzer:
                 DiagnosticCode.INVALID_NES_COLOR_VALUE,
                 f"Value {literal.text} is not valid for type nes_color.",
                 "Allowed range: $00..$3F.",
+                len(literal.text),
+            )
+        if expected_type is BuiltInType.SPRITE and literal.value > 0x3F:
+            self._error(
+                literal.position,
+                DiagnosticCode.INVALID_SPRITE_VALUE,
+                f"Value {literal.text} is not valid for type sprite.",
+                "Allowed range: $00..$3F (hardware sprites 0..63).",
                 len(literal.text),
             )
         if expected_type is BuiltInType.BYTE and literal.value > 0xFF:

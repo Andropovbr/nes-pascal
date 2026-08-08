@@ -121,6 +121,19 @@ class ToolchainIntegrationTests(unittest.TestCase):
             expected_empty_chr=False,
         )
 
+    def test_sprite_support_example_builds_a_valid_nrom_image(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            rom_path = Path(temporary_directory) / "sprite_support.nes"
+            compile_source(
+                ROOT / "examples" / "sprite_support.nsp",
+                rom_path,
+                chr_path="assets/chr_asset.chr",
+            )
+            rom = rom_path.read_bytes()
+        self.assertEqual(rom[:6], b"NES\x1a\x02\x01")
+        self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
+        self.assertNotEqual(rom[-8 * 1024 :], bytes(8 * 1024))
+
     def test_configured_chr_asset_is_included_unchanged_and_reproducibly(self) -> None:
         source = """program ChrAsset;
 begin
@@ -599,6 +612,13 @@ class MesenIntegrationTests(unittest.TestCase):
         self._run_mesen_test(
             "controller_input",
             "verify_controller_input.lua",
+        )
+
+    def test_basic_sprite_shadow_and_dma_reach_expected_runtime_state(self) -> None:
+        self._run_mesen_test(
+            "sprite_support",
+            "verify_sprite_support.lua",
+            chr_path="assets/chr_asset.chr",
         )
 
     def test_palette_example_uploads_initial_and_runtime_palettes(self) -> None:

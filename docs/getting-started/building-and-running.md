@@ -25,6 +25,7 @@ python -m nes_pascal.cli examples/frame_synchronization.nsp -o build/frame_synch
 python -m nes_pascal.cli examples/frame_callbacks.nsp -o build/frame_callbacks.nes
 python -m nes_pascal.cli examples/slow_update_callback.nsp -o build/slow_update_callback.nes
 python -m nes_pascal.cli examples/controller_input.nsp -o build/controller_input.nes
+python -m nes_pascal.cli examples/sprite_support.nsp -o build/sprite_support.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/chr_asset.nsp -o build/chr_asset.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/palette_support.nsp -o build/palette_support.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
@@ -59,6 +60,8 @@ The examples demonstrate:
 - `controller_input.nsp`: controller 1 movement, held A speed, B press/release
   appearance, Start reset, Select mode toggle, safe sprite-0 staging, OAM DMA,
   and two small embedded CHR tiles.
+- `sprite_support.nsp`: one strongly typed hardware sprite configured through
+  the OAM-shadow API and uploaded by NMI OAM DMA.
 - `chr_asset.nsp`: inclusion of one project-relative raw CHR-ROM asset.
 - `palette_support.nsp`: custom CHR data, initialized background and sprite
   palettes, then a safely queued full and individual palette update.

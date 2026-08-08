@@ -96,5 +96,6 @@ complete record to `runtime_oam_shadow` before OAM DMA.
 
 This helper supports hardware sprite 0 only. It is not a sprite allocation,
 management, animation, collision, or metasprite API. Its two 8x8 player tiles
-are embedded in CHR-ROM only when the helper is used. General sprite support
-remains a later milestone.
+are embedded in CHR-ROM only when the helper is used. New programs should use
+the general [hardware sprite primitives](sprites.md); the fixed helper remains
+for compatibility with this focused controller example.
