@@ -312,7 +312,7 @@ end.
             nmi.index("sta $4014"),
         )
         self.assertIn("sta runtime_sprite_zero_ready", self.assembly)
-        self.assertIn("ora #$18", self.assembly)
+        self.assertIn("ora #$1E", self.assembly)
         self.assertIn("sta runtime_ppumask_shadow", self.assembly)
         self.assertIn("tile 1 plane 0", self.assembly)
         self.assertIn("tile 2 plane 1", self.assembly)

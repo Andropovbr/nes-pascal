@@ -64,6 +64,11 @@ diagnostics section.
 | E3048 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E3049 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E3050 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3051 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3052 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3053 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3054 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
+| E3055 | Semantic Analysis | [Semantic diagnostics](reference/diagnostics/semantic.md) |
 | E4001 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4002 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4003 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
@@ -72,6 +77,7 @@ diagnostics section.
 | E4006 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4007 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4008 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4009 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E5001 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5002 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5003 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
@@ -88,3 +94,11 @@ diagnostics section.
 | E6008 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
 | E6009 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
 | E6010 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6011 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6012 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6013 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6014 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6015 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6016 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6017 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6018 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |

@@ -1,0 +1,116 @@
+program MetaspriteClippingRuntimeTest;
+
+var
+    Player: metasprite;
+    Stage: byte;
+
+begin
+    nes.import_metasprite(player);
+    Player := nes.metasprite_create(player.idle_0);
+    Stage := $00;
+    nes.set_sprite_palette($00, $0F, $16, $27, $30);
+    nes.metasprite_set_flip_horizontal(Player, false);
+    nes.metasprite_set_flip_vertical(Player, false);
+    nes.metasprite_set_position(Player, $70, $68);
+    nes.metasprite_show(Player);
+    nes.set_background_color($0F);
+    nes.run;
+
+    while true do
+    begin
+        nes.wait_frame;
+        if Stage = $00 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            nes.metasprite_set_position(Player, $70, $68);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $01 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            nes.metasprite_set_position(Player, $00, $68);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $02 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            nes.metasprite_set_position(Player, $FF, $68);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $03 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            nes.metasprite_set_position(Player, $70, $00);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $04 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            nes.metasprite_set_position(Player, $70, $F4);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $05 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, true);
+            nes.metasprite_set_flip_vertical(Player, false);
+            nes.metasprite_set_position(Player, $00, $68);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $06 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, true);
+            nes.metasprite_set_flip_vertical(Player, false);
+            nes.metasprite_set_position(Player, $FF, $68);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $07 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, true);
+            nes.metasprite_set_position(Player, $70, $00);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $08 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, true);
+            nes.metasprite_set_position(Player, $70, $F4);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $09 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, true);
+            nes.metasprite_set_flip_vertical(Player, true);
+            nes.metasprite_set_position(Player, $70, $68);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $0A then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, true);
+            nes.metasprite_set_flip_vertical(Player, true);
+            nes.metasprite_set_position(Player, $70, $68);
+            nes.metasprite_hide(Player);
+        end
+        else if Stage = $0B then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, true);
+            nes.metasprite_set_flip_vertical(Player, false);
+            nes.metasprite_set_position(Player, $78, $70);
+            nes.metasprite_set_frame(Player, player.idle_2);
+            nes.metasprite_hide(Player);
+        end
+        else
+        begin
+            nes.metasprite_set_flip_horizontal(Player, true);
+            nes.metasprite_set_flip_vertical(Player, false);
+            nes.metasprite_set_position(Player, $78, $70);
+            nes.metasprite_show(Player);
+        end;
+        inc(Stage);
+    end;
+end.

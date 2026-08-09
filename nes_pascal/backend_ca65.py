@@ -11,6 +11,7 @@ from .ast import (
     ImmediateValue,
     PaletteKind,
     ResolvedLoadBackground,
+    ResolvedImportMetasprite,
     ResolvedAssignment,
     ResolvedBackgroundUpdatesOverflowed,
     ResolvedBinaryExpression,
@@ -28,6 +29,8 @@ from .ast import (
     ResolvedGetTile,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
+    ResolvedMetaspriteCreate,
+    ResolvedMetaspriteOperation,
     ResolvedProgram,
     ResolvedProcedure,
     ResolvedProcedureCall,
@@ -46,6 +49,7 @@ from .ast import (
     ResolvedValue,
     ResolvedWhileStatement,
     Run,
+    MetaspriteOperationKind,
     SpriteOperationKind,
     UnaryOperator,
     VariableValue,
@@ -134,6 +138,7 @@ def generate(
     )
     sprite_features = detect_sprite_runtime_features(program)
     sprite_api_enabled = sprite_features.sprite_api
+    metasprite_api_enabled = sprite_features.metasprite_api
     oam_enabled = bool(oam_symbols)
     palette_runtime_enabled = any(
         symbol.assembly_symbol == "runtime_palette_shadow"
@@ -170,7 +175,6 @@ def generate(
         label_counter,
         (),
         for_counter,
-        oam_enabled,
         palette_runtime_enabled,
         background_queue_enabled,
         background_shadow_enabled,
@@ -181,7 +185,6 @@ def generate(
         program.procedures,
         label_counter,
         for_counter,
-        oam_enabled,
         palette_runtime_enabled,
         background_queue_enabled,
         background_shadow_enabled,
@@ -356,6 +359,27 @@ def generate(
         if sprite_api_enabled
         else ""
     )
+    metasprite_runtime_routines = (
+        _generate_metasprite_runtime_routines(program)
+        if metasprite_api_enabled
+        else ""
+    )
+    metasprite_initialization = (
+        _generate_metasprite_initialization(program)
+        if metasprite_api_enabled
+        else ""
+    )
+    metasprite_storage = (
+        _generate_metasprite_storage(program)
+        if metasprite_api_enabled
+        else ""
+    )
+    runtime_routines = (
+        sprite_runtime_routines
+        + metasprite_runtime_routines
+        + palette_runtime_routine
+        + background_runtime_routines
+    )
     chr_storage = _generate_chr_storage(
         settings.chr_rom_size,
         sprite_zero_enabled,
@@ -444,7 +468,7 @@ RESET:
 @wait_vblank_2:
     bit $2002
     bpl @wait_vblank_2
-{oam_initialization}{empty_background_initialization}{statements}
+{oam_initialization}{metasprite_initialization}{empty_background_initialization}{statements}
 
 {runtime_main_loop}
 
@@ -488,8 +512,8 @@ runtime_read_controller_ports:
     ror runtime_controller_2_current
     dex
     bne @read_controller_bits
-    rts{sprite_runtime_routines}{palette_runtime_routine}{background_runtime_routines}
-{procedures}{background_storage}
+    rts{runtime_routines}
+{procedures}{metasprite_storage}{background_storage}
 
 .segment "VECTORS"
     .word NMI
@@ -506,7 +530,6 @@ def _generate_statements(
     label_counter: list[int],
     loop_targets: tuple[tuple[str, str], ...],
     for_counter: list[int],
-    sprite_zero_enabled: bool,
     palette_runtime_enabled: bool,
     background_queue_enabled: bool,
     background_shadow_enabled: bool,
@@ -603,7 +626,6 @@ def _generate_statements(
                 if default_sprite_palette_enabled
                 else []
             )
-            rendering_mask = 0x18 if sprite_zero_enabled else 0x08
             ppu_state_lines = [
                 "    lda runtime_ppuctrl_shadow",
                 "    ora #$80",
@@ -614,7 +636,7 @@ def _generate_statements(
                 "    lda runtime_scroll_y_shadow ; zero-filled default scroll Y",
                 "    sta $2005",
                 "    lda runtime_ppumask_shadow",
-                f"    ora #${rendering_mask:02X}",
+                "    ora #$1E",
                 "    sta runtime_ppumask_shadow ; preserve bits and enable rendering",
                 "    sta $2001",
             ]
@@ -670,6 +692,14 @@ def _generate_statements(
         elif isinstance(statement, ResolvedSpriteOperation):
             statement_lines.extend(
                 _generate_sprite_operation(statement, label_counter)
+            )
+        elif isinstance(statement, ResolvedMetaspriteOperation):
+            statement_lines.extend(
+                _generate_metasprite_operation(statement, label_counter)
+            )
+        elif isinstance(statement, ResolvedImportMetasprite):
+            statement_lines.extend(
+                ["", f"; Source: nes.import_metasprite({statement.asset_name})"]
             )
         elif isinstance(statement, ResolvedSetTile):
             statement_lines.extend(
@@ -769,7 +799,6 @@ def _generate_statements(
                         label_counter,
                         loop_targets,
                         for_counter,
-                        sprite_zero_enabled,
                         palette_runtime_enabled,
                         background_queue_enabled,
                         background_shadow_enabled,
@@ -788,7 +817,6 @@ def _generate_statements(
                             label_counter,
                             loop_targets,
                             for_counter,
-                            sprite_zero_enabled,
                             palette_runtime_enabled,
                             background_queue_enabled,
                             background_shadow_enabled,
@@ -817,7 +845,6 @@ def _generate_statements(
                         label_counter,
                         (*loop_targets, (end_label, condition_label)),
                         for_counter,
-                        sprite_zero_enabled,
                         palette_runtime_enabled,
                         background_queue_enabled,
                         background_shadow_enabled,
@@ -842,7 +869,6 @@ def _generate_statements(
                         label_counter,
                         (*loop_targets, (end_label, condition_label)),
                         for_counter,
-                        sprite_zero_enabled,
                         palette_runtime_enabled,
                         background_queue_enabled,
                         background_shadow_enabled,
@@ -906,7 +932,6 @@ def _generate_statements(
                         label_counter,
                         (*loop_targets, (end_label, step_label)),
                         for_counter,
-                        sprite_zero_enabled,
                         palette_runtime_enabled,
                         background_queue_enabled,
                         background_shadow_enabled,
@@ -1129,6 +1154,35 @@ def _generate_sprite_operation(
     return lines
 
 
+def _generate_metasprite_operation(
+    statement: ResolvedMetaspriteOperation,
+    label_counter: list[int],
+) -> list[str]:
+    command = f"nes.metasprite_{statement.kind.value}"
+    lines = ["", f"; Source: {command}(...)"]
+    if statement.value is not None:
+        lines.extend(
+            [
+                *_load_value(statement.value, label_counter),
+                "    sta runtime_metasprite_offset_x ; evaluate the value once",
+            ]
+        )
+    if statement.secondary_value is not None:
+        lines.extend(
+            [
+                *_load_value(statement.secondary_value, label_counter),
+                "    sta runtime_metasprite_offset_y ; evaluate Y once",
+            ]
+        )
+    lines.extend(
+        [
+            *_load_value(statement.instance, label_counter),
+            f"    jsr runtime_metasprite_{statement.kind.value}",
+        ]
+    )
+    return lines
+
+
 def _generate_sprite_runtime_routines(set_position: bool) -> str:
     """Generate bounded helpers for dynamic hardware-sprite indexes."""
 
@@ -1248,6 +1302,370 @@ def _generate_sprite_runtime_routines(set_position: bool) -> str:
                 "    rts",
             ]
         )
+    return "\n".join(lines)
+
+
+def _generate_metasprite_initialization(program: ResolvedProgram) -> str:
+    lines = [
+        "",
+        "    ; Runtime: initialize statically owned metasprite instances hidden",
+    ]
+    for instance in program.metasprite_instances:
+        suffix = "" if instance.index == 0 else f" + {instance.index}"
+        lines.extend(
+            [
+                f"    lda #${instance.initial_frame_id:02X}",
+                f"    sta runtime_metasprite_frame{suffix}",
+            ]
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _generate_metasprite_storage(program: ResolvedProgram) -> str:
+    frames = sorted(
+        (frame for asset in program.metasprite_assets for frame in asset.frames),
+        key=lambda frame: frame.id,
+    )
+    if [frame.id for frame in frames] != list(range(len(frames))):
+        raise ValueError("metasprite frame identifiers must be dense from zero")
+    asset_ids = {
+        asset.name.lower(): index
+        for index, asset in enumerate(program.metasprite_assets)
+    }
+    lines = [
+        "",
+        "",
+        "; Asset: immutable metasprite tables in PRG-ROM",
+        "metasprite_frame_pointer_low:",
+        "    .byte " + ", ".join(f"<metasprite_frame_{frame.id}" for frame in frames),
+        "metasprite_frame_pointer_high:",
+        "    .byte " + ", ".join(f">metasprite_frame_{frame.id}" for frame in frames),
+        "metasprite_frame_asset:",
+        "    .byte "
+        + ", ".join(f"${asset_ids[frame.asset_name.lower()]:02X}" for frame in frames),
+        "metasprite_instance_slot_pointer_low:",
+        "    .byte "
+        + ", ".join(
+            f"<metasprite_instance_slots_{instance.index}"
+            for instance in program.metasprite_instances
+        ),
+        "metasprite_instance_slot_pointer_high:",
+        "    .byte "
+        + ", ".join(
+            f">metasprite_instance_slots_{instance.index}"
+            for instance in program.metasprite_instances
+        ),
+        "metasprite_instance_asset:",
+        "    .byte "
+        + ", ".join(
+            f"${asset_ids[instance.asset_name.lower()]:02X}"
+            for instance in program.metasprite_instances
+        ),
+    ]
+    for frame in frames:
+        lines.extend(
+            [
+                f"metasprite_frame_{frame.id}:",
+                f"    .byte ${len(frame.components):02X} ; {frame.symbol}",
+            ]
+        )
+        for component in frame.components:
+            lines.append(
+                "    .byte "
+                f"${component.x_offset & 0xFF:02X}, "
+                f"${component.y_offset & 0xFF:02X}, "
+                f"${component.tile:02X}, ${component.attributes:02X}"
+            )
+    for instance in program.metasprite_instances:
+        values = ", ".join(f"${index:02X}" for index in instance.oam_indexes)
+        lines.extend(
+            [
+                f"metasprite_instance_slots_{instance.index}:",
+                f"    .byte ${len(instance.oam_indexes):02X}"
+                + (f", {values}" if values else ""),
+            ]
+        )
+    return "\n".join(lines)
+
+
+def _generate_metasprite_runtime_routines(program: ResolvedProgram) -> str:
+    instance_count = len(program.metasprite_instances)
+    frame_count = sum(len(asset.frames) for asset in program.metasprite_assets)
+
+    def instance_limit_check(done_label: str) -> list[str]:
+        if instance_count == 256:
+            return []
+        return [
+            f"    cmp #${instance_count:02X}",
+            f"    bcs {done_label}",
+        ]
+
+    frame_limit_check = (
+        [
+            f"    cmp #${frame_count:02X}",
+            "    bcs @metasprite_set_frame_done",
+        ]
+        if frame_count < 256
+        else []
+    )
+    lines = [
+        "",
+        "",
+        "; Runtime: bounded table-driven metasprite rendering into the OAM shadow",
+        "; Flags: bit 0 visible, bit 1 whole horizontal flip, bit 2 whole vertical flip.",
+        "runtime_metasprite_set_position:",
+        *instance_limit_check("@metasprite_set_position_done"),
+        "    tax",
+        "    lda runtime_metasprite_offset_x",
+        "    sta runtime_metasprite_x, x",
+        "    lda runtime_metasprite_offset_y",
+        "    sta runtime_metasprite_y, x",
+        "    txa",
+        "    jsr runtime_metasprite_render",
+        "@metasprite_set_position_done:",
+        "    rts",
+        "",
+        "runtime_metasprite_set_frame:",
+        *instance_limit_check("@metasprite_set_frame_done"),
+        "    tax",
+        "    lda runtime_metasprite_offset_x",
+        *frame_limit_check,
+        "    tay",
+        "    lda metasprite_frame_asset, y",
+        "    cmp metasprite_instance_asset, x",
+        "    bne @metasprite_set_frame_done ; dynamic cross-asset frames are ignored",
+        "    tya",
+        "    sta runtime_metasprite_frame, x",
+        "    txa",
+        "    jsr runtime_metasprite_render",
+        "@metasprite_set_frame_done:",
+        "    rts",
+        "",
+        "runtime_metasprite_hide:",
+        *instance_limit_check("@metasprite_hide_done"),
+        "    tax",
+        "    lda runtime_metasprite_flags, x",
+        "    and #$FE",
+        "    sta runtime_metasprite_flags, x",
+        "    txa",
+        "    jsr runtime_metasprite_render",
+        "@metasprite_hide_done:",
+        "    rts",
+        "",
+        "runtime_metasprite_show:",
+        *instance_limit_check("@metasprite_show_done"),
+        "    tax",
+        "    lda runtime_metasprite_flags, x",
+        "    ora #$01",
+        "    sta runtime_metasprite_flags, x",
+        "    txa",
+        "    jsr runtime_metasprite_render",
+        "@metasprite_show_done:",
+        "    rts",
+    ]
+    for name, mask in (("set_flip_horizontal", 0x02), ("set_flip_vertical", 0x04)):
+        lines.extend(
+            [
+                "",
+                f"runtime_metasprite_{name}:",
+                *instance_limit_check(f"@metasprite_{name}_done"),
+                "    tax",
+                "    lda runtime_metasprite_offset_x",
+                f"    beq @metasprite_{name}_clear",
+                "    lda runtime_metasprite_flags, x",
+                f"    ora #${mask:02X}",
+                f"    jmp @metasprite_{name}_store",
+                f"@metasprite_{name}_clear:",
+                "    lda runtime_metasprite_flags, x",
+                f"    and #${0xFF ^ mask:02X}",
+                f"@metasprite_{name}_store:",
+                "    sta runtime_metasprite_flags, x",
+                "    txa",
+                "    jsr runtime_metasprite_render",
+                f"@metasprite_{name}_done:",
+                "    rts",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "runtime_metasprite_render:",
+            "    sta runtime_metasprite_current_instance",
+            "    tax",
+            "    lda metasprite_instance_slot_pointer_low, x",
+            "    sta runtime_metasprite_slot_pointer",
+            "    lda metasprite_instance_slot_pointer_high, x",
+            "    sta runtime_metasprite_slot_pointer + 1",
+            "    ldy #$00",
+            "    lda (runtime_metasprite_slot_pointer), y",
+            "    sta runtime_metasprite_slots_remaining",
+            "    jsr runtime_metasprite_advance_slot_pointer",
+            "    lda runtime_metasprite_flags, x",
+            "    and #$01",
+            "    bne @metasprite_visible",
+            "    jmp @metasprite_hide_slots",
+            "@metasprite_visible:",
+            "    lda runtime_metasprite_frame, x",
+            "    tay",
+            "    lda metasprite_frame_pointer_low, y",
+            "    sta runtime_metasprite_frame_pointer",
+            "    lda metasprite_frame_pointer_high, y",
+            "    sta runtime_metasprite_frame_pointer + 1",
+            "    ldy #$00",
+            "    lda (runtime_metasprite_frame_pointer), y",
+            "    sta runtime_metasprite_frame_remaining",
+            "    jsr runtime_metasprite_advance_frame_pointer",
+            "@metasprite_slot_loop:",
+            "    lda runtime_metasprite_slots_remaining",
+            "    bne @metasprite_slot_available",
+            "    jmp @metasprite_render_done",
+            "@metasprite_slot_available:",
+            "    ldy #$00",
+            "    lda (runtime_metasprite_slot_pointer), y",
+            "    asl a",
+            "    asl a",
+            "    sta runtime_metasprite_oam_offset",
+            "    jsr runtime_metasprite_advance_slot_pointer",
+            "    lda runtime_metasprite_frame_remaining",
+            "    bne @metasprite_component_available",
+            "    jmp @metasprite_hide_one",
+            "@metasprite_component_available:",
+            "    dec runtime_metasprite_frame_remaining",
+            "    ldy #$00",
+            "    lda (runtime_metasprite_frame_pointer), y",
+            "    sta runtime_metasprite_offset_x",
+            "    jsr runtime_metasprite_advance_frame_pointer",
+            "    ldy #$00",
+            "    lda (runtime_metasprite_frame_pointer), y",
+            "    sta runtime_metasprite_offset_y",
+            "    jsr runtime_metasprite_advance_frame_pointer",
+            "    ldy #$00",
+            "    lda (runtime_metasprite_frame_pointer), y",
+            "    sta runtime_metasprite_tile",
+            "    jsr runtime_metasprite_advance_frame_pointer",
+            "    ldy #$00",
+            "    lda (runtime_metasprite_frame_pointer), y",
+            "    sta runtime_metasprite_attributes",
+            "    jsr runtime_metasprite_advance_frame_pointer",
+            "    ldx runtime_metasprite_current_instance",
+            "    lda runtime_metasprite_flags, x",
+            "    and #$02",
+            "    beq @metasprite_x_not_flipped",
+            "    lda runtime_metasprite_offset_x",
+            "    eor #$FF",
+            "    sec",
+            "    sbc #$07                ; -offset - 8 for an 8-pixel tile",
+            "    sta runtime_metasprite_offset_x",
+            "    lda runtime_metasprite_attributes",
+            "    eor #$40                ; combine component and whole flip",
+            "    sta runtime_metasprite_attributes",
+            "@metasprite_x_not_flipped:",
+            "    lda runtime_metasprite_flags, x",
+            "    and #$04",
+            "    beq @metasprite_y_not_flipped",
+            "    lda runtime_metasprite_offset_y",
+            "    eor #$FF",
+            "    sec",
+            "    sbc #$07",
+            "    sta runtime_metasprite_offset_y",
+            "    lda runtime_metasprite_attributes",
+            "    eor #$80",
+            "    sta runtime_metasprite_attributes",
+            "@metasprite_y_not_flipped:",
+            "    lda runtime_metasprite_offset_x",
+            "    bmi @metasprite_x_negative",
+            "    clc",
+            "    adc runtime_metasprite_x, x",
+            "    bcs @metasprite_hide_one",
+            "    cmp #$F9                ; a full 8-pixel tile ends at X = 255",
+            "    bcs @metasprite_hide_one",
+            "    jmp @metasprite_x_valid",
+            "@metasprite_x_negative:",
+            "    eor #$FF",
+            "    clc",
+            "    adc #$01",
+            "    sta runtime_metasprite_offset_x",
+            "    lda runtime_metasprite_x, x",
+            "    cmp runtime_metasprite_offset_x",
+            "    bcc @metasprite_hide_one",
+            "    sec",
+            "    sbc runtime_metasprite_offset_x",
+            "    cmp #$F9                ; negative offsets still obey the right edge",
+            "    bcs @metasprite_hide_one",
+            "@metasprite_x_valid:",
+            "    ldy runtime_metasprite_oam_offset",
+            "    sta runtime_oam_shadow + 3, y",
+            "    lda runtime_metasprite_offset_y",
+            "    bmi @metasprite_y_negative",
+            "    clc",
+            "    adc runtime_metasprite_y, x",
+            "    bcs @metasprite_hide_one",
+            "    cmp #$E9                ; logical top 1..232 is fully visible",
+            "    bcs @metasprite_hide_one",
+            "    jmp @metasprite_y_range",
+            "@metasprite_y_negative:",
+            "    eor #$FF",
+            "    clc",
+            "    adc #$01",
+            "    sta runtime_metasprite_offset_y",
+            "    lda runtime_metasprite_y, x",
+            "    cmp runtime_metasprite_offset_y",
+            "    bcc @metasprite_hide_one",
+            "    sec",
+            "    sbc runtime_metasprite_offset_y",
+            "@metasprite_y_range:",
+            "    beq @metasprite_hide_one ; $FF is reserved as the hidden OAM Y",
+            "    cmp #$E9",
+            "    bcs @metasprite_hide_one",
+            "    sec",
+            "    sbc #$01                ; logical top -> NES OAM Y convention",
+            "    pha",
+            "    ldy runtime_metasprite_oam_offset",
+            "    lda runtime_metasprite_tile",
+            "    sta runtime_oam_shadow + 1, y",
+            "    lda runtime_metasprite_attributes",
+            "    sta runtime_oam_shadow + 2, y",
+            "    pla",
+            "    sta runtime_oam_shadow, y ; publish Y last",
+            "    jmp @metasprite_next_slot",
+            "@metasprite_hide_one:",
+            "    ldy runtime_metasprite_oam_offset",
+            "    lda #$FF",
+            "    sta runtime_oam_shadow, y",
+            "@metasprite_next_slot:",
+            "    dec runtime_metasprite_slots_remaining",
+            "    jmp @metasprite_slot_loop",
+            "@metasprite_hide_slots:",
+            "    lda runtime_metasprite_slots_remaining",
+            "    beq @metasprite_render_done",
+            "    ldy #$00",
+            "    lda (runtime_metasprite_slot_pointer), y",
+            "    asl a",
+            "    asl a",
+            "    tay",
+            "    lda #$FF",
+            "    sta runtime_oam_shadow, y",
+            "    jsr runtime_metasprite_advance_slot_pointer",
+            "    dec runtime_metasprite_slots_remaining",
+            "    jmp @metasprite_hide_slots",
+            "@metasprite_render_done:",
+            "    rts",
+            "",
+            "runtime_metasprite_advance_frame_pointer:",
+            "    inc runtime_metasprite_frame_pointer",
+            "    bne @metasprite_frame_pointer_done",
+            "    inc runtime_metasprite_frame_pointer + 1",
+            "@metasprite_frame_pointer_done:",
+            "    rts",
+            "",
+            "runtime_metasprite_advance_slot_pointer:",
+            "    inc runtime_metasprite_slot_pointer",
+            "    bne @metasprite_slot_pointer_done",
+            "    inc runtime_metasprite_slot_pointer + 1",
+            "@metasprite_slot_pointer_done:",
+            "    rts",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -1783,7 +2201,6 @@ def _generate_procedures(
     procedures: tuple[ResolvedProcedure, ...],
     label_counter: list[int],
     for_counter: list[int],
-    sprite_zero_enabled: bool,
     palette_runtime_enabled: bool,
     background_queue_enabled: bool,
     background_shadow_enabled: bool,
@@ -1803,7 +2220,6 @@ def _generate_procedures(
                     label_counter,
                     (),
                     for_counter,
-                    sprite_zero_enabled,
                     palette_runtime_enabled,
                     background_queue_enabled,
                     background_shadow_enabled,
@@ -1862,6 +2278,10 @@ def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
     if isinstance(value, ResolvedSpriteCreate):
         return [
             f"    lda #${value.index:02X}              ; static sprite reservation"
+        ]
+    if isinstance(value, ResolvedMetaspriteCreate):
+        return [
+            f"    lda #${value.instance_index:02X}              ; static metasprite reservation"
         ]
     if isinstance(value, ImmediateValue):
         if value.type is BuiltInType.BOOLEAN:

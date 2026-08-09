@@ -1,0 +1,10 @@
+program MetaspriteArgumentCount;
+var
+    Player: metasprite;
+begin
+    nes.import_metasprite(player);
+    Player := nes.metasprite_create(player.idle_0);
+    nes.metasprite_set_position(Player, $10);
+    nes.set_background_color($0F);
+    nes.run;
+end.

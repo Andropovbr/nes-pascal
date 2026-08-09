@@ -7,7 +7,8 @@ the supported language.
 
 ## Language limitations
 
-- `nes_color`, `byte`, `boolean`, and `sprite` are the only built-in types.
+- `nes_color`, `byte`, `boolean`, `sprite`, and `metasprite` are the only
+  built-in types.
 - `type` declarations and user-defined types are not supported.
 - Constants cannot refer to other constants, and constant initializers cannot
   contain expressions.
@@ -20,7 +21,8 @@ the supported language.
 - Boolean expressions support only `not`, `and`, and `or`.
 - `case`, arrays, records, general functions, runtime strings, and inline
   Assembly are not supported. A small fixed set of built-in query expressions
-  and the statically resolved `nes.sprite_create()` intrinsic are supported.
+  and the statically resolved `nes.sprite_create()` and
+  `nes.metasprite_create(frame)` intrinsics are supported.
 - Procedure parameters are limited to `byte` and `boolean` values. There are
   no reference parameters, default values, return values, or general local
   variables.
@@ -32,7 +34,8 @@ the supported language.
 - Statements are limited to assignment, `inc` and `dec`, `if`/`else`,
   supported loops, `break`, `continue`, procedure calls,
   the palette APIs, `nes.load_background`, `nes.set_background_color`,
-  `nes.set_scroll`, the `nes.sprite_*` hardware sprite primitives,
+  `nes.set_scroll`, the `nes.sprite_*` hardware sprite primitives, compile-time
+  `nes.import_metasprite`, and the `nes.metasprite_*` primitives,
   `nes.run`, `nes.wait_frame`,
   `nes.on_update`, `nes.on_vblank`, and the fixed controller-example
   `nes.set_sprite_zero` helper.
@@ -62,10 +65,12 @@ the supported language.
   expansion devices, buffering, combos, turbo, or DMC-safe repeated reads.
 - Hardware sprite primitives support all 64 OAM entries, individual fields,
   palette/flip/priority attributes, deterministic hide/show, static individual
-  allocation, and NMI OAM DMA. Runtime creation/destruction, metasprites,
-  animations, collision, sprite
-  multiplexing/flickering, sorting, and scanline-overflow mitigation are not
-  supported. `nes.set_sprite_zero` remains a legacy compatibility helper.
+  allocation, and NMI OAM DMA. Metasprites support statically owned arbitrary
+  component layouts, manual frame selection, whole-object position,
+  visibility, flip, and hardware-sprite clipping. Runtime creation/destruction,
+  automatic animation/timing, collision, sprite multiplexing/flickering,
+  sorting, and scanline-overflow mitigation are not supported.
+  `nes.set_sprite_zero` remains a legacy compatibility helper.
 - Callback registration is static. There is only one callback of each kind,
   with no parameters, return values, priorities, lists, removal, indirect
   calls, IRQ callbacks, or user-owned interrupt handlers.

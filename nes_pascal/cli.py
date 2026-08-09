@@ -18,6 +18,7 @@ from .memory_layout import (
     generate_linker_config,
     generate_memory_map,
 )
+from .metasprite_assets import load_metasprite_assets
 from .parser import parse
 from .semantic import analyze
 
@@ -35,6 +36,7 @@ def compile_source(
     nametable_tiles_path: str | Path | None = None,
     nametable_attributes_path: str | Path | None = None,
     mirroring: str | None = None,
+    metasprite_paths: tuple[str | Path, ...] = (),
 ) -> tuple[Path, Path]:
     source_path = source_path.resolve()
     output_path = output_path.resolve()
@@ -54,8 +56,19 @@ def compile_source(
             horizontal_mirroring=normalized_mirroring == "horizontal",
         )
     program = parse(source, str(source_path))
-    resolved_program = analyze(program, source, str(source_path))
     chr_rom = load_chr_rom(chr_path, source_path, source)
+    metasprite_assets = load_metasprite_assets(
+        metasprite_paths,
+        source_path,
+        source,
+        chr_rom,
+    )
+    resolved_program = analyze(
+        program,
+        source,
+        str(source_path),
+        metasprite_assets=metasprite_assets,
+    )
     background_data = load_background_data(
         nametable_path,
         nametable_tiles_path,
@@ -159,6 +172,15 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="8 KiB .chr asset; relative paths use the source file directory",
     )
     parser.add_argument(
+        "--metasprite",
+        action="append",
+        default=[],
+        help=(
+            "PNG2CHR Studio JSON metadata; repeat for multiple assets; "
+            "relative paths use the source file directory"
+        ),
+    )
+    parser.add_argument(
         "--nametable",
         type=str,
         help="1 KiB raw nametable; relative paths use the source file directory",
@@ -193,6 +215,7 @@ def main(argv: list[str] | None = None) -> int:
             nametable_tiles_path=arguments.nametable_tiles,
             nametable_attributes_path=arguments.nametable_attributes,
             mirroring=arguments.mirroring,
+            metasprite_paths=tuple(arguments.metasprite),
         )
     except (CompilerError, ToolchainError) as error:
         print(error, file=sys.stderr)

@@ -28,7 +28,13 @@ frame, Zero Page opcodes, fixed sprite staging, general sprite setters,
 attribute preservation, visibility state, OAM initialization and DMA, and
 deterministic Assembly. Sprite-management tests additionally cover static OAM
 ownership, explicit-index coexistence, 64-entry exhaustion, and the combined
-position setter.
+position setter. Metasprite tests validate the attached PNG2CHR Studio asset,
+its already anchor-relative offset contract, malformed schema variants,
+arbitrary signed/sparse/reused layouts, centered and non-centered pivots,
+asymmetric horizontal/vertical geometry, bounding-range preservation,
+component flip XOR, shared OAM ownership and exhaustion, compact PRG tables,
+per-instance RAM, visibility, shorter-frame hiding, edge clipping structure,
+and optional Mesen behavior.
 Toolchain tests are skipped with an explicit message when `ca65` or `ld65` is
 unavailable.
 
@@ -43,7 +49,15 @@ slow-update pending-frame behavior without nested calls, and the universal
 background color. The controller ROM additionally drives both virtual ports,
 checks every direction and button behavior, verifies OAM consistency, and
 runs across an 8-bit frame-counter wrap. The sprite ROM verifies one visible
-sprite, 63 hidden entries, attribute composition, and DMA page selection:
+sprite, 63 hidden entries, attribute composition, and DMA page selection. The
+metasprite player ROM drives all eight D-pad directions and validates in-place
+centered flipping, manual frame selection while flipped, source/whole flip
+composition, asset-derived fully visible gameplay limits at all four edges,
+hide/move/show state, logical Y conversion, component OAM, and DMA. A separate
+deterministic clipping fixture validates all four edges,
+horizontal, vertical, and combined flips, negative offsets, non-wrapping
+coordinates, hidden movement, and flipped frame switching; the user-facing
+clipping example remains deliberately slow enough for visual inspection:
 
 ```powershell
 $env:MESEN_PATH = "C:\path\to\Mesen.exe"

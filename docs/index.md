@@ -38,6 +38,7 @@ Planned work is tracked separately in the
 - [Frame callbacks](runtime/frame-callbacks.md)
 - [Controller input](runtime/controller-input.md)
 - [Hardware sprites](runtime/sprites.md)
+- [Metasprites](runtime/metasprites.md)
 
 ## Reference
 

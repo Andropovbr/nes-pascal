@@ -20,6 +20,7 @@ from .ast import (
     ResolvedGetTile,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
+    ResolvedMetaspriteOperation,
     ResolvedProcedureCall,
     ResolvedProgram,
     ResolvedRepeatStatement,
@@ -182,18 +183,37 @@ class SpriteRuntimeFeatures:
     legacy_sprite_zero: bool = False
     sprite_api: bool = False
     set_position: bool = False
+    metasprite_instances: int = 0
 
     @property
     def oam_shadow(self) -> bool:
-        return self.legacy_sprite_zero or self.sprite_api
+        return (
+            self.legacy_sprite_zero
+            or self.sprite_api
+            or self.metasprite_instances > 0
+        )
 
     @property
-    def runtime_size(self) -> int:
+    def metasprite_api(self) -> bool:
+        return self.metasprite_instances > 0
+
+    @property
+    def individual_runtime_size(self) -> int:
         return (
             (5 if self.legacy_sprite_zero else 0)
             + (65 if self.sprite_api else 0)
             + (1 if self.set_position else 0)
         )
+
+    @property
+    def metasprite_runtime_size(self) -> int:
+        if not self.metasprite_api:
+            return 0
+        return self.metasprite_instances * 4 + 8
+
+    @property
+    def runtime_size(self) -> int:
+        return self.individual_runtime_size + self.metasprite_runtime_size
 
 
 @dataclass(frozen=True, slots=True)
@@ -308,12 +328,14 @@ def build_memory_layout(
     sprite_features = detect_sprite_runtime_features(program)
     sprite_zero_enabled = sprite_features.legacy_sprite_zero
     sprite_api_enabled = sprite_features.sprite_api
+    metasprite_api_enabled = sprite_features.metasprite_api
     palette_runtime_enabled = _uses_runtime_palette(program)
     scroll_runtime_enabled = _uses_set_scroll(program)
     background_features = detect_background_runtime_features(program)
     background_queue_enabled = background_features.queue
     background_shadow_enabled = background_features.shadow
     sprite_zero_runtime_size = 5 if sprite_zero_enabled else 0
+    individual_sprite_runtime_size = sprite_features.individual_runtime_size
     sprite_runtime_size = sprite_features.runtime_size
     palette_runtime_size = 41 if palette_runtime_enabled else 0
     ppu_state_size = 4
@@ -456,6 +478,9 @@ def build_memory_layout(
             page_purpose,
         )
 
+    metasprite_base = runtime_data.start + individual_sprite_runtime_size
+    metasprite_count = sprite_features.metasprite_instances
+
     runtime_symbols = (
         MemorySymbol(
             "runtime_frame_counter",
@@ -528,6 +553,28 @@ def build_memory_layout(
             SymbolKind.RUNTIME,
             zero_page_runtime.name,
             "distinguishes an initial zero byte from a completed frame-zero poll",
+        ),
+        *(
+            (
+                MemorySymbol(
+                    "runtime_metasprite_frame_pointer",
+                    zero_page_runtime.start + 9,
+                    2,
+                    SymbolKind.RUNTIME,
+                    zero_page_runtime.name,
+                    "indirect pointer into immutable metasprite frame data",
+                ),
+                MemorySymbol(
+                    "runtime_metasprite_slot_pointer",
+                    zero_page_runtime.start + 11,
+                    2,
+                    SymbolKind.RUNTIME,
+                    zero_page_runtime.name,
+                    "indirect pointer into one metasprite OAM ownership table",
+                ),
+            )
+            if metasprite_api_enabled
+            else ()
         ),
         *(
             (
@@ -623,6 +670,66 @@ def build_memory_layout(
                 ),
             )
             if sprite_api_enabled
+            else ()
+        ),
+        *(
+            (
+                MemorySymbol(
+                    "runtime_metasprite_x",
+                    metasprite_base,
+                    metasprite_count,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "logical screen X for each metasprite instance",
+                ),
+                MemorySymbol(
+                    "runtime_metasprite_y",
+                    metasprite_base + metasprite_count,
+                    metasprite_count,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "logical screen Y for each metasprite instance",
+                ),
+                MemorySymbol(
+                    "runtime_metasprite_frame",
+                    metasprite_base + metasprite_count * 2,
+                    metasprite_count,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "selected symbolic frame for each metasprite instance",
+                ),
+                MemorySymbol(
+                    "runtime_metasprite_flags",
+                    metasprite_base + metasprite_count * 3,
+                    metasprite_count,
+                    SymbolKind.RUNTIME,
+                    runtime_data.name,
+                    "visibility and whole-metasprite flip flags",
+                ),
+                *(
+                    MemorySymbol(
+                        f"runtime_metasprite_{name}",
+                        metasprite_base + metasprite_count * 4 + offset,
+                        1,
+                        SymbolKind.RUNTIME,
+                        runtime_data.name,
+                        purpose,
+                    )
+                    for offset, (name, purpose) in enumerate(
+                        (
+                            ("current_instance", "instance currently being rendered"),
+                            ("frame_remaining", "components left in selected frame"),
+                            ("slots_remaining", "reserved OAM slots left to visit"),
+                            ("oam_offset", "current OAM shadow byte offset"),
+                            ("offset_x", "signed component X offset"),
+                            ("offset_y", "signed component Y offset"),
+                            ("tile", "current component CHR tile"),
+                            ("attributes", "current component attributes"),
+                        )
+                    )
+                ),
+            )
+            if metasprite_api_enabled
             else ()
         ),
         *(
@@ -1406,6 +1513,7 @@ def detect_sprite_runtime_features(program: ResolvedProgram) -> SpriteRuntimeFea
         legacy_sprite_zero=legacy_sprite_zero,
         sprite_api=sprite_api,
         set_position=set_position,
+        metasprite_instances=len(program.metasprite_instances),
     )
 
 
@@ -1533,6 +1641,16 @@ def detect_background_runtime_features(
                     )
                     if value is not None
                 )
+            elif isinstance(statement, ResolvedMetaspriteOperation):
+                values = tuple(
+                    value
+                    for value in (
+                        statement.instance,
+                        statement.value,
+                        statement.secondary_value,
+                    )
+                    if value is not None
+                )
             elif isinstance(statement, ResolvedSetTile):
                 values = (statement.x, statement.y, statement.tile)
             elif isinstance(statement, ResolvedSetAttribute):
@@ -1597,6 +1715,12 @@ def _count_statement_variable_references(
             _count_value_variable_references(value, counts)
     elif isinstance(statement, ResolvedSpriteOperation):
         _count_value_variable_references(statement.sprite, counts)
+        if statement.value is not None:
+            _count_value_variable_references(statement.value, counts)
+        if statement.secondary_value is not None:
+            _count_value_variable_references(statement.secondary_value, counts)
+    elif isinstance(statement, ResolvedMetaspriteOperation):
+        _count_value_variable_references(statement.instance, counts)
         if statement.value is not None:
             _count_value_variable_references(statement.value, counts)
         if statement.secondary_value is not None:
@@ -1718,6 +1842,14 @@ def _statement_expression_depth(statement: ResolvedStatement) -> int:
     if isinstance(statement, ResolvedSpriteOperation):
         return max(
             _expression_depth(statement.sprite),
+            _expression_depth(statement.value) if statement.value is not None else 0,
+            _expression_depth(statement.secondary_value)
+            if statement.secondary_value is not None
+            else 0,
+        )
+    if isinstance(statement, ResolvedMetaspriteOperation):
+        return max(
+            _expression_depth(statement.instance),
             _expression_depth(statement.value) if statement.value is not None else 0,
             _expression_depth(statement.secondary_value)
             if statement.secondary_value is not None

@@ -363,7 +363,7 @@ RESET:
     lda runtime_scroll_y_shadow ; zero-filled default scroll Y
     sta $2005
     lda runtime_ppumask_shadow
-    ora #$08
+    ora #$1E
     sta runtime_ppumask_shadow ; preserve bits and enable rendering
     sta $2001
 

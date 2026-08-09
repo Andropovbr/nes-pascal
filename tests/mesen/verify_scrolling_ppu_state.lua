@@ -16,7 +16,7 @@ local function validateScrollingPpuState()
     if control ~= 0x80 then
         return
     end
-    if mask ~= 0x08 then
+    if mask ~= 0x1E then
         fail("The authoritative PPUCTRL or PPUMASK shadow changed.", 2)
         return
     end

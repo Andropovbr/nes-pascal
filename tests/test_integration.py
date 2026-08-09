@@ -518,16 +518,19 @@ class MesenIntegrationTests(unittest.TestCase):
         memory_settings: MemoryLayoutSettings | None = None,
         chr_path: str | Path | None = None,
         nametable_path: str | Path | None = None,
+        metasprite_paths: tuple[str | Path, ...] = (),
+        source_path: Path | None = None,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             rom_path = Path(temporary_directory) / f"{example_name}.nes"
-            source_path = ROOT / "examples" / f"{example_name}.nsp"
+            source_path = source_path or ROOT / "examples" / f"{example_name}.nsp"
             if memory_settings is None:
                 compile_source(
                     source_path,
                     rom_path,
                     chr_path=chr_path,
                     nametable_path=nametable_path,
+                    metasprite_paths=metasprite_paths,
                 )
             else:
                 compile_source(
@@ -536,6 +539,7 @@ class MesenIntegrationTests(unittest.TestCase):
                     memory_settings,
                     chr_path=chr_path,
                     nametable_path=nametable_path,
+                    metasprite_paths=metasprite_paths,
                 )
             result = subprocess.run(
                 [
@@ -619,6 +623,23 @@ class MesenIntegrationTests(unittest.TestCase):
             "sprite_support",
             "verify_sprite_support.lua",
             chr_path="assets/chr_asset.chr",
+        )
+
+    def test_metasprite_player_moves_in_eight_directions(self) -> None:
+        self._run_mesen_test(
+            "metasprite_player",
+            "verify_metasprite_player.lua",
+            chr_path="assets/game.chr",
+            metasprite_paths=("assets/player_idle.json",),
+        )
+
+    def test_metasprite_clipping_prevents_coordinate_wrap(self) -> None:
+        self._run_mesen_test(
+            "metasprite_clipping",
+            "verify_metasprite_clipping.lua",
+            chr_path=ROOT / "examples" / "assets" / "game.chr",
+            metasprite_paths=(ROOT / "examples" / "assets" / "player_idle.json",),
+            source_path=ROOT / "tests" / "fixtures" / "runtime" / "metasprite_clipping.nsp",
         )
 
     def test_palette_example_uploads_initial_and_runtime_palettes(self) -> None:

@@ -1,0 +1,115 @@
+program MetaspriteClipping;
+
+var
+    Player: metasprite;
+    Stage: byte;
+    PlayerX: byte;
+    PlayerY: byte;
+
+begin
+    nes.import_metasprite(player);
+    Player := nes.metasprite_create(player.idle_0);
+    Stage := $00;
+    PlayerX := $70;
+    PlayerY := $68;
+    nes.set_sprite_palette($00, $0F, $16, $27, $30);
+    nes.metasprite_set_flip_horizontal(Player, false);
+    nes.metasprite_set_flip_vertical(Player, false);
+    nes.metasprite_set_position(Player, PlayerX, PlayerY);
+    nes.metasprite_show(Player);
+    nes.set_background_color($0F);
+    nes.run;
+
+    while true do
+    begin
+        nes.wait_frame;
+        if Stage = $00 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            if PlayerX > $00 then
+                dec(PlayerX)
+            else
+                Stage := $01;
+            nes.metasprite_set_position(Player, PlayerX, PlayerY);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $01 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            if PlayerX < $70 then
+                inc(PlayerX)
+            else
+                Stage := $02;
+            nes.metasprite_set_position(Player, PlayerX, PlayerY);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $02 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            if PlayerX < $FF then
+                inc(PlayerX)
+            else
+                Stage := $03;
+            nes.metasprite_set_position(Player, PlayerX, PlayerY);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $03 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            if PlayerX > $70 then
+                dec(PlayerX)
+            else
+                Stage := $04;
+            nes.metasprite_set_position(Player, PlayerX, PlayerY);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $04 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            if PlayerY > $00 then
+                dec(PlayerY)
+            else
+                Stage := $05;
+            nes.metasprite_set_position(Player, PlayerX, PlayerY);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $05 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            if PlayerY < $68 then
+                inc(PlayerY)
+            else
+                Stage := $06;
+            nes.metasprite_set_position(Player, PlayerX, PlayerY);
+            nes.metasprite_show(Player);
+        end
+        else if Stage = $06 then
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            if PlayerY < $FF then
+                inc(PlayerY)
+            else
+                Stage := $07;
+            nes.metasprite_set_position(Player, PlayerX, PlayerY);
+            nes.metasprite_show(Player);
+        end
+        else
+        begin
+            nes.metasprite_set_flip_horizontal(Player, false);
+            nes.metasprite_set_flip_vertical(Player, false);
+            if PlayerY > $68 then
+                dec(PlayerY)
+            else
+                Stage := $00;
+            nes.metasprite_set_position(Player, PlayerX, PlayerY);
+            nes.metasprite_show(Player);
+        end;
+    end;
+end.

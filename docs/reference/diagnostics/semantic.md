@@ -763,13 +763,74 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 ## E3050 - OAM hardware-sprite capacity exhausted
 
 - **Category:** Semantic Analysis
-- **Explanation:** Explicit individual-sprite reservations and distinct
-  `nes.sprite_create()` sites share the NES's fixed 64-entry OAM capacity.
-  Static allocation cannot reserve another non-conflicting entry.
+- **Explanation:** Explicit individual-sprite reservations, distinct
+  `nes.sprite_create()` sites, and statically owned metasprite components share
+  the NES's fixed 64-entry OAM capacity. Static allocation cannot reserve
+  another non-conflicting entry or component group.
 - **Trigger:** Compile
   `tests/fixtures/diagnostics/sprite_capacity_exhausted.nsp` or otherwise
   reserve all 64 indexes before another creation site.
 - **Expected compiler output:** `E3050` identifies the creation site that
   cannot receive an OAM entry.
-- **Suggested fix:** Remove an individual sprite reservation or creation site.
-  Allocation never wraps, aliases an owner, or returns a sentinel.
+- **Suggested fix:** Remove an individual sprite reservation, sprite creation
+  site, or metasprite instance. Allocation never wraps, aliases an owner,
+  truncates a metasprite, or returns a sentinel.
+
+## E3051 - Invalid metasprite import
+
+- **Category:** Semantic Analysis
+- **Explanation:** A compile-time metasprite import must be a direct top-level
+  statement before `nes.run`, must name one asset configured with
+  `--metasprite`, and every configured asset must be imported.
+- **Trigger:** Compile `tests/fixtures/diagnostics/invalid_metasprite_import.nsp`
+  without configuring its `player` metadata, nest the import, or move it after
+  runtime startup.
+- **Expected compiler output:** `E3051` identifies the invalid import or the
+  configured asset that lacks an import statement.
+- **Suggested fix:** Configure the JSON and write
+  `nes.import_metasprite(player);` directly in the main block before
+  `nes.run;`.
+
+## E3052 - Duplicate metasprite import
+
+- **Category:** Semantic Analysis
+- **Explanation:** One configured asset root may be imported exactly once.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/duplicate_metasprite_import.nsp` with the player
+  asset configured.
+- **Expected compiler output:** `E3052` identifies the second import.
+- **Suggested fix:** Keep one top-level import for each asset root.
+
+## E3053 - Invalid metasprite creation
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.metasprite_create` requires exactly one imported,
+  symbolic frame such as `player.idle_0`. The creation site has a persistent
+  static identity and is not a heap allocation.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/invalid_metasprite_create.nsp` or call the
+  intrinsic without one symbolic frame.
+- **Expected compiler output:** `E3053` explains the invalid creation form.
+- **Suggested fix:** Import the asset and pass one frame symbol.
+
+## E3054 - Invalid metasprite API argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** Position takes a metasprite and two bytes; frame and flip
+  setters take a metasprite and one value; hide/show take one metasprite.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/metasprite_argument_count.nsp`.
+- **Expected compiler output:** `E3054` reports the expected and actual counts.
+- **Suggested fix:** Pass exactly the arguments documented by the metasprite
+  API.
+
+## E3055 - Incompatible metasprite frame
+
+- **Category:** Semantic Analysis
+- **Explanation:** A metasprite instance owns OAM capacity for all frames in
+  its creation asset. A frame from another asset cannot be selected safely.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/incompatible_metasprite_frame.nsp` with both
+  referenced assets configured.
+- **Expected compiler output:** `E3055` names the instance and frame assets.
+- **Suggested fix:** Select a frame from the same asset used at creation.

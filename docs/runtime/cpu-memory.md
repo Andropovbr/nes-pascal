@@ -16,6 +16,7 @@ and are never treated as additional storage.
 | `$0200-$02FF` | 0 or 256 bytes | Runtime | Page-aligned OAM shadow, linked by general or legacy sprite operations |
 | from `$0200` without sprites, otherwise `$0300` | 0 or 5 bytes | Runtime | Legacy fixed sprite-0 staging record, allocated only when used |
 | after earlier runtime blocks | 0, 65, or 66 bytes | Runtime | General sprite logical-Y table and one or two helper bytes |
+| after earlier runtime blocks | `4N + 8` bytes | Runtime | Four mutable bytes per metasprite instance plus shared renderer scratch |
 | after earlier runtime blocks | 4 bytes | Runtime | Authoritative PPUCTRL, PPUMASK, and scroll state |
 | after earlier runtime blocks | 0 or 41 bytes | Runtime | Palette shadow and atomic dirty flags, allocated only for runtime palette calls |
 | after earlier runtime blocks | 0 or 960 bytes | Runtime | Confirmed tile shadow, linked only by `nes.get_tile` |
@@ -42,7 +43,16 @@ restore one position for each of 64 sprites. The legacy controller-example
 helper instead reserves a five-byte staging record; when both APIs are used,
 that record precedes the 65- or 66-byte general-sprite state.
 
-Programs without sprite or OAM operations omit the OAM symbol, Assembly
+Metasprite-only programs reserve `$0200-$02FF` for the shared OAM shadow. They
+also reserve two two-byte indirect pointers at `$0009-$000C`, four regular-RAM
+bytes per instance (X, Y, frame, flags), and eight shared regular-RAM scratch
+bytes. One instance therefore uses 12 regular bytes plus four shared Zero Page
+bytes; each additional instance adds four regular bytes. These blocks follow
+any individual-sprite runtime state and precede palette/PPU/background state.
+The statically owned component indexes and immutable geometry live in PRG-ROM,
+not RAM.
+
+Programs without individual sprite, metasprite, or OAM operations omit the OAM symbol, Assembly
 segment, linker region, DMA code, and sprite state. Their regular runtime and
 user allocation starts at `$0200`, making that 256-byte page available instead
 of reserving it implicitly.

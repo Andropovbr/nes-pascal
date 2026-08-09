@@ -17,6 +17,8 @@ class BuiltInType(Enum):
     BYTE = "byte"
     BOOLEAN = "boolean"
     SPRITE = "sprite"
+    METASPRITE = "metasprite"
+    METASPRITE_FRAME = "metasprite_frame"
 
 
 class UnaryOperator(Enum):
@@ -71,6 +73,15 @@ class SpriteOperationKind(Enum):
     SET_FLIP_HORIZONTAL = "set_flip_horizontal"
     SET_FLIP_VERTICAL = "set_flip_vertical"
     SET_BEHIND_BACKGROUND = "set_behind_background"
+
+
+class MetaspriteOperationKind(Enum):
+    SET_POSITION = "set_position"
+    SET_FRAME = "set_frame"
+    HIDE = "hide"
+    SHOW = "show"
+    SET_FLIP_HORIZONTAL = "set_flip_horizontal"
+    SET_FLIP_VERTICAL = "set_flip_vertical"
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +187,12 @@ class SpriteCreate:
 
 
 @dataclass(frozen=True, slots=True)
+class MetaspriteCreate:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
 class GetTile:
     arguments: tuple[ValueExpression, ...]
     position: SourcePosition
@@ -199,6 +216,7 @@ ValueExpression = (
     | BooleanBinaryExpression
     | ControllerQuery
     | SpriteCreate
+    | MetaspriteCreate
     | GetTile
     | BackgroundUpdatesOverflowed
 )
@@ -299,6 +317,19 @@ class SpriteOperation:
 
 
 @dataclass(frozen=True, slots=True)
+class ImportMetasprite:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class MetaspriteOperation:
+    kind: MetaspriteOperationKind
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
 class IfStatement:
     condition: ValueExpression
     then_branch: tuple[Statement, ...]
@@ -385,6 +416,8 @@ Statement = (
     | CallbackRegistration
     | SetSpriteZero
     | SpriteOperation
+    | ImportMetasprite
+    | MetaspriteOperation
     | IfStatement
     | WhileStatement
     | RepeatStatement
@@ -480,6 +513,12 @@ class ResolvedSpriteCreate:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedMetaspriteCreate:
+    instance_index: int
+    initial_frame_id: int
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedGetTile:
     x: ResolvedValue
     y: ResolvedValue
@@ -500,6 +539,7 @@ ResolvedValue = (
     | ResolvedBooleanBinaryExpression
     | ResolvedControllerQuery
     | ResolvedSpriteCreate
+    | ResolvedMetaspriteCreate
     | ResolvedGetTile
     | ResolvedBackgroundUpdatesOverflowed
 )
@@ -655,11 +695,67 @@ class ResolvedSpriteOperation:
     secondary_value: ResolvedValue | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedImportMetasprite:
+    asset_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedMetaspriteOperation:
+    kind: MetaspriteOperationKind
+    instance: ResolvedValue
+    value: ResolvedValue | None = None
+    secondary_value: ResolvedValue | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class MetaspriteComponent:
+    x_offset: int
+    y_offset: int
+    tile: int
+    attributes: int
+
+
+@dataclass(frozen=True, slots=True)
+class MetaspriteFrame:
+    id: int
+    symbol: str
+    asset_name: str
+    animation_name: str
+    animation_frame_index: int
+    width: int
+    height: int
+    origin_x: int
+    origin_y: int
+    components: tuple[MetaspriteComponent, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class MetaspriteAsset:
+    name: str
+    configured_path: str
+    frames: tuple[MetaspriteFrame, ...]
+
+    @property
+    def maximum_component_count(self) -> int:
+        return max((len(frame.components) for frame in self.frames), default=0)
+
+
+@dataclass(frozen=True, slots=True)
+class MetaspriteInstance:
+    index: int
+    asset_name: str
+    initial_frame_id: int
+    oam_indexes: tuple[int, ...]
+    position: SourcePosition | None = field(default=None, compare=False)
+
+
 class OamOwnerKind(Enum):
     """Compile-time ownership classes for physical hardware-sprite slots."""
 
     INDIVIDUAL_EXPLICIT = "individual_explicit"
     INDIVIDUAL_CREATED = "individual_created"
+    METASPRITE_COMPONENT = "metasprite_component"
 
 
 @dataclass(frozen=True, slots=True)
@@ -667,6 +763,8 @@ class OamReservation:
     index: int
     owner: OamOwnerKind
     position: SourcePosition | None = field(default=None, compare=False)
+    owner_index: int | None = None
+    component_index: int | None = None
 
 
 ResolvedStatement = (
@@ -685,6 +783,8 @@ ResolvedStatement = (
     | ResolvedCallbackRegistration
     | ResolvedSetSpriteZero
     | ResolvedSpriteOperation
+    | ResolvedImportMetasprite
+    | ResolvedMetaspriteOperation
     | ResolvedIfStatement
     | ResolvedWhileStatement
     | ResolvedRepeatStatement
@@ -712,3 +812,5 @@ class ResolvedProgram:
     procedures: tuple[ResolvedProcedure, ...]
     statements: tuple[ResolvedStatement, ...]
     oam_reservations: tuple[OamReservation, ...] = ()
+    metasprite_assets: tuple[MetaspriteAsset, ...] = ()
+    metasprite_instances: tuple[MetaspriteInstance, ...] = ()

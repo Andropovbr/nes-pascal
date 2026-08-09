@@ -73,6 +73,8 @@ class ScrollBackendTests(unittest.TestCase):
         run = assembly.split("; Source: nes.run", 1)[1].split("; Runtime: implicit", 1)[0]
         self.assertIn("lda runtime_scroll_x_shadow ; zero-filled default scroll X", run)
         self.assertIn("lda runtime_scroll_y_shadow ; zero-filled default scroll Y", run)
+        self.assertIn("lda runtime_ppumask_shadow\n    ora #$1E", run)
+        self.assertNotIn("lda #$1E\n    sta $2001", run)
 
     def test_runtime_call_only_stages_complete_pair_and_last_call_wins(self) -> None:
         assembly, _ = compile_assembly(
