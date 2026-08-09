@@ -80,6 +80,7 @@ the range reserved for their category.
 | [E3053](semantic.md) | Semantic Analysis | Invalid metasprite creation |
 | [E3054](semantic.md) | Semantic Analysis | Invalid metasprite API argument count |
 | [E3055](semantic.md) | Semantic Analysis | Incompatible metasprite frame |
+| [E3056](semantic.md) | Semantic Analysis | Invalid metasprite animation |
 | [E4001](type-system.md) | Type System | Unknown type |
 | [E4002](type-system.md) | Type System | Invalid `nes_color` value |
 | [E4003](type-system.md) | Type System | Invalid `byte` value |

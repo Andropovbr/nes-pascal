@@ -39,6 +39,7 @@ Planned work is tracked separately in the
 - [Controller input](runtime/controller-input.md)
 - [Hardware sprites](runtime/sprites.md)
 - [Metasprites](runtime/metasprites.md)
+- [Sprite animation](runtime/sprite-animation.md)
 
 ## Reference
 

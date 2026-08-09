@@ -40,6 +40,8 @@ zeroed position. There is no heap, destruction, or runtime name lookup.
 ```pascal
 nes.metasprite_set_position(Player, X, Y);
 nes.metasprite_set_frame(Player, player.idle_2);
+nes.metasprite_set_animation(Player, player.idle);
+nes.metasprite_restart_animation(Player);
 nes.metasprite_set_flip_horizontal(Player, true);
 nes.metasprite_set_flip_vertical(Player, false);
 nes.metasprite_hide(Player);
@@ -56,9 +58,9 @@ at compilation. Because ordinary `metasprite` variables are opaque one-byte
 identities, the runtime also checks asset IDs and safely ignores an
 incompatible dynamic pairing instead of reading beyond reserved capacity.
 
-This milestone exposes manual frame selection only. It does not read frame
-durations or automatically advance, loop, restart, or complete animations;
-those temporal behaviors belong to milestone 0.5.4.
+Animation selection, automatic timing, looping, one-shot completion, restart,
+and the interaction with manual frame selection are documented in
+[Sprite animation](sprite-animation.md).
 
 ## Supported metadata
 
@@ -74,6 +76,11 @@ non-contiguous CHR indexes remain unchanged. Only entries in each frame's
 `sprites` array consume OAM, so omitted/transparent source tiles do not.
 Component order is preserved.
 
+There is one immutable frame representation. Manual frame selection and
+[sprite animation](sprite-animation.md) reference the same frame IDs and the
+same component lists; animation state never creates a second geometry,
+pivot, flip, or clipping path.
+
 PNG2CHR Studio version 2 defines root `origin` as the configured logical anchor
 in source-frame pixel coordinates. It subtracts that anchor during export, so
 every `animations[].frames[].sprites[].x/y` value is already a signed offset
@@ -81,8 +88,9 @@ from the anchor. NES Pascal consumes those offsets directly; it does not
 subtract `origin` again.
 
 Tooling fields such as source image coordinates, source tile row/column,
-reuse labels, conversion statistics, and frame duration stay in the compiler
-only. Tile graphics remain solely in CHR-ROM; they are not copied into PRG.
+reuse labels, and conversion statistics stay in the compiler only. Animation
+durations and loop policy become compact immutable PRG tables. Tile graphics
+remain solely in CHR-ROM; they are not copied into PRG.
 
 The metadata currently declares a tile capacity and final tile count but does
 not unambiguously identify which 4 KiB NES pattern table the indexes target.
@@ -173,8 +181,8 @@ instance privately maps component positions to those OAM indexes.
 
 If the shared total would exceed 64, E3050 stops compilation. Allocation never
 wraps, overwrites another owner, truncates a frame, or returns an invalid
-sentinel. This fixed maximum lets milestone 0.5.4 switch between differently
-sized frames without runtime OAM allocation.
+sentinel. This fixed maximum lets automatic animations switch between
+differently sized frames without runtime OAM allocation.
 
 Each instance uses four mutable regular-RAM bytes: logical X, logical Y,
 selected frame ID, and visibility/flip flags. Metasprite support also links
@@ -190,6 +198,11 @@ pointers. Immutable PRG tables contain:
 
 Width, height, and origin do not occupy ROM table bytes because the exported
 component offsets already encode the anchor-relative geometry.
+
+Programs using [sprite animation](sprite-animation.md) add four mutable bytes
+per instance and compact animation sequence tables in PRG-ROM. Programs that
+use only static frame operations retain the costs above and do not link the
+animation state or routines.
 
 ## Visibility, clipping, and NES Y
 
@@ -224,5 +237,6 @@ one OAM DMA.
 The 64-entry OAM capacity is not the only sprite limit. The NES PPU renders at
 most eight hardware sprites on one scanline. A wide metasprite, or several
 objects sharing scanlines, may exhibit sprite dropout even when total OAM
-ownership is valid. Milestone 0.5.3 does not sort sprites, rotate OAM priority,
-balance scanlines, or implement flicker mitigation.
+ownership is valid. NES Pascal does not sort sprites, rotate OAM priority,
+balance scanlines, or implement flicker mitigation. Animation does not change
+this hardware limit.

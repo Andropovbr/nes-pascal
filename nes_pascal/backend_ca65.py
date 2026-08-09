@@ -30,6 +30,7 @@ from .ast import (
     ResolvedIfStatement,
     ResolvedIncrementStatement,
     ResolvedMetaspriteCreate,
+    ResolvedMetaspriteAnimationFinished,
     ResolvedMetaspriteOperation,
     ResolvedProgram,
     ResolvedProcedure,
@@ -139,6 +140,7 @@ def generate(
     sprite_features = detect_sprite_runtime_features(program)
     sprite_api_enabled = sprite_features.sprite_api
     metasprite_api_enabled = sprite_features.metasprite_api
+    metasprite_animation_enabled = sprite_features.metasprite_animation
     oam_enabled = bool(oam_symbols)
     palette_runtime_enabled = any(
         symbol.assembly_symbol == "runtime_palette_shadow"
@@ -229,11 +231,30 @@ def generate(
         if vblank_callback is not None
         else ""
     )
-    if update_callback is None:
+    if update_callback is None and not metasprite_animation_enabled:
         runtime_main_loop = """; Runtime: implicit stable loop after the main program finishes
 @runtime_idle_loop:
     jmp @runtime_idle_loop"""
+    elif update_callback is None:
+        runtime_main_loop = """; Runtime: frame-synchronized automatic animation loop
+    ; Establish the frame baseline once; missed frames remain coalesced.
+    lda runtime_frame_counter
+    sta runtime_last_processed_frame
+@runtime_animation_loop:
+    lda runtime_frame_counter
+    cmp runtime_last_processed_frame
+    beq @runtime_animation_loop
+    sta runtime_last_processed_frame
+    lda #$00
+    sta runtime_frame_ready ; advisory latch only; counter comparison is authoritative
+    jsr runtime_metasprite_update_animations
+    jmp @runtime_animation_loop"""
     else:
+        animation_update = (
+            "\n    jsr runtime_metasprite_update_animations"
+            if metasprite_animation_enabled
+            else ""
+        )
         runtime_main_loop = f"""; Runtime: frame-synchronized update callback loop
     ; Establish the frame baseline once when the callback loop starts.
     lda runtime_frame_counter
@@ -247,7 +268,7 @@ def generate(
     lda #$00
     sta runtime_frame_ready ; advisory latch only; counter comparison is authoritative
     lda runtime_last_processed_frame
-    jsr runtime_update_controllers ; exactly once for the accepted frame
+    jsr runtime_update_controllers ; exactly once for the accepted frame{animation_update}
     jsr {update_callback.procedure_label}
     jmp @runtime_update_loop"""
 
@@ -1306,6 +1327,7 @@ def _generate_sprite_runtime_routines(set_position: bool) -> str:
 
 
 def _generate_metasprite_initialization(program: ResolvedProgram) -> str:
+    animation_enabled = detect_sprite_runtime_features(program).metasprite_animation
     lines = [
         "",
         "    ; Runtime: initialize statically owned metasprite instances hidden",
@@ -1316,6 +1338,16 @@ def _generate_metasprite_initialization(program: ResolvedProgram) -> str:
             [
                 f"    lda #${instance.initial_frame_id:02X}",
                 f"    sta runtime_metasprite_frame{suffix}",
+                *(
+                    [
+                        "    lda #$00",
+                        f"    sta runtime_metasprite_animation_flags{suffix}",
+                        f"    sta runtime_metasprite_animation_frame{suffix}",
+                        f"    sta runtime_metasprite_animation_timer{suffix}",
+                    ]
+                    if animation_enabled
+                    else []
+                ),
             ]
         )
     return "\n".join(lines) + "\n"
@@ -1332,6 +1364,19 @@ def _generate_metasprite_storage(program: ResolvedProgram) -> str:
         asset.name.lower(): index
         for index, asset in enumerate(program.metasprite_assets)
     }
+    animation_enabled = detect_sprite_runtime_features(program).metasprite_animation
+    animations = sorted(
+        (
+            animation
+            for asset in program.metasprite_assets
+            for animation in asset.animations
+        ),
+        key=lambda animation: animation.id,
+    )
+    if animations and [animation.id for animation in animations] != list(
+        range(len(animations))
+    ):
+        raise ValueError("metasprite animation identifiers must be dense from zero")
     lines = [
         "",
         "",
@@ -1362,6 +1407,41 @@ def _generate_metasprite_storage(program: ResolvedProgram) -> str:
             for instance in program.metasprite_instances
         ),
     ]
+    if animation_enabled:
+        lines.extend(
+            [
+                "metasprite_animation_pointer_low:",
+                "    .byte "
+                + ", ".join(
+                    f"<metasprite_animation_{animation.id}"
+                    for animation in animations
+                ),
+                "metasprite_animation_pointer_high:",
+                "    .byte "
+                + ", ".join(
+                    f">metasprite_animation_{animation.id}"
+                    for animation in animations
+                ),
+                "metasprite_animation_frame_count:",
+                "    .byte "
+                + ", ".join(
+                    f"${len(animation.frame_ids):02X}"
+                    for animation in animations
+                ),
+                "metasprite_animation_flags:",
+                "    .byte "
+                + ", ".join(
+                    "$01" if animation.loop else "$00"
+                    for animation in animations
+                ),
+                "metasprite_animation_asset:",
+                "    .byte "
+                + ", ".join(
+                    f"${asset_ids[animation.asset_name.lower()]:02X}"
+                    for animation in animations
+                ),
+            ]
+        )
     for frame in frames:
         lines.extend(
             [
@@ -1375,6 +1455,25 @@ def _generate_metasprite_storage(program: ResolvedProgram) -> str:
                 f"${component.x_offset & 0xFF:02X}, "
                 f"${component.y_offset & 0xFF:02X}, "
                 f"${component.tile:02X}, ${component.attributes:02X}"
+            )
+    if animation_enabled:
+        for animation in animations:
+            lines.extend(
+                [
+                    f"metasprite_animation_{animation.id}:",
+                    "    ; Geometry remains in the shared metasprite_frame tables.",
+                    f"    ; {animation.symbol}: frame id, duration pairs",
+                    "    .byte "
+                    + ", ".join(
+                        value
+                        for frame_id, duration in zip(
+                            animation.frame_ids,
+                            animation.durations,
+                            strict=True,
+                        )
+                        for value in (f"${frame_id:02X}", f"${duration:02X}")
+                    ),
+                ]
             )
     for instance in program.metasprite_instances:
         values = ", ".join(f"${index:02X}" for index in instance.oam_indexes)
@@ -1391,6 +1490,10 @@ def _generate_metasprite_storage(program: ResolvedProgram) -> str:
 def _generate_metasprite_runtime_routines(program: ResolvedProgram) -> str:
     instance_count = len(program.metasprite_instances)
     frame_count = sum(len(asset.frames) for asset in program.metasprite_assets)
+    animation_enabled = detect_sprite_runtime_features(program).metasprite_animation
+    animation_count = sum(
+        len(asset.animations) for asset in program.metasprite_assets
+    )
 
     def instance_limit_check(done_label: str) -> list[str]:
         if instance_count == 256:
@@ -1406,6 +1509,14 @@ def _generate_metasprite_runtime_routines(program: ResolvedProgram) -> str:
             "    bcs @metasprite_set_frame_done",
         ]
         if frame_count < 256
+        else []
+    )
+    animation_limit_check = (
+        [
+            f"    cmp #${animation_count:02X}",
+            "    bcs @metasprite_set_animation_done",
+        ]
+        if animation_count < 256
         else []
     )
     lines = [
@@ -1436,6 +1547,16 @@ def _generate_metasprite_runtime_routines(program: ResolvedProgram) -> str:
         "    bne @metasprite_set_frame_done ; dynamic cross-asset frames are ignored",
         "    tya",
         "    sta runtime_metasprite_frame, x",
+        *(
+            [
+                "    lda #$00",
+                "    sta runtime_metasprite_animation_flags, x ; manual frame disables playback",
+                "    sta runtime_metasprite_animation_frame, x",
+                "    sta runtime_metasprite_animation_timer, x",
+            ]
+            if animation_enabled
+            else []
+        ),
         "    txa",
         "    jsr runtime_metasprite_render",
         "@metasprite_set_frame_done:",
@@ -1483,6 +1604,152 @@ def _generate_metasprite_runtime_routines(program: ResolvedProgram) -> str:
                 "    txa",
                 "    jsr runtime_metasprite_render",
                 f"@metasprite_{name}_done:",
+                "    rts",
+            ]
+        )
+    if animation_enabled:
+        update_loop_tail = (
+            [
+                "    ldx runtime_metasprite_current_instance",
+                "    inx",
+                "    bne @metasprite_animation_update_loop",
+            ]
+            if instance_count == 256
+            else [
+                "    ldx runtime_metasprite_current_instance",
+                "    inx",
+                f"    cpx #${instance_count:02X}",
+                "    bne @metasprite_animation_update_loop",
+            ]
+        )
+        lines.extend(
+            [
+                "",
+                "; Runtime: select immutable animation data without restarting an active match",
+                "runtime_metasprite_set_animation:",
+                *instance_limit_check("@metasprite_set_animation_done"),
+                "    sta runtime_metasprite_current_instance",
+                "    tax",
+                "    lda runtime_metasprite_offset_x",
+                *animation_limit_check,
+                "    tay",
+                "    lda metasprite_animation_asset, y",
+                "    cmp metasprite_instance_asset, x",
+                "    bne @metasprite_set_animation_done ; cross-asset animations are ignored",
+                "    lda runtime_metasprite_animation_flags, x",
+                "    and #$80",
+                "    beq @metasprite_select_animation",
+                "    tya",
+                "    cmp runtime_metasprite_animation, x",
+                "    beq @metasprite_set_animation_done ; same active animation keeps timing",
+                "@metasprite_select_animation:",
+                "    jsr runtime_metasprite_begin_animation",
+                "@metasprite_set_animation_done:",
+                "    rts",
+                "",
+                "; Runtime: explicitly restart the current active animation",
+                "runtime_metasprite_restart_animation:",
+                *instance_limit_check("@metasprite_restart_animation_done"),
+                "    sta runtime_metasprite_current_instance",
+                "    tax",
+                "    lda runtime_metasprite_animation_flags, x",
+                "    and #$80",
+                "    beq @metasprite_restart_animation_done",
+                "    ldy runtime_metasprite_animation, x",
+                "    jsr runtime_metasprite_begin_animation",
+                "@metasprite_restart_animation_done:",
+                "    rts",
+                "",
+                "; Runtime: Boolean completion query; looping animations never set bit 0",
+                "runtime_metasprite_animation_finished:",
+                *instance_limit_check("@metasprite_animation_finished_false"),
+                "    tax",
+                "    lda runtime_metasprite_animation_flags, x",
+                "    and #$01",
+                "    rts",
+                "@metasprite_animation_finished_false:",
+                "    lda #$00",
+                "    rts",
+                "",
+                "; Runtime: advance every active instance once per accepted logical frame",
+                "runtime_metasprite_update_animations:",
+                "    ldx #$00",
+                "@metasprite_animation_update_loop:",
+                "    stx runtime_metasprite_current_instance",
+                "    lda runtime_metasprite_animation_flags, x",
+                "    and #$80",
+                "    beq @metasprite_animation_update_next",
+                "    lda runtime_metasprite_animation_flags, x",
+                "    and #$01",
+                "    bne @metasprite_animation_update_next",
+                "    lda runtime_metasprite_animation_timer, x",
+                "    beq @metasprite_animation_advance_now",
+                "    dec runtime_metasprite_animation_timer, x",
+                "    bne @metasprite_animation_update_next",
+                "@metasprite_animation_advance_now:",
+                "    jsr runtime_metasprite_advance_animation",
+                "@metasprite_animation_update_next:",
+                *update_loop_tail,
+                "    rts",
+                "",
+                "; Runtime: initialize frame zero and its full duration",
+                "; Input: X instance, Y animation; current_instance already matches X.",
+                "runtime_metasprite_begin_animation:",
+                "    tya",
+                "    sta runtime_metasprite_animation, x",
+                "    lda #$80              ; active, not completed",
+                "    sta runtime_metasprite_animation_flags, x",
+                "    lda #$00",
+                "    sta runtime_metasprite_animation_frame, x",
+                "    lda metasprite_animation_pointer_low, y",
+                "    sta runtime_metasprite_frame_pointer",
+                "    lda metasprite_animation_pointer_high, y",
+                "    sta runtime_metasprite_frame_pointer + 1",
+                "    ldy #$00",
+                "    lda (runtime_metasprite_frame_pointer), y",
+                "    sta runtime_metasprite_frame, x",
+                "    iny",
+                "    lda (runtime_metasprite_frame_pointer), y",
+                "    sta runtime_metasprite_animation_timer, x",
+                "    txa",
+                "    jsr runtime_metasprite_render",
+                "    rts",
+                "",
+                "; Runtime: transition through frame/duration pairs or complete one-shot playback",
+                "runtime_metasprite_advance_animation:",
+                "    ldx runtime_metasprite_current_instance",
+                "    ldy runtime_metasprite_animation, x",
+                "    lda metasprite_animation_pointer_low, y",
+                "    sta runtime_metasprite_frame_pointer",
+                "    lda metasprite_animation_pointer_high, y",
+                "    sta runtime_metasprite_frame_pointer + 1",
+                "    lda runtime_metasprite_animation_frame, x",
+                "    clc",
+                "    adc #$01",
+                "    cmp metasprite_animation_frame_count, y",
+                "    bcc @metasprite_animation_select_frame",
+                "    lda metasprite_animation_flags, y",
+                "    and #$01",
+                "    beq @metasprite_animation_complete",
+                "    lda #$00              ; looping animation wraps to frame zero",
+                "@metasprite_animation_select_frame:",
+                "    sta runtime_metasprite_animation_frame, x",
+                "    asl a                  ; frame id/duration pair offset",
+                "    tay",
+                "    lda (runtime_metasprite_frame_pointer), y",
+                "    sta runtime_metasprite_frame, x",
+                "    iny",
+                "    lda (runtime_metasprite_frame_pointer), y",
+                "    sta runtime_metasprite_animation_timer, x",
+                "    txa",
+                "    jsr runtime_metasprite_render",
+                "    rts",
+                "@metasprite_animation_complete:",
+                "    lda runtime_metasprite_animation_flags, x",
+                "    ora #$01              ; keep final frame and mark completed",
+                "    sta runtime_metasprite_animation_flags, x",
+                "    lda #$00",
+                "    sta runtime_metasprite_animation_timer, x",
                 "    rts",
             ]
         )
@@ -2282,6 +2549,12 @@ def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
     if isinstance(value, ResolvedMetaspriteCreate):
         return [
             f"    lda #${value.instance_index:02X}              ; static metasprite reservation"
+        ]
+    if isinstance(value, ResolvedMetaspriteAnimationFinished):
+        return [
+            "    ; nes.metasprite_animation_finished(instance)",
+            *_load_value(value.instance, label_counter),
+            "    jsr runtime_metasprite_animation_finished",
         ]
     if isinstance(value, ImmediateValue):
         if value.type is BuiltInType.BOOLEAN:

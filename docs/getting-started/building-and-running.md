@@ -28,6 +28,7 @@ python -m nes_pascal.cli examples/controller_input.nsp -o build/controller_input
 python -m nes_pascal.cli examples/sprite_support.nsp -o build/sprite_support.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/metasprite_player.nsp -o build/metasprite_player.nes --chr assets/game.chr --metasprite assets/player_idle.json
 python -m nes_pascal.cli examples/metasprite_clipping.nsp -o build/metasprite_clipping.nes --chr assets/game.chr --metasprite assets/player_idle.json
+python -m nes_pascal.cli examples/sprite_animation.nsp -o build/sprite_animation.nes --chr assets/game.chr --metasprite assets/player_consolidated.json
 python -m nes_pascal.cli examples/chr_asset.nsp -o build/chr_asset.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/palette_support.nsp -o build/palette_support.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
@@ -69,9 +70,14 @@ The examples demonstrate:
   selection with A, whole-object hide/show with Select, and explicit gameplay
   bounds that keep every component visible at all four edges.
 - `metasprite_clipping.nsp`: a slow visual loop from center to the left, right,
-  top, and bottom boundaries and back, with explicit position, visibility, and
-  cleared flip state in every stage. Complete 8-by-8 components disappear and
-  return without wrapping as they cross an edge.
+  top, and bottom edges and back. Each target is only far enough beyond the
+  screen to clip one component row or column, keeping the demo visible and
+  understandable. Flip state is explicitly cleared in every stage; complete
+  8-by-8 components disappear and return without wrapping.
+- `sprite_animation.nsp`: one consolidated idle/movement manifest, automatic
+  state switching, explicit A-button restart, Select hide/show without pausing
+  time, persistent left/right facing, and D-pad movement in all eight
+  directions.
 - `chr_asset.nsp`: inclusion of one project-relative raw CHR-ROM asset.
 - `palette_support.nsp`: custom CHR data, initialized background and sprite
   palettes, then a safely queued full and individual palette update.
@@ -125,7 +131,9 @@ the existing fixed sprite-0 demonstration, which retains its internal tiles).
 Metasprite programs add one or more repeatable `--metasprite` JSON paths and
 must also configure the matching 8 KiB CHR bank. Both path types are resolved
 from the `.nsp` directory. See [Metasprites](../runtime/metasprites.md) for the
-metadata contract, symbolic frame names, and OAM cost.
+metadata contract, symbolic frame names, and OAM cost, and
+[Sprite animation](../runtime/sprite-animation.md) for sequence symbols,
+timing, loop policy, and animation RAM/ROM cost.
 
 ## Nametable assets
 

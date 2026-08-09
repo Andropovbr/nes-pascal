@@ -1,0 +1,126 @@
+{
+  "format": "png2chr-studio-animation",
+  "version": 2,
+  "name": "shape",
+  "source": {
+    "tile_width": 8,
+    "tile_height": 8
+  },
+  "chr": {
+    "capacity_tiles": 256,
+    "final_tile_count": 6,
+    "final_size_bytes": 8192
+  },
+  "attribute_flags": {
+    "flip_horizontal": 64,
+    "flip_vertical": 128,
+    "palette_mask": 3
+  },
+  "origin": {
+    "x": 0,
+    "y": 0
+  },
+  "animations": [
+    {
+      "name": "cycle",
+      "default_frame_duration": 2,
+      "loop": true,
+      "frames": [
+        {
+          "width": 8,
+          "height": 8,
+          "sprites": [
+            {
+              "x": 0,
+              "y": 0,
+              "tile": 0,
+              "attributes": 0,
+              "palette": 0,
+              "horizontal_flip": false,
+              "vertical_flip": false
+            }
+          ]
+        },
+        {
+          "duration": 3,
+          "width": 16,
+          "height": 8,
+          "sprites": [
+            {
+              "x": 0,
+              "y": 0,
+              "tile": 1,
+              "attributes": 0,
+              "palette": 0,
+              "horizontal_flip": false,
+              "vertical_flip": false
+            },
+            {
+              "x": 8,
+              "y": 0,
+              "tile": 2,
+              "attributes": 0,
+              "palette": 0,
+              "horizontal_flip": false,
+              "vertical_flip": false
+            }
+          ]
+        },
+        {
+          "duration": 1,
+          "width": 12,
+          "height": 8,
+          "sprites": [
+            {
+              "x": 4,
+              "y": 0,
+              "tile": 3,
+              "attributes": 0,
+              "palette": 0,
+              "horizontal_flip": false,
+              "vertical_flip": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "burst",
+      "default_frame_duration": 2,
+      "loop": false,
+      "frames": [
+        {
+          "duration": 1,
+          "width": 8,
+          "height": 8,
+          "sprites": [
+            {
+              "x": 0,
+              "y": 0,
+              "tile": 4,
+              "attributes": 0,
+              "palette": 0,
+              "horizontal_flip": false,
+              "vertical_flip": false
+            }
+          ]
+        },
+        {
+          "width": 8,
+          "height": 8,
+          "sprites": [
+            {
+              "x": 0,
+              "y": 0,
+              "tile": 5,
+              "attributes": 0,
+              "palette": 0,
+              "horizontal_flip": false,
+              "vertical_flip": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

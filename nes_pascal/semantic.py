@@ -32,6 +32,8 @@ from .ast import (
     ImportMetasprite,
     LoadBackground,
     MetaspriteAsset,
+    MetaspriteAnimation,
+    MetaspriteAnimationFinished,
     MetaspriteCreate,
     MetaspriteFrame,
     MetaspriteInstance,
@@ -65,6 +67,7 @@ from .ast import (
     ResolvedImportMetasprite,
     ResolvedLoadBackground,
     ResolvedMetaspriteCreate,
+    ResolvedMetaspriteAnimationFinished,
     ResolvedMetaspriteOperation,
     ResolvedRepeatStatement,
     ResolvedProgram,
@@ -169,6 +172,7 @@ class SemanticAnalyzer:
         }
         self.imported_metasprite_assets: tuple[MetaspriteAsset, ...] = ()
         self.metasprite_frames_by_id: dict[int, MetaspriteFrame] = {}
+        self.metasprite_animations_by_id: dict[int, MetaspriteAnimation] = {}
         self.sprite_allocation_plan = SpriteAllocationPlan({}, (), {}, ())
 
     def analyze(self, program: Program) -> ResolvedProgram:
@@ -178,11 +182,21 @@ class SemanticAnalyzer:
             for asset in self.imported_metasprite_assets
             for frame in asset.frames
         }
+        self.metasprite_animations_by_id = {
+            animation.id: animation
+            for asset in self.imported_metasprite_assets
+            for animation in asset.animations
+        }
         constants: dict[str, TypedConstant] = {
             name: TypedConstant(BuiltInType.BYTE, value)
             for name, value in CONTROLLER_BUTTONS.items()
         }
         for asset in self.imported_metasprite_assets:
+            for animation in asset.animations:
+                constants[animation.symbol.lower()] = TypedConstant(
+                    BuiltInType.METASPRITE_ANIMATION,
+                    animation.id,
+                )
             for frame in asset.frames:
                 constants[frame.symbol.lower()] = TypedConstant(
                     BuiltInType.METASPRITE_FRAME,
@@ -676,6 +690,28 @@ class SemanticAnalyzer:
         )
         raise AssertionError("unreachable")
 
+    def _static_metasprite_animation(
+        self,
+        expression: ValueExpression,
+        constants: dict[str, TypedConstant],
+        command: str,
+    ) -> MetaspriteAnimation:
+        if isinstance(expression, ConstantReference):
+            constant = constants.get(expression.name.lower())
+            if (
+                constant is not None
+                and constant.type is BuiltInType.METASPRITE_ANIMATION
+            ):
+                return self.metasprite_animations_by_id[constant.value]
+        self._error(
+            expression.position,
+            DiagnosticCode.INVALID_METASPRITE_ANIMATION,
+            f"{command} requires an imported symbolic metasprite animation.",
+            "Use an animation such as player.idle from an imported asset.",
+            len(getattr(expression, "name", command)),
+        )
+        raise AssertionError("unreachable")
+
     @staticmethod
     def _explicit_sprite_index(
         expression: ValueExpression,
@@ -1138,6 +1174,7 @@ class SemanticAnalyzer:
                 unary = statement.kind in (
                     MetaspriteOperationKind.HIDE,
                     MetaspriteOperationKind.SHOW,
+                    MetaspriteOperationKind.RESTART_ANIMATION,
                 )
                 set_position = (
                     statement.kind is MetaspriteOperationKind.SET_POSITION
@@ -1196,6 +1233,30 @@ class SemanticAnalyzer:
                                 f"asset {created.asset_name}.",
                                 "Select a frame from the same imported asset.",
                                 len(frame.symbol),
+                            )
+                elif statement.kind is MetaspriteOperationKind.SET_ANIMATION:
+                    animation = self._static_metasprite_animation(
+                        statement.arguments[1],
+                        constants,
+                        command,
+                    )
+                    value = ImmediateValue(
+                        animation.id,
+                        BuiltInType.METASPRITE_ANIMATION,
+                    )
+                    if isinstance(instance, ResolvedMetaspriteCreate):
+                        created = self.sprite_allocation_plan.metasprite_instances[
+                            instance.instance_index
+                        ]
+                        if created.asset_name != animation.asset_name:
+                            self._error(
+                                statement.arguments[1].position,
+                                DiagnosticCode.INVALID_METASPRITE_ANIMATION,
+                                f"Animation {animation.symbol} belongs to asset "
+                                f"{animation.asset_name}, but this instance owns "
+                                f"asset {created.asset_name}.",
+                                "Select an animation from the same imported asset.",
+                                len(animation.symbol),
                             )
                 elif not unary:
                     value = self._resolve_value(
@@ -2185,6 +2246,32 @@ class SemanticAnalyzer:
         assigned_variables: set[str],
         assignment_target: ResolvedVariable | None = None,
     ) -> ResolvedValue:
+        if isinstance(expression, MetaspriteAnimationFinished):
+            self._require_expression_result_type(
+                expression.position,
+                BuiltInType.BOOLEAN,
+                expected_type,
+                "nes.metasprite_animation_finished result",
+                assignment_target,
+            )
+            if len(expression.arguments) != 1:
+                self._error(
+                    expression.position,
+                    DiagnosticCode.INVALID_METASPRITE_ARGUMENT_COUNT,
+                    "nes.metasprite_animation_finished expects exactly one "
+                    f"argument, but {len(expression.arguments)} were provided.",
+                    "Pass the metasprite instance to query.",
+                    len("nes.metasprite_animation_finished"),
+                )
+            return ResolvedMetaspriteAnimationFinished(
+                self._resolve_value(
+                    expression.arguments[0],
+                    BuiltInType.METASPRITE,
+                    constants,
+                    variables,
+                    assigned_variables,
+                )
+            )
         if isinstance(expression, MetaspriteCreate):
             self._require_expression_result_type(
                 expression.position,
@@ -2953,6 +3040,7 @@ class SemanticAnalyzer:
                 ControllerQuery,
                 GetTile,
                 BackgroundUpdatesOverflowed,
+                MetaspriteAnimationFinished,
             ),
         ):
             return (

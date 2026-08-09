@@ -29,7 +29,8 @@ The compiler pipeline is deliberately separated:
   raw CHR-ROM, combined nametable, and split tile/attribute byte counts;
 - `metasprite_assets.py` validates PNG2CHR Studio version-2 animation metadata,
   consumes its already origin-relative signed component coordinates without a
-  second subtraction, and retains only runtime-relevant frame geometry;
+  second subtraction, and retains frame geometry plus symbolic sequence,
+  duration, and loop metadata;
 - `memory_layout.py` owns physical RAM ranges, allocation, bounds and overlap
   checks, mandatory Zero Page storage, conservative optional promotion,
   regular-RAM fallback, ld65 configuration generation, and the human-readable
@@ -42,7 +43,8 @@ The compiler pipeline is deliberately separated:
   state, isolated serial controller reader, guarded controller polling, bounded
   background queue, confirmed tile shadow, page-aligned OAM shadow, sprite
   individual sprite helpers, table-driven metasprite composition and clipping,
-  OAM DMA, and direct static callback calls;
+  main-thread metasprite animation timing, OAM DMA, and direct static callback
+  calls;
 - `cli.py` writes Assembly, the generated `.cfg` linker configuration, and the
   `.map` CPU memory report before coordinating ca65 and ld65.
 

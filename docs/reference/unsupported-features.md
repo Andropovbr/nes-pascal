@@ -67,9 +67,10 @@ the supported language.
   palette/flip/priority attributes, deterministic hide/show, static individual
   allocation, and NMI OAM DMA. Metasprites support statically owned arbitrary
   component layouts, manual frame selection, whole-object position,
-  visibility, flip, and hardware-sprite clipping. Runtime creation/destruction,
-  automatic animation/timing, collision, sprite multiplexing/flickering,
-  sorting, and scanline-overflow mitigation are not supported.
+  visibility, flip, hardware-sprite clipping, and automatic looping or one-shot
+  frame sequences. Runtime creation/destruction, variable playback speed,
+  animation blending, collision, sprite multiplexing/flickering, sorting, and
+  scanline-overflow mitigation are not supported.
   `nes.set_sprite_zero` remains a legacy compatibility helper.
 - Callback registration is static. There is only one callback of each kind,
   with no parameters, return values, priorities, lists, removal, indirect

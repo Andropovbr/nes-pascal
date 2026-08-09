@@ -1,0 +1,57 @@
+program SpriteAnimationRuntime;
+
+var
+    First: metasprite;
+    Second: metasprite;
+    Step: byte;
+    FirstFinished: boolean;
+
+procedure Update;
+begin
+    inc(Step);
+    if Step < $10 then
+        nes.metasprite_set_animation(First, shape.cycle);
+
+    if Step = $03 then
+        nes.metasprite_set_animation(Second, shape.cycle);
+
+    if Step = $10 then
+        nes.metasprite_set_animation(First, shape.burst);
+
+    if Step = $08 then
+    begin
+        nes.metasprite_set_flip_horizontal(First, true);
+        nes.metasprite_set_flip_vertical(First, true);
+    end;
+
+    FirstFinished := nes.metasprite_animation_finished(First);
+
+    if Step = $17 then
+        nes.metasprite_restart_animation(First);
+
+    if Step = $19 then
+        nes.metasprite_hide(Second);
+
+    if Step = $1D then
+        nes.metasprite_show(Second);
+
+    if Step = $20 then
+        nes.metasprite_set_frame(Second, shape.cycle_0);
+end;
+
+begin
+    nes.import_metasprite(shape);
+    First := nes.metasprite_create(shape.cycle_0);
+    Second := nes.metasprite_create(shape.cycle_0);
+    Step := $00;
+    FirstFinished := false;
+    nes.set_background_color($0F);
+    nes.set_sprite_palette($00, $0F, $16, $27, $30);
+    nes.metasprite_set_position(First, $40, $60);
+    nes.metasprite_set_position(Second, $80, $60);
+    nes.metasprite_set_animation(First, shape.cycle);
+    nes.metasprite_show(First);
+    nes.metasprite_show(Second);
+    nes.on_update(Update);
+    nes.run;
+end.

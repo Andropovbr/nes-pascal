@@ -16,7 +16,7 @@ and are never treated as additional storage.
 | `$0200-$02FF` | 0 or 256 bytes | Runtime | Page-aligned OAM shadow, linked by general or legacy sprite operations |
 | from `$0200` without sprites, otherwise `$0300` | 0 or 5 bytes | Runtime | Legacy fixed sprite-0 staging record, allocated only when used |
 | after earlier runtime blocks | 0, 65, or 66 bytes | Runtime | General sprite logical-Y table and one or two helper bytes |
-| after earlier runtime blocks | `4N + 8` bytes | Runtime | Four mutable bytes per metasprite instance plus shared renderer scratch |
+| after earlier runtime blocks | `4N + 8` or `8N + 8` bytes | Runtime | Static or animation-enabled metasprite state plus shared renderer scratch |
 | after earlier runtime blocks | 4 bytes | Runtime | Authoritative PPUCTRL, PPUMASK, and scroll state |
 | after earlier runtime blocks | 0 or 41 bytes | Runtime | Palette shadow and atomic dirty flags, allocated only for runtime palette calls |
 | after earlier runtime blocks | 0 or 960 bytes | Runtime | Confirmed tile shadow, linked only by `nes.get_tile` |
@@ -51,6 +51,13 @@ bytes; each additional instance adds four regular bytes. These blocks follow
 any individual-sprite runtime state and precede palette/PPU/background state.
 The statically owned component indexes and immutable geometry live in PRG-ROM,
 not RAM.
+
+When a program uses an animation operation or completion query, every
+metasprite instance adds four regular-RAM bytes for animation ID, sequence
+index, frame timer, and playback flags. The resulting regular-RAM cost is
+`8N + 8`; the OAM shadow, shared scratch, and Zero Page pointers do not grow.
+Programs limited to static frame selection retain `4N + 8` and omit all
+animation state and routines.
 
 Programs without individual sprite, metasprite, or OAM operations omit the OAM symbol, Assembly
 segment, linker region, DMA code, and sprite state. Their regular runtime and

@@ -147,8 +147,7 @@ Runtime-validation diagnostics use the E6000-E6999 range.
 ## E6014 - Unsupported metasprite metadata format
 
 - **Category:** Runtime Validation
-- **Explanation:** Milestone 0.5.3 accepts format
-  `png2chr-studio-animation` only.
+- **Explanation:** NES Pascal accepts format `png2chr-studio-animation` only.
 - **Trigger:** Set the root `format` field to another value.
 - **Expected compiler output:** `E6014` shows the actual and supported formats.
 - **Suggested fix:** Export PNG2CHR Studio animation metadata.
@@ -166,7 +165,7 @@ Runtime-validation diagnostics use the E6000-E6999 range.
 - **Category:** Runtime Validation
 - **Explanation:** Required structure or values are invalid, including frame
   dimensions, origin-relative signed offsets, component counts, attributes,
-  palette bits, or flip metadata.
+  palette bits, flip metadata, animation names, durations, or loop policy.
 - **Trigger:** Omit a required field or make component metadata inconsistent.
 - **Expected compiler output:** `E6016` identifies the JSON path and rule.
 - **Suggested fix:** Correct the metadata and export it again.
@@ -185,8 +184,9 @@ Runtime-validation diagnostics use the E6000-E6999 range.
 
 - **Category:** Runtime Validation
 - **Explanation:** Configured metadata roots must have unique Pascal-compatible
-  names and the combined set may expose at most 256 symbolic frames.
-- **Trigger:** Configure two assets with the same root name or exceed the frame
+  names and the combined set may expose at most 256 symbolic frames and 256
+  symbolic animations.
+- **Trigger:** Configure two assets with the same root name or exceed either
   identifier capacity.
 - **Expected compiler output:** `E6018` identifies the conflicting setup.
 - **Suggested fix:** Use unique asset roots and split the program's asset set.

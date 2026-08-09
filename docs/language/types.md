@@ -102,6 +102,12 @@ The type supports assignment and the [metasprite API](../runtime/metasprites.md)
 but not arithmetic, comparisons, `inc`, `dec`, constants, or procedure
 parameters. E4009 rejects numeric values in a metasprite context.
 
+Imported frame and animation names are internal compile-time symbol kinds, not
+user-declarable built-in types. Frame symbols select creation/manual frames;
+animation symbols are accepted only by the
+[sprite-animation API](../runtime/sprite-animation.md). Neither can be stored
+in a variable or synthesized from a byte.
+
 Procedure value parameters currently support only `byte` and `boolean`.
 `nes_color`, `sprite`, and `metasprite` remain valid global types but produce
 E4005 when used as a parameter type. `nes_color` and `sprite` also support

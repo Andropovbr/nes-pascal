@@ -19,6 +19,7 @@ class BuiltInType(Enum):
     SPRITE = "sprite"
     METASPRITE = "metasprite"
     METASPRITE_FRAME = "metasprite_frame"
+    METASPRITE_ANIMATION = "metasprite_animation"
 
 
 class UnaryOperator(Enum):
@@ -78,6 +79,8 @@ class SpriteOperationKind(Enum):
 class MetaspriteOperationKind(Enum):
     SET_POSITION = "set_position"
     SET_FRAME = "set_frame"
+    SET_ANIMATION = "set_animation"
+    RESTART_ANIMATION = "restart_animation"
     HIDE = "hide"
     SHOW = "show"
     SET_FLIP_HORIZONTAL = "set_flip_horizontal"
@@ -193,6 +196,12 @@ class MetaspriteCreate:
 
 
 @dataclass(frozen=True, slots=True)
+class MetaspriteAnimationFinished:
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
 class GetTile:
     arguments: tuple[ValueExpression, ...]
     position: SourcePosition
@@ -217,6 +226,7 @@ ValueExpression = (
     | ControllerQuery
     | SpriteCreate
     | MetaspriteCreate
+    | MetaspriteAnimationFinished
     | GetTile
     | BackgroundUpdatesOverflowed
 )
@@ -519,6 +529,11 @@ class ResolvedMetaspriteCreate:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedMetaspriteAnimationFinished:
+    instance: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedGetTile:
     x: ResolvedValue
     y: ResolvedValue
@@ -540,6 +555,7 @@ ResolvedValue = (
     | ResolvedControllerQuery
     | ResolvedSpriteCreate
     | ResolvedMetaspriteCreate
+    | ResolvedMetaspriteAnimationFinished
     | ResolvedGetTile
     | ResolvedBackgroundUpdatesOverflowed
 )
@@ -731,10 +747,24 @@ class MetaspriteFrame:
 
 
 @dataclass(frozen=True, slots=True)
+class MetaspriteAnimation:
+    """Playback metadata referencing canonical MetaspriteFrame IDs only."""
+
+    id: int
+    symbol: str
+    asset_name: str
+    name: str
+    frame_ids: tuple[int, ...]
+    durations: tuple[int, ...]
+    loop: bool
+
+
+@dataclass(frozen=True, slots=True)
 class MetaspriteAsset:
     name: str
     configured_path: str
     frames: tuple[MetaspriteFrame, ...]
+    animations: tuple[MetaspriteAnimation, ...] = ()
 
     @property
     def maximum_component_count(self) -> int:
