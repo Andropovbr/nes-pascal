@@ -37,6 +37,9 @@ operations omit that shadow and reuse the RAM page for runtime state and
 variables. Metasprites reserve from the same 64-entry pool, keep arbitrary
 signed component layouts in PRG-ROM, and provide whole-object positioning,
 manual frame selection, visibility, anchor-centered flip, and edge clipping.
+Imported animation symbols add automatic default/per-frame timing, looping and
+one-shot playback, explicit restart, completion queries, and main-thread frame
+advancement without duplicating component geometry.
 
 ## Documentation
 

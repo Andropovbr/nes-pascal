@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import StrEnum
 
 from .ast import (
     OamOwnerKind,
+    MetaspriteOperationKind,
     ResolvedAssignment,
     ResolvedBackgroundUpdatesOverflowed,
     ResolvedBinaryExpression,
@@ -21,6 +22,7 @@ from .ast import (
     ResolvedIfStatement,
     ResolvedIncrementStatement,
     ResolvedMetaspriteOperation,
+    ResolvedMetaspriteAnimationFinished,
     ResolvedProcedureCall,
     ResolvedProgram,
     ResolvedRepeatStatement,
@@ -184,6 +186,7 @@ class SpriteRuntimeFeatures:
     sprite_api: bool = False
     set_position: bool = False
     metasprite_instances: int = 0
+    metasprite_animation: bool = False
 
     @property
     def oam_shadow(self) -> bool:
@@ -209,7 +212,8 @@ class SpriteRuntimeFeatures:
     def metasprite_runtime_size(self) -> int:
         if not self.metasprite_api:
             return 0
-        return self.metasprite_instances * 4 + 8
+        instance_bytes = 8 if self.metasprite_animation else 4
+        return self.metasprite_instances * instance_bytes + 8
 
     @property
     def runtime_size(self) -> int:
@@ -480,6 +484,10 @@ def build_memory_layout(
 
     metasprite_base = runtime_data.start + individual_sprite_runtime_size
     metasprite_count = sprite_features.metasprite_instances
+    metasprite_animation_base = metasprite_base + metasprite_count * 4
+    metasprite_scratch_base = metasprite_animation_base + (
+        metasprite_count * 4 if sprite_features.metasprite_animation else 0
+    )
 
     runtime_symbols = (
         MemorySymbol(
@@ -707,9 +715,47 @@ def build_memory_layout(
                     "visibility and whole-metasprite flip flags",
                 ),
                 *(
+                    (
+                        MemorySymbol(
+                            "runtime_metasprite_animation",
+                            metasprite_animation_base,
+                            metasprite_count,
+                            SymbolKind.RUNTIME,
+                            runtime_data.name,
+                            "selected animation identifier",
+                        ),
+                        MemorySymbol(
+                            "runtime_metasprite_animation_frame",
+                            metasprite_animation_base + metasprite_count,
+                            metasprite_count,
+                            SymbolKind.RUNTIME,
+                            runtime_data.name,
+                            "current frame index inside each active animation",
+                        ),
+                        MemorySymbol(
+                            "runtime_metasprite_animation_timer",
+                            metasprite_animation_base + metasprite_count * 2,
+                            metasprite_count,
+                            SymbolKind.RUNTIME,
+                            runtime_data.name,
+                            "remaining logical frame ticks for each animation frame",
+                        ),
+                        MemorySymbol(
+                            "runtime_metasprite_animation_flags",
+                            metasprite_animation_base + metasprite_count * 3,
+                            metasprite_count,
+                            SymbolKind.RUNTIME,
+                            runtime_data.name,
+                            "animation active and completion flags",
+                        ),
+                    )
+                    if sprite_features.metasprite_animation
+                    else ()
+                ),
+                *(
                     MemorySymbol(
                         f"runtime_metasprite_{name}",
-                        metasprite_base + metasprite_count * 4 + offset,
+                        metasprite_scratch_base + offset,
                         1,
                         SymbolKind.RUNTIME,
                         runtime_data.name,
@@ -1486,9 +1532,22 @@ def detect_sprite_runtime_features(program: ResolvedProgram) -> SpriteRuntimeFea
         for reservation in program.oam_reservations
     )
     set_position = False
+    metasprite_animation = False
+
+    def contains_animation_query(value: object) -> bool:
+        if isinstance(value, ResolvedMetaspriteAnimationFinished):
+            return True
+        if isinstance(value, tuple):
+            return any(contains_animation_query(item) for item in value)
+        if is_dataclass(value):
+            return any(
+                contains_animation_query(getattr(value, field.name))
+                for field in fields(value)
+            )
+        return False
 
     def visit(statements: tuple[ResolvedStatement, ...]) -> None:
-        nonlocal legacy_sprite_zero, sprite_api, set_position
+        nonlocal legacy_sprite_zero, sprite_api, set_position, metasprite_animation
         for statement in statements:
             if isinstance(statement, ResolvedSetSpriteZero):
                 legacy_sprite_zero = True
@@ -1496,6 +1555,13 @@ def detect_sprite_runtime_features(program: ResolvedProgram) -> SpriteRuntimeFea
                 sprite_api = True
                 if statement.kind is SpriteOperationKind.SET_POSITION:
                     set_position = True
+            elif isinstance(statement, ResolvedMetaspriteOperation) and statement.kind in (
+                MetaspriteOperationKind.SET_ANIMATION,
+                MetaspriteOperationKind.RESTART_ANIMATION,
+            ):
+                metasprite_animation = True
+            if contains_animation_query(statement):
+                metasprite_animation = True
             if isinstance(statement, ResolvedIfStatement):
                 visit(statement.then_branch)
                 if statement.else_branch is not None:
@@ -1514,6 +1580,7 @@ def detect_sprite_runtime_features(program: ResolvedProgram) -> SpriteRuntimeFea
         sprite_api=sprite_api,
         set_position=set_position,
         metasprite_instances=len(program.metasprite_instances),
+        metasprite_animation=metasprite_animation,
     )
 
 

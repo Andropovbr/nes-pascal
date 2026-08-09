@@ -1,5 +1,13 @@
 program MetaspriteClipping;
 
+const
+    CenterX: byte = $70;
+    CenterY: byte = $68;
+    PartlyBeyondLeftX: byte = $08;
+    PartlyBeyondRightX: byte = $F8;
+    PartlyBeyondTopY: byte = $08;
+    PartlyBeyondBottomY: byte = $EC;
+
 var
     Player: metasprite;
     Stage: byte;
@@ -10,8 +18,8 @@ begin
     nes.import_metasprite(player);
     Player := nes.metasprite_create(player.idle_0);
     Stage := $00;
-    PlayerX := $70;
-    PlayerY := $68;
+    PlayerX := CenterX;
+    PlayerY := CenterY;
     nes.set_sprite_palette($00, $0F, $16, $27, $30);
     nes.metasprite_set_flip_horizontal(Player, false);
     nes.metasprite_set_flip_vertical(Player, false);
@@ -27,7 +35,7 @@ begin
         begin
             nes.metasprite_set_flip_horizontal(Player, false);
             nes.metasprite_set_flip_vertical(Player, false);
-            if PlayerX > $00 then
+            if PlayerX > PartlyBeyondLeftX then
                 dec(PlayerX)
             else
                 Stage := $01;
@@ -38,7 +46,7 @@ begin
         begin
             nes.metasprite_set_flip_horizontal(Player, false);
             nes.metasprite_set_flip_vertical(Player, false);
-            if PlayerX < $70 then
+            if PlayerX < CenterX then
                 inc(PlayerX)
             else
                 Stage := $02;
@@ -49,7 +57,7 @@ begin
         begin
             nes.metasprite_set_flip_horizontal(Player, false);
             nes.metasprite_set_flip_vertical(Player, false);
-            if PlayerX < $FF then
+            if PlayerX < PartlyBeyondRightX then
                 inc(PlayerX)
             else
                 Stage := $03;
@@ -60,7 +68,7 @@ begin
         begin
             nes.metasprite_set_flip_horizontal(Player, false);
             nes.metasprite_set_flip_vertical(Player, false);
-            if PlayerX > $70 then
+            if PlayerX > CenterX then
                 dec(PlayerX)
             else
                 Stage := $04;
@@ -71,7 +79,7 @@ begin
         begin
             nes.metasprite_set_flip_horizontal(Player, false);
             nes.metasprite_set_flip_vertical(Player, false);
-            if PlayerY > $00 then
+            if PlayerY > PartlyBeyondTopY then
                 dec(PlayerY)
             else
                 Stage := $05;
@@ -82,7 +90,7 @@ begin
         begin
             nes.metasprite_set_flip_horizontal(Player, false);
             nes.metasprite_set_flip_vertical(Player, false);
-            if PlayerY < $68 then
+            if PlayerY < CenterY then
                 inc(PlayerY)
             else
                 Stage := $06;
@@ -93,7 +101,7 @@ begin
         begin
             nes.metasprite_set_flip_horizontal(Player, false);
             nes.metasprite_set_flip_vertical(Player, false);
-            if PlayerY < $FF then
+            if PlayerY < PartlyBeyondBottomY then
                 inc(PlayerY)
             else
                 Stage := $07;
@@ -104,7 +112,7 @@ begin
         begin
             nes.metasprite_set_flip_horizontal(Player, false);
             nes.metasprite_set_flip_vertical(Player, false);
-            if PlayerY > $68 then
+            if PlayerY > CenterY then
                 dec(PlayerY)
             else
                 Stage := $00;

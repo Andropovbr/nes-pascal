@@ -9,6 +9,7 @@ import re
 from typing import Any
 
 from .ast import (
+    MetaspriteAnimation,
     MetaspriteAsset,
     MetaspriteComponent,
     MetaspriteFrame,
@@ -50,13 +51,15 @@ def load_metasprite_assets(
     assets: list[MetaspriteAsset] = []
     names: set[str] = set()
     next_frame_id = 0
+    next_animation_id = 0
     for configured_path in configured_paths:
-        asset, next_frame_id = _load_one_asset(
+        asset, next_frame_id, next_animation_id = _load_one_asset(
             configured_path,
             source_path,
             source,
             chr_tile_capacity,
             next_frame_id,
+            next_animation_id,
         )
         normalized = asset.name.lower()
         if normalized in names:
@@ -78,7 +81,8 @@ def _load_one_asset(
     source: str,
     chr_tile_capacity: int,
     first_frame_id: int,
-) -> tuple[MetaspriteAsset, int]:
+    first_animation_id: int,
+) -> tuple[MetaspriteAsset, int, int]:
     original_path = str(configured_path)
     candidate = Path(configured_path)
     if not candidate.is_absolute():
@@ -232,11 +236,34 @@ def _load_one_asset(
         _invalid(source_path, source, "$.animations must contain at least one animation.")
 
     frames: list[MetaspriteFrame] = []
+    animation_assets: list[MetaspriteAnimation] = []
     animation_names: set[str] = set()
     frame_id = first_frame_id
+    animation_id = first_animation_id
     for animation_index, animation_value in enumerate(animations):
         animation_path = f"$.animations[{animation_index}]"
         animation = _mapping(animation_value, animation_path, source_path, source)
+        supported_animation_fields = {
+            "name",
+            "type",
+            "direction",
+            "generated_by_horizontal_flip",
+            "default_frame_duration",
+            "width",
+            "height",
+            "width_tiles",
+            "height_tiles",
+            "frames",
+            "loop",
+        }
+        unsupported_fields = sorted(set(animation) - supported_animation_fields)
+        if unsupported_fields:
+            _invalid(
+                source_path,
+                source,
+                f"{animation_path} contains unsupported field "
+                f"{unsupported_fields[0]!r}.",
+            )
         animation_name = _identifier(
             _string(animation, "name", animation_path, source_path, source),
             f"{animation_path}.name",
@@ -250,6 +277,30 @@ def _load_one_asset(
                 f"{animation_path}.name duplicates animation {animation_name!r}.",
             )
         animation_names.add(animation_name)
+        if animation_id > 0xFF:
+            _error(
+                source_path,
+                source,
+                DiagnosticCode.INVALID_METASPRITE_CONFIGURATION,
+                "Configured metasprite assets exceed 256 symbolic animations.",
+                "Reduce the configured animation set for this NROM program.",
+            )
+        default_duration = _optional_positive_byte(
+            animation,
+            "default_frame_duration",
+            animation_path,
+            source_path,
+            source,
+            default=1,
+        )
+        loop = _optional_boolean(
+            animation,
+            "loop",
+            animation_path,
+            source_path,
+            source,
+            default=True,
+        )
         frame_values = _list_field(
             animation,
             "frames",
@@ -263,6 +314,15 @@ def _load_one_asset(
                 source,
                 f"{animation_path}.frames must contain at least one frame.",
             )
+        if len(frame_values) > 0xFF:
+            _invalid(
+                source_path,
+                source,
+                f"{animation_path}.frames contains {len(frame_values)} frames; "
+                "one animation can contain at most 255.",
+            )
+        animation_frame_ids: list[int] = []
+        animation_durations: list[int] = []
         for animation_frame_index, frame_value in enumerate(frame_values):
             if frame_id > 0xFF:
                 _error(
@@ -274,6 +334,14 @@ def _load_one_asset(
                 )
             frame_path = f"{animation_path}.frames[{animation_frame_index}]"
             frame = _mapping(frame_value, frame_path, source_path, source)
+            duration = _optional_positive_byte(
+                frame,
+                "duration",
+                frame_path,
+                source_path,
+                source,
+                default=default_duration,
+            )
             width = _positive_byte(frame, "width", frame_path, source_path, source)
             height = _positive_byte(frame, "height", frame_path, source_path, source)
             sprite_values = _list_field(
@@ -314,8 +382,31 @@ def _load_one_asset(
                     components,
                 )
             )
+            animation_frame_ids.append(frame_id)
+            animation_durations.append(duration)
             frame_id += 1
-    return MetaspriteAsset(asset_name, original_path, tuple(frames)), frame_id
+        animation_assets.append(
+            MetaspriteAnimation(
+                animation_id,
+                f"{asset_name}.{animation_name}",
+                asset_name,
+                animation_name,
+                tuple(animation_frame_ids),
+                tuple(animation_durations),
+                loop,
+            )
+        )
+        animation_id += 1
+    return (
+        MetaspriteAsset(
+            asset_name,
+            original_path,
+            tuple(frames),
+            tuple(animation_assets),
+        ),
+        frame_id,
+        animation_id,
+    )
 
 
 def _component(
@@ -467,6 +558,20 @@ def _positive_byte(
     return result
 
 
+def _optional_positive_byte(
+    value: dict[str, Any],
+    field: str,
+    path: str,
+    source_path: Path,
+    source: str,
+    *,
+    default: int,
+) -> int:
+    if field not in value:
+        return default
+    return _positive_byte(value, field, path, source_path, source)
+
+
 def _boolean(
     value: dict[str, Any],
     field: str,
@@ -478,6 +583,20 @@ def _boolean(
     if not isinstance(result, bool):
         _invalid(source_path, source, f"{path}.{field} must be boolean.")
     return result
+
+
+def _optional_boolean(
+    value: dict[str, Any],
+    field: str,
+    path: str,
+    source_path: Path,
+    source: str,
+    *,
+    default: bool,
+) -> bool:
+    if field not in value:
+        return default
+    return _boolean(value, field, path, source_path, source)
 
 
 def _required(

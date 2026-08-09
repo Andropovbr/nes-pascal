@@ -30,6 +30,8 @@ APIs are:
 - [Metasprites](metasprites.md) compile PNG2CHR Studio frame metadata into
   PRG-resident component lists with one logical position and shared OAM
   ownership.
+- [Sprite animation](sprite-animation.md) advances symbolic metasprite frame
+  sequences on the frame-synchronized main thread.
 - `nes.set_sprite_zero` is the fixed, example-only OAM staging helper described
   in the controller documentation; it remains as a compatibility helper.
 

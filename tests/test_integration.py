@@ -642,6 +642,33 @@ class MesenIntegrationTests(unittest.TestCase):
             source_path=ROOT / "tests" / "fixtures" / "runtime" / "metasprite_clipping.nsp",
         )
 
+    def test_human_metasprite_clipping_demo_uses_partial_targets(self) -> None:
+        self._run_mesen_test(
+            "metasprite_clipping",
+            "verify_metasprite_clipping_demo.lua",
+            chr_path="assets/game.chr",
+            metasprite_paths=("assets/player_idle.json",),
+        )
+
+    def test_sprite_animation_timing_and_state_transitions(self) -> None:
+        self._run_mesen_test(
+            "sprite_animation_runtime",
+            "verify_sprite_animation.lua",
+            chr_path=ROOT / "examples" / "assets" / "game.chr",
+            metasprite_paths=(
+                ROOT / "tests" / "fixtures" / "runtime" / "sprite_animation.json",
+            ),
+            source_path=ROOT / "tests" / "fixtures" / "runtime" / "sprite_animation.nsp",
+        )
+
+    def test_animated_player_switches_idle_movement_and_facing(self) -> None:
+        self._run_mesen_test(
+            "sprite_animation",
+            "verify_sprite_animation_player.lua",
+            chr_path="assets/game.chr",
+            metasprite_paths=("assets/player_consolidated.json",),
+        )
+
     def test_palette_example_uploads_initial_and_runtime_palettes(self) -> None:
         self._run_mesen_test(
             "palette_support",

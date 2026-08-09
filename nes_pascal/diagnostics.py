@@ -73,6 +73,7 @@ class DiagnosticCode(StrEnum):
     INVALID_METASPRITE_CREATE = "E3053"
     INVALID_METASPRITE_ARGUMENT_COUNT = "E3054"
     INCOMPATIBLE_METASPRITE_FRAME = "E3055"
+    INVALID_METASPRITE_ANIMATION = "E3056"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -297,6 +298,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INCOMPATIBLE_METASPRITE_FRAME: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Incompatible metasprite frame"
+    ),
+    DiagnosticCode.INVALID_METASPRITE_ANIMATION: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid metasprite animation"
     ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"

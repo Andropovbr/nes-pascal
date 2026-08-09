@@ -32,6 +32,7 @@ from .ast import (
     ImportMetasprite,
     LoadBackground,
     MetaspriteCreate,
+    MetaspriteAnimationFinished,
     MetaspriteOperation,
     MetaspriteOperationKind,
     PaletteKind,
@@ -181,7 +182,11 @@ class Parser:
         public_types = tuple(
             type_
             for type_ in BuiltInType
-            if type_ is not BuiltInType.METASPRITE_FRAME
+            if type_
+            not in (
+                BuiltInType.METASPRITE_FRAME,
+                BuiltInType.METASPRITE_ANIMATION,
+            )
         )
         for built_in_type in public_types:
             if token.text.lower() == built_in_type.value:
@@ -411,6 +416,10 @@ class Parser:
         metasprite_commands = {
             "nes.metasprite_set_position": MetaspriteOperationKind.SET_POSITION,
             "nes.metasprite_set_frame": MetaspriteOperationKind.SET_FRAME,
+            "nes.metasprite_set_animation": MetaspriteOperationKind.SET_ANIMATION,
+            "nes.metasprite_restart_animation": (
+                MetaspriteOperationKind.RESTART_ANIMATION
+            ),
             "nes.metasprite_hide": MetaspriteOperationKind.HIDE,
             "nes.metasprite_show": MetaspriteOperationKind.SHOW,
             "nes.metasprite_set_flip_horizontal": (
@@ -951,6 +960,11 @@ class Parser:
                     )
                 if normalized == "nes.metasprite_create":
                     return MetaspriteCreate(
+                        self._parse_expression_arguments(normalized),
+                        position,
+                    )
+                if normalized == "nes.metasprite_animation_finished":
+                    return MetaspriteAnimationFinished(
                         self._parse_expression_arguments(normalized),
                         position,
                     )

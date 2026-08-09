@@ -817,7 +817,8 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 
 - **Category:** Semantic Analysis
 - **Explanation:** Position takes a metasprite and two bytes; frame and flip
-  setters take a metasprite and one value; hide/show take one metasprite.
+  setters and animation selection take a metasprite and one value; hide/show,
+  animation restart, and animation completion queries take one metasprite.
 - **Trigger:** Compile
   `tests/fixtures/diagnostics/metasprite_argument_count.nsp`.
 - **Expected compiler output:** `E3054` reports the expected and actual counts.
@@ -834,3 +835,17 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
   referenced assets configured.
 - **Expected compiler output:** `E3055` names the instance and frame assets.
 - **Suggested fix:** Select a frame from the same asset used at creation.
+
+## E3056 - Invalid metasprite animation
+
+- **Category:** Semantic Analysis
+- **Explanation:** `nes.metasprite_set_animation` requires one imported,
+  symbolic animation belonging to the instance's creation asset. Animation
+  names are compiler-only symbols and cannot be replaced with numeric values.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/invalid_metasprite_animation.nsp`, or pass a
+  statically known animation from another asset.
+- **Expected compiler output:** `E3056` identifies the non-symbolic or
+  incompatible animation selection.
+- **Suggested fix:** Pass a symbol such as `player.movement_right` from the
+  same imported asset used by `nes.metasprite_create`.

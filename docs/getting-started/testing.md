@@ -34,7 +34,11 @@ arbitrary signed/sparse/reused layouts, centered and non-centered pivots,
 asymmetric horizontal/vertical geometry, bounding-range preservation,
 component flip XOR, shared OAM ownership and exhaustion, compact PRG tables,
 per-instance RAM, visibility, shorter-frame hiding, edge clipping structure,
-and optional Mesen behavior.
+and optional Mesen behavior. Sprite-animation tests add symbolic sequence
+imports, default and overridden durations, loop policy, one-shot completion,
+same-animation stability, restart, hidden advancement, flip preservation,
+independent instances, variable component counts, feature emission, and exact
+RAM/PRG table costs.
 Toolchain tests are skipped with an explicit message when `ca65` or `ld65` is
 unavailable.
 
@@ -57,7 +61,18 @@ hide/move/show state, logical Y conversion, component OAM, and DMA. A separate
 deterministic clipping fixture validates all four edges,
 horizontal, vertical, and combined flips, negative offsets, non-wrapping
 coordinates, hidden movement, and flipped frame switching; the user-facing
-clipping example remains deliberately slow enough for visual inspection:
+clipping example remains deliberately slow enough for visual inspection. The
+sprite-animation fixture additionally validates exact 2/3/1-frame timing,
+loop wrap, one-shot final-frame retention and completion, explicit restart,
+hidden playback, independent start times, stale-slot hiding, flip persistence,
+manual-frame cancellation, and inactive-instance isolation. The consolidated
+player regression verifies that manual and animated consumers emit identical
+centered frame geometry, that idle/movement selections do not restart while
+repeated, and that facing survives state changes. A second Mesen pass drives
+the actual animated-player example through idle, left movement, left-facing
+idle, vertical movement, right movement, and right-facing idle. The visual
+clipping example also completes one full center/partial-edge cycle under an
+automated state/OAM check:
 
 ```powershell
 $env:MESEN_PATH = "C:\path\to\Mesen.exe"
