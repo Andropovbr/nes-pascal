@@ -116,3 +116,77 @@ Runtime-validation diagnostics use the E6000-E6999 range.
 - **Trigger:** Pass any other value to `--mirroring`.
 - **Expected compiler output:** `E6010` followed by the configured value.
 - **Suggested fix:** Use `--mirroring horizontal` or `--mirroring vertical`.
+
+## E6011 - Metasprite asset not found
+
+- **Category:** Runtime Validation
+- **Explanation:** A `--metasprite` path did not resolve to an existing JSON
+  file. Relative paths use the Pascal source directory.
+- **Trigger:** Configure a missing metadata file.
+- **Expected compiler output:** `E6011` includes the original and resolved
+  paths.
+- **Suggested fix:** Correct the source-relative path or add the file.
+
+## E6012 - Metasprite asset read failure
+
+- **Category:** Runtime Validation
+- **Explanation:** The metadata path resolved, but its UTF-8 text could not be
+  read.
+- **Trigger:** Configure an unreadable file or directory.
+- **Expected compiler output:** `E6012` includes the operating-system error.
+- **Suggested fix:** Provide a readable UTF-8 JSON file.
+
+## E6013 - Malformed metasprite JSON metadata
+
+- **Category:** Runtime Validation
+- **Explanation:** The configured file is not syntactically valid JSON.
+- **Trigger:** Configure a truncated or malformed JSON document.
+- **Expected compiler output:** `E6013` includes the metadata line and column.
+- **Suggested fix:** Correct the JSON or export it again from PNG2CHR Studio.
+
+## E6014 - Unsupported metasprite metadata format
+
+- **Category:** Runtime Validation
+- **Explanation:** Milestone 0.5.3 accepts format
+  `png2chr-studio-animation` only.
+- **Trigger:** Set the root `format` field to another value.
+- **Expected compiler output:** `E6014` shows the actual and supported formats.
+- **Suggested fix:** Export PNG2CHR Studio animation metadata.
+
+## E6015 - Unsupported metasprite metadata version
+
+- **Category:** Runtime Validation
+- **Explanation:** The supported PNG2CHR Studio schema version is `2`.
+- **Trigger:** Configure metadata with a different root `version`.
+- **Expected compiler output:** `E6015` shows the actual and supported versions.
+- **Suggested fix:** Re-export using schema version 2.
+
+## E6016 - Invalid metasprite metadata
+
+- **Category:** Runtime Validation
+- **Explanation:** Required structure or values are invalid, including frame
+  dimensions, origin-relative signed offsets, component counts, attributes,
+  palette bits, or flip metadata.
+- **Trigger:** Omit a required field or make component metadata inconsistent.
+- **Expected compiler output:** `E6016` identifies the JSON path and rule.
+- **Suggested fix:** Correct the metadata and export it again.
+
+## E6017 - Incompatible metasprite CHR data
+
+- **Category:** Runtime Validation
+- **Explanation:** Metadata needs one configured 8 KiB NROM CHR bank and every
+  component tile must fit the metadata's declared sprite tile set.
+- **Trigger:** Omit `--chr`, configure incompatible capacity/size metadata, or
+  reference a tile outside `final_tile_count`.
+- **Expected compiler output:** `E6017` explains the CHR mismatch.
+- **Suggested fix:** Configure JSON and CHR emitted by the same asset export.
+
+## E6018 - Invalid metasprite asset configuration
+
+- **Category:** Runtime Validation
+- **Explanation:** Configured metadata roots must have unique Pascal-compatible
+  names and the combined set may expose at most 256 symbolic frames.
+- **Trigger:** Configure two assets with the same root name or exceed the frame
+  identifier capacity.
+- **Expected compiler output:** `E6018` identifies the conflicting setup.
+- **Suggested fix:** Use unique asset roots and split the program's asset set.

@@ -2,9 +2,10 @@
 
 NES Pascal exposes the NES's 64 hardware OAM entries as individually managed
 hardware sprites. One `sprite` value identifies exactly one four-byte OAM
-entry; it is not a game entity or a multi-tile metasprite. Metasprite
-composition belongs to milestone 0.5.3. There is no animation, collision,
-sorting, flickering, or 8-sprites-per-scanline mitigation yet.
+entry; it is not a game entity or a multi-tile metasprite. Use the separate
+[metasprite API](metasprites.md) for compiled multi-component objects. There is
+no automatic animation, collision, sorting, flickering, or
+8-sprites-per-scanline mitigation yet.
 
 ## Sprite indexes
 
@@ -47,16 +48,17 @@ allocation, regardless of their source order. Multiple explicit references
 may intentionally alias one hardware sprite, but `sprite_create()` never
 selects an explicitly owned or previously created slot.
 
-The resolved program records each reserved OAM index as either
-`individual_explicit` or `individual_created`. This metadata costs no runtime
-RAM. Milestone 0.5.3 can allocate metasprite components only from the
-unreserved complement of that same 64-entry table, so individual sprites and
-future metasprites share one ownership model.
+The resolved program records each reserved OAM index as
+`individual_explicit`, `individual_created`, or `metasprite_component`. This
+metadata costs no runtime RAM. Metasprite creation allocates components only
+from the unreserved complement of that same 64-entry table, so individual
+sprites and metasprites cannot collide.
 
 If a creation site would exceed the remaining capacity, compilation stops
-with E3050. Allocation never wraps, aliases, overwrites another owner, or
-returns a sentinel. `nes.sprite_create()` takes no arguments and E3049 reports
-an invalid argument list.
+with E3050. The same diagnostic reports a metasprite whose maximum frame does
+not fit. Allocation never wraps, aliases, overwrites another owner, truncates
+a metasprite, or returns a sentinel. `nes.sprite_create()` takes no arguments
+and E3049 reports an invalid argument list.
 
 ## OAM layout and API
 
@@ -90,10 +92,17 @@ visibility helpers operate independently. A compile-time sprite palette above
 3 produces E3048. A dynamic `byte` palette outside `0..3` is ignored at
 runtime, leaving the existing attributes unchanged.
 
+This individual-sprite API exposes the hardware OAM Y byte directly. The PPU
+draws the first sprite row on the scanline after that value, and `$FF` is used
+as the hidden sentinel. No logical-screen `Y - 1` conversion is performed.
+The higher-level [metasprite API](metasprites.md) instead accepts a logical
+screen anchor and converts each visible component with
+`OAM Y = component logical top - 1`.
+
 `nes.sprite_set_position(sprite, x, y)` is equivalent to the separate X and Y
 setters. For a dynamic sprite value, its OAM offset is calculated once before
-both coordinates are written. The operation also updates logical Y and does
-not implicitly show a hidden sprite.
+both coordinates are written. The operation also updates the runtime's cached
+OAM Y without implicitly showing a hidden sprite.
 
 ## Attribute byte
 
@@ -116,10 +125,10 @@ unrelated bit.
 All 64 sprites start hidden. Initialization writes `$FF` to every OAM-shadow Y
 byte before NMI or rendering can expose RAM contents.
 
-`nes.sprite_hide` saves the current visible Y coordinate in a runtime-owned
-64-byte logical-Y table, then writes `$FF` to OAM. Repeated hide calls preserve
-the saved value. `nes.sprite_show` restores that logical Y. Calling
-`nes.sprite_set_y` while hidden updates the logical Y but keeps the sprite
+`nes.sprite_hide` saves the current visible raw OAM Y byte in a runtime-owned
+64-byte cache, then writes `$FF` to OAM. Repeated hide calls preserve the saved
+value. `nes.sprite_show` restores that byte. Calling `nes.sprite_set_y` while
+hidden updates the cache but keeps the sprite
 hidden; a later show uses the new value. The extra 64 bytes keep hide/show
 deterministic without introducing a larger sprite object model.
 

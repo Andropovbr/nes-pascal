@@ -3,7 +3,7 @@
 The compiler pipeline is deliberately separated:
 
 ```text
-.nsp source + optional CHR-ROM and nametable assets
+.nsp source + optional CHR-ROM, metasprite JSON, and nametable assets
   -> lexer
   -> parser
   -> AST
@@ -23,10 +23,13 @@ The compiler pipeline is deliberately separated:
 - `semantic.py` validates declarations, resolves references and procedure
   calls, checks exact types, enforces interprocedural definite assignment, and
   validates controller intrinsics and the complete VBlank callback call graph.
-  It also builds deterministic per-slot OAM ownership before resolving static
-  `nes.sprite_create()` expressions;
+  It also builds deterministic shared per-slot OAM ownership before resolving
+  static `nes.sprite_create()` and `nes.metasprite_create(frame)` expressions;
 - `assets.py` resolves configured paths from the source directory and validates
   raw CHR-ROM, combined nametable, and split tile/attribute byte counts;
+- `metasprite_assets.py` validates PNG2CHR Studio version-2 animation metadata,
+  consumes its already origin-relative signed component coordinates without a
+  second subtraction, and retains only runtime-relevant frame geometry;
 - `memory_layout.py` owns physical RAM ranges, allocation, bounds and overlap
   checks, mandatory Zero Page storage, conservative optional promotion,
   regular-RAM fallback, ld65 configuration generation, and the human-readable
@@ -38,7 +41,8 @@ The compiler pipeline is deliberately separated:
   transition, frame-counter wait sequence, persistent last-processed frame
   state, isolated serial controller reader, guarded controller polling, bounded
   background queue, confirmed tile shadow, page-aligned OAM shadow, sprite
-  property helpers, OAM DMA, and direct static callback calls;
+  individual sprite helpers, table-driven metasprite composition and clipping,
+  OAM DMA, and direct static callback calls;
 - `cli.py` writes Assembly, the generated `.cfg` linker configuration, and the
   `.map` CPU memory report before coordinating ca65 and ld65.
 

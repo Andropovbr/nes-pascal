@@ -1,0 +1,14 @@
+program IncompatibleMetaspriteFrame;
+var
+    Player: metasprite;
+begin
+    nes.import_metasprite(player);
+    nes.import_metasprite(enemy);
+    Player := nes.metasprite_create(player.idle_0);
+    nes.metasprite_set_frame(
+        nes.metasprite_create(player.idle_0),
+        enemy.idle_0
+    );
+    nes.set_background_color($0F);
+    nes.run;
+end.

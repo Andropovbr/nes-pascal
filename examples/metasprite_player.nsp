@@ -1,0 +1,76 @@
+program MetaspritePlayer;
+
+const
+    PlayerMinimumX: byte = $0C;
+    PlayerMaximumX: byte = $F4;
+    PlayerMinimumY: byte = $0D;
+    PlayerMaximumY: byte = $E4;
+
+var
+    Player: metasprite;
+    PlayerX: byte;
+    PlayerY: byte;
+    AlternateFrame: boolean;
+    PlayerVisible: boolean;
+
+procedure Update;
+begin
+    if nes.controller_down($01, nes.button_left) then
+    begin
+        if PlayerX > PlayerMinimumX then
+            dec(PlayerX);
+        nes.metasprite_set_flip_horizontal(Player, true);
+    end
+    else if nes.controller_down($01, nes.button_right) then
+    begin
+        if PlayerX < PlayerMaximumX then
+            inc(PlayerX);
+        nes.metasprite_set_flip_horizontal(Player, false);
+    end;
+
+    if nes.controller_down($01, nes.button_up) then
+    begin
+        if PlayerY > PlayerMinimumY then
+            dec(PlayerY);
+    end
+    else if nes.controller_down($01, nes.button_down) then
+    begin
+        if PlayerY < PlayerMaximumY then
+            inc(PlayerY);
+    end;
+
+    if nes.controller_pressed($01, nes.button_a) then
+    begin
+        AlternateFrame := not AlternateFrame;
+        if AlternateFrame then
+            nes.metasprite_set_frame(Player, player.idle_2)
+        else
+            nes.metasprite_set_frame(Player, player.idle_0);
+    end;
+
+    if nes.controller_pressed($01, nes.button_select) then
+    begin
+        PlayerVisible := not PlayerVisible;
+        if PlayerVisible then
+            nes.metasprite_show(Player)
+        else
+            nes.metasprite_hide(Player);
+    end;
+
+    nes.metasprite_set_position(Player, PlayerX, PlayerY);
+end;
+
+begin
+    nes.import_metasprite(player);
+    Player := nes.metasprite_create(player.idle_0);
+    PlayerX := $70;
+    PlayerY := $68;
+    AlternateFrame := false;
+    PlayerVisible := true;
+    nes.set_sprite_palette($00, $0F, $16, $27, $30);
+    nes.metasprite_set_position(Player, PlayerX, PlayerY);
+    nes.metasprite_show(Player);
+    nes.set_background_color($0F);
+    nes.on_update(Update);
+    nes.run;
+end.

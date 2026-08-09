@@ -27,6 +27,9 @@ APIs are:
   standard controllers 1 and 2.
 - [Hardware sprite primitives](sprites.md) maintain 64 OAM entries in a
   page-aligned CPU shadow and upload them through NMI OAM DMA.
+- [Metasprites](metasprites.md) compile PNG2CHR Studio frame metadata into
+  PRG-resident component lists with one logical position and shared OAM
+  ownership.
 - `nes.set_sprite_zero` is the fixed, example-only OAM staging helper described
   in the controller documentation; it remains as a compatibility helper.
 

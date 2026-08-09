@@ -12,8 +12,12 @@ It must:
 - appear exactly once;
 - remain outside conditionals, loops, and procedures.
 
-The runtime waits for VBlank and enables NMI and background rendering through
-compiler-owned PPUCTRL and PPUMASK shadows. Scroll shadows retain their
+The runtime waits for VBlank and enables NMI, background rendering, sprite
+rendering, and both leftmost-eight-pixel rendering bits through compiler-owned
+PPUCTRL and PPUMASK shadows. The normal enabled PPUMASK state therefore adds
+`$1E` while preserving unrelated shadow bits. Content at X positions `$00..$07`
+is visible by default; no public masking configuration is currently provided.
+Scroll shadows retain their
 zero-filled `($00, $00)` defaults unless [`nes.set_scroll`](scrolling-and-ppu-state.md)
 stages a new pair. Runtime-owned state and initialization PPU writes are
 complete before NMI is enabled.

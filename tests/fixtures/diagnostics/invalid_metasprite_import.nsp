@@ -1,0 +1,8 @@
+program InvalidMetaspriteImport;
+var
+    Player: metasprite;
+begin
+    Player := nes.metasprite_create(player.idle_0);
+    nes.set_background_color($0F);
+    nes.run;
+end.

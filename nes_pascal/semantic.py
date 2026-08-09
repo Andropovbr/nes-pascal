@@ -29,7 +29,14 @@ from .ast import (
     IfStatement,
     ImmediateValue,
     IncrementStatement,
+    ImportMetasprite,
     LoadBackground,
+    MetaspriteAsset,
+    MetaspriteCreate,
+    MetaspriteFrame,
+    MetaspriteInstance,
+    MetaspriteOperation,
+    MetaspriteOperationKind,
     OamOwnerKind,
     OamReservation,
     PaletteKind,
@@ -55,7 +62,10 @@ from .ast import (
     ResolvedGetTile,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
+    ResolvedImportMetasprite,
     ResolvedLoadBackground,
+    ResolvedMetaspriteCreate,
+    ResolvedMetaspriteOperation,
     ResolvedRepeatStatement,
     ResolvedProgram,
     ResolvedProcedure,
@@ -135,10 +145,17 @@ class SpriteAllocationPlan:
 
     create_indexes: dict[SourcePosition, int]
     reservations: tuple[OamReservation, ...]
+    metasprite_create_indexes: dict[SourcePosition, int]
+    metasprite_instances: tuple[MetaspriteInstance, ...]
 
 
 class SemanticAnalyzer:
-    def __init__(self, source: str, filename: str = "<input>") -> None:
+    def __init__(
+        self,
+        source: str,
+        filename: str = "<input>",
+        metasprite_assets: tuple[MetaspriteAsset, ...] = (),
+    ) -> None:
         self.source_lines = source.splitlines()
         self.filename = filename
         self.required_variables: set[str] | None = None
@@ -147,13 +164,30 @@ class SemanticAnalyzer:
             CallbackKind, CallbackRegistration
         ] = {}
         self.callback_symbols: dict[CallbackKind, ProcedureSymbol] = {}
-        self.sprite_allocation_plan = SpriteAllocationPlan({}, ())
+        self.configured_metasprite_assets = {
+            asset.name.lower(): asset for asset in metasprite_assets
+        }
+        self.imported_metasprite_assets: tuple[MetaspriteAsset, ...] = ()
+        self.metasprite_frames_by_id: dict[int, MetaspriteFrame] = {}
+        self.sprite_allocation_plan = SpriteAllocationPlan({}, (), {}, ())
 
     def analyze(self, program: Program) -> ResolvedProgram:
+        self.imported_metasprite_assets = self._resolve_metasprite_imports(program)
+        self.metasprite_frames_by_id = {
+            frame.id: frame
+            for asset in self.imported_metasprite_assets
+            for frame in asset.frames
+        }
         constants: dict[str, TypedConstant] = {
             name: TypedConstant(BuiltInType.BYTE, value)
             for name, value in CONTROLLER_BUTTONS.items()
         }
+        for asset in self.imported_metasprite_assets:
+            for frame in asset.frames:
+                constants[frame.symbol.lower()] = TypedConstant(
+                    BuiltInType.METASPRITE_FRAME,
+                    frame.id,
+                )
         declared_names: set[str] = set()
         for declaration in program.constants:
             normalized_name = declaration.name.lower()
@@ -335,7 +369,109 @@ class SemanticAnalyzer:
             ),
             resolved_statements,
             self.sprite_allocation_plan.reservations,
+            self.imported_metasprite_assets,
+            self.sprite_allocation_plan.metasprite_instances,
         )
+
+    def _resolve_metasprite_imports(
+        self,
+        program: Program,
+    ) -> tuple[MetaspriteAsset, ...]:
+        top_level_imports = [
+            statement
+            for statement in program.statements
+            if isinstance(statement, ImportMetasprite)
+        ]
+        top_level_positions = {statement.position for statement in top_level_imports}
+        for node in self._walk_ast_nodes(program):
+            if (
+                isinstance(node, ImportMetasprite)
+                and node.position not in top_level_positions
+            ):
+                self._error(
+                    node.position,
+                    DiagnosticCode.INVALID_METASPRITE_IMPORT,
+                    "nes.import_metasprite is a compile-time top-level import.",
+                    "Move the import directly into the main program block.",
+                    len("nes.import_metasprite"),
+                )
+
+        run_index = next(
+            (
+                index
+                for index, statement in enumerate(program.statements)
+                if isinstance(statement, Run)
+            ),
+            len(program.statements),
+        )
+        imported: list[MetaspriteAsset] = []
+        imported_names: set[str] = set()
+        for import_statement in top_level_imports:
+            statement_index = program.statements.index(import_statement)
+            if statement_index > run_index:
+                self._error(
+                    import_statement.position,
+                    DiagnosticCode.INVALID_METASPRITE_IMPORT,
+                    "nes.import_metasprite must appear before nes.run.",
+                    "Move the compile-time import before runtime startup.",
+                    len("nes.import_metasprite"),
+                )
+            if len(import_statement.arguments) != 1 or not isinstance(
+                import_statement.arguments[0],
+                (ConstantReference, VariableReference),
+            ):
+                self._error(
+                    import_statement.position,
+                    DiagnosticCode.INVALID_METASPRITE_IMPORT,
+                    "nes.import_metasprite expects exactly one configured asset name.",
+                    "Use nes.import_metasprite(player) after configuring "
+                    "player metadata with --metasprite.",
+                    len("nes.import_metasprite"),
+                )
+            reference = import_statement.arguments[0]
+            if "." in reference.name:
+                self._error(
+                    reference.position,
+                    DiagnosticCode.INVALID_METASPRITE_IMPORT,
+                    "A metasprite import names the asset root, not a frame.",
+                    "Import player, then reference a frame such as player.idle_0.",
+                    len(reference.name),
+                )
+            normalized = reference.name.lower()
+            asset = self.configured_metasprite_assets.get(normalized)
+            if asset is None:
+                self._error(
+                    reference.position,
+                    DiagnosticCode.INVALID_METASPRITE_IMPORT,
+                    f"Metasprite asset {reference.name} was not configured.",
+                    "Pass its JSON path with --metasprite and ensure the JSON "
+                    "root name matches the import.",
+                    len(reference.name),
+                )
+            if normalized in imported_names:
+                self._error(
+                    reference.position,
+                    DiagnosticCode.DUPLICATE_METASPRITE_IMPORT,
+                    f"Metasprite asset {reference.name} is imported more than once.",
+                    "Keep one compile-time import for each configured asset.",
+                    len(reference.name),
+                )
+            imported_names.add(normalized)
+            imported.append(asset)
+
+        unimported = set(self.configured_metasprite_assets) - imported_names
+        if unimported:
+            name = sorted(unimported)[0]
+            position = program.end_position or SourcePosition(1, 1)
+            self._error(
+                position,
+                DiagnosticCode.INVALID_METASPRITE_IMPORT,
+                f"Configured metasprite asset {name} is not imported by the program.",
+                f"Add nes.import_metasprite({name}); before nes.run, or remove "
+                "its --metasprite option.",
+                len(name),
+            )
+        return tuple(imported)
 
     def _plan_sprite_ownership(
         self,
@@ -422,6 +558,82 @@ class SemanticAnalyzer:
                     OamOwnerKind.INDIVIDUAL_CREATED,
                     create.position,
                 )
+                )
+
+        remaining = available[len(create_sites) :]
+        metasprite_create_sites = sorted(
+            (
+                node
+                for node in self._walk_ast_nodes(program)
+                if isinstance(node, MetaspriteCreate)
+            ),
+            key=lambda create: (create.position.line, create.position.column),
+        )
+        if len(metasprite_create_sites) > 256:
+            overflow = metasprite_create_sites[256]
+            self._error(
+                overflow.position,
+                DiagnosticCode.INVALID_METASPRITE_CREATE,
+                "A program can contain at most 256 static metasprite creation sites.",
+                "Reduce the number of metasprite instances in this NROM program.",
+                len("nes.metasprite_create"),
+            )
+        metasprite_create_indexes: dict[SourcePosition, int] = {}
+        metasprite_instances: list[MetaspriteInstance] = []
+        metasprite_reservations: list[OamReservation] = []
+        for instance_index, create in enumerate(metasprite_create_sites):
+            if len(create.arguments) != 1:
+                self._error(
+                    create.position,
+                    DiagnosticCode.INVALID_METASPRITE_CREATE,
+                    "nes.metasprite_create expects exactly one symbolic frame, "
+                    f"but {len(create.arguments)} arguments were provided.",
+                    "Pass an imported frame such as player.idle_0.",
+                    len("nes.metasprite_create"),
+                )
+            frame = self._static_metasprite_frame(
+                create.arguments[0],
+                constants,
+                "nes.metasprite_create",
+            )
+            asset = next(
+                asset
+                for asset in self.imported_metasprite_assets
+                if asset.name == frame.asset_name
+            )
+            required = asset.maximum_component_count
+            if len(remaining) < required:
+                self._error(
+                    create.position,
+                    DiagnosticCode.OAM_SPRITE_CAPACITY_EXHAUSTED,
+                    f"Metasprite asset {asset.name} needs {required} hardware "
+                    f"sprite slots, but only {len(remaining)} remain after "
+                    "individual and earlier metasprite reservations.",
+                    "Reduce individual sprites or metasprite instances. The NES "
+                    "has exactly 64 shared OAM entries.",
+                    len("nes.metasprite_create"),
+                )
+            indexes = tuple(remaining[:required])
+            remaining = remaining[required:]
+            metasprite_create_indexes[create.position] = instance_index
+            metasprite_instances.append(
+                MetaspriteInstance(
+                    instance_index,
+                    asset.name,
+                    frame.id,
+                    indexes,
+                    create.position,
+                )
+            )
+            metasprite_reservations.extend(
+                OamReservation(
+                    oam_index,
+                    OamOwnerKind.METASPRITE_COMPONENT,
+                    create.position,
+                    instance_index,
+                    component_index,
+                )
+                for component_index, oam_index in enumerate(indexes)
             )
 
         reservations = [
@@ -433,8 +645,36 @@ class SemanticAnalyzer:
             for index, position in explicit_positions.items()
         ]
         reservations.extend(created_reservations)
+        reservations.extend(metasprite_reservations)
         reservations.sort(key=lambda reservation: reservation.index)
-        return SpriteAllocationPlan(create_indexes, tuple(reservations))
+        return SpriteAllocationPlan(
+            create_indexes,
+            tuple(reservations),
+            metasprite_create_indexes,
+            tuple(metasprite_instances),
+        )
+
+    def _static_metasprite_frame(
+        self,
+        expression: ValueExpression,
+        constants: dict[str, TypedConstant],
+        command: str,
+    ) -> MetaspriteFrame:
+        if isinstance(expression, ConstantReference):
+            constant = constants.get(expression.name.lower())
+            if (
+                constant is not None
+                and constant.type is BuiltInType.METASPRITE_FRAME
+            ):
+                return self.metasprite_frames_by_id[constant.value]
+        self._error(
+            expression.position,
+            DiagnosticCode.INVALID_METASPRITE_CREATE,
+            f"{command} requires an imported symbolic metasprite frame.",
+            "Use a frame such as player.idle_0 from an imported asset.",
+            len(getattr(expression, "name", command)),
+        )
+        raise AssertionError("unreachable")
 
     @staticmethod
     def _explicit_sprite_index(
@@ -478,6 +718,8 @@ class SemanticAnalyzer:
             | CallbackRegistration
             | SetSpriteZero
             | SpriteOperation
+            | ImportMetasprite
+            | MetaspriteOperation
             | IfStatement
             | WhileStatement
             | RepeatStatement
@@ -881,6 +1123,92 @@ class SemanticAnalyzer:
                     ResolvedSpriteOperation(
                         statement.kind,
                         sprite,
+                        value,
+                        secondary_value,
+                    )
+                )
+            elif isinstance(statement, ImportMetasprite):
+                reference = statement.arguments[0]
+                assert isinstance(reference, (ConstantReference, VariableReference))
+                resolved_statements.append(
+                    ResolvedImportMetasprite(reference.name.lower())
+                )
+            elif isinstance(statement, MetaspriteOperation):
+                command = f"nes.metasprite_{statement.kind.value}"
+                unary = statement.kind in (
+                    MetaspriteOperationKind.HIDE,
+                    MetaspriteOperationKind.SHOW,
+                )
+                set_position = (
+                    statement.kind is MetaspriteOperationKind.SET_POSITION
+                )
+                expected_count = 1 if unary else (3 if set_position else 2)
+                if len(statement.arguments) != expected_count:
+                    self._error(
+                        statement.position,
+                        DiagnosticCode.INVALID_METASPRITE_ARGUMENT_COUNT,
+                        f"{command} expects exactly {expected_count} argument(s), "
+                        f"but {len(statement.arguments)} were provided.",
+                        "Pass the metasprite followed by the documented value(s).",
+                        len(command),
+                    )
+                instance = self._resolve_value(
+                    statement.arguments[0],
+                    BuiltInType.METASPRITE,
+                    constants,
+                    variables,
+                    current_assignments,
+                )
+                value: ResolvedValue | None = None
+                secondary_value: ResolvedValue | None = None
+                if set_position:
+                    value = self._resolve_value(
+                        statement.arguments[1],
+                        BuiltInType.BYTE,
+                        constants,
+                        variables,
+                        current_assignments,
+                    )
+                    secondary_value = self._resolve_value(
+                        statement.arguments[2],
+                        BuiltInType.BYTE,
+                        constants,
+                        variables,
+                        current_assignments,
+                    )
+                elif statement.kind is MetaspriteOperationKind.SET_FRAME:
+                    frame = self._static_metasprite_frame(
+                        statement.arguments[1],
+                        constants,
+                        command,
+                    )
+                    value = ImmediateValue(frame.id, BuiltInType.METASPRITE_FRAME)
+                    if isinstance(instance, ResolvedMetaspriteCreate):
+                        created = self.sprite_allocation_plan.metasprite_instances[
+                            instance.instance_index
+                        ]
+                        if created.asset_name != frame.asset_name:
+                            self._error(
+                                statement.arguments[1].position,
+                                DiagnosticCode.INCOMPATIBLE_METASPRITE_FRAME,
+                                f"Frame {frame.symbol} belongs to asset "
+                                f"{frame.asset_name}, but this instance owns "
+                                f"asset {created.asset_name}.",
+                                "Select a frame from the same imported asset.",
+                                len(frame.symbol),
+                            )
+                elif not unary:
+                    value = self._resolve_value(
+                        statement.arguments[1],
+                        BuiltInType.BOOLEAN,
+                        constants,
+                        variables,
+                        current_assignments,
+                    )
+                resolved_statements.append(
+                    ResolvedMetaspriteOperation(
+                        statement.kind,
+                        instance,
                         value,
                         secondary_value,
                     )
@@ -1357,6 +1685,17 @@ class SemanticAnalyzer:
                     "NMI owns OAM DMA.",
                     len(command),
                 )
+            if isinstance(statement, MetaspriteOperation):
+                command = f"nes.metasprite_{statement.kind.value}"
+                self._error(
+                    statement.position,
+                    DiagnosticCode.VBLANK_UNSAFE_OPERATION,
+                    f"VBlank callback path through {owner} reaches unsupported "
+                    f"operation {command}.",
+                    "Update metasprites from main code or the update callback; "
+                    "NMI owns OAM DMA.",
+                    len(command),
+                )
             if isinstance(
                 statement,
                 (
@@ -1538,6 +1877,10 @@ class SemanticAnalyzer:
             return "nes.set_sprite_zero"
         if isinstance(statement, SpriteOperation):
             return f"nes.sprite_{statement.kind.value}"
+        if isinstance(statement, MetaspriteOperation):
+            return f"nes.metasprite_{statement.kind.value}"
+        if isinstance(statement, ImportMetasprite):
+            return "nes.import_metasprite"
         if isinstance(statement, LoadBackground):
             return "nes.load_background"
         if isinstance(statement, SetTile):
@@ -1842,6 +2185,34 @@ class SemanticAnalyzer:
         assigned_variables: set[str],
         assignment_target: ResolvedVariable | None = None,
     ) -> ResolvedValue:
+        if isinstance(expression, MetaspriteCreate):
+            self._require_expression_result_type(
+                expression.position,
+                BuiltInType.METASPRITE,
+                expected_type,
+                "nes.metasprite_create result",
+                assignment_target,
+            )
+            if len(expression.arguments) != 1:
+                self._error(
+                    expression.position,
+                    DiagnosticCode.INVALID_METASPRITE_CREATE,
+                    "nes.metasprite_create expects exactly one symbolic frame, "
+                    f"but {len(expression.arguments)} arguments were provided.",
+                    "Pass an imported frame such as player.idle_0.",
+                    len("nes.metasprite_create"),
+                )
+            frame = self._static_metasprite_frame(
+                expression.arguments[0],
+                constants,
+                "nes.metasprite_create",
+            )
+            instance_index = (
+                self.sprite_allocation_plan.metasprite_create_indexes[
+                    expression.position
+                ]
+            )
+            return ResolvedMetaspriteCreate(instance_index, frame.id)
         if isinstance(expression, SpriteCreate):
             self._require_expression_result_type(
                 expression.position,
@@ -2591,6 +2962,8 @@ class SemanticAnalyzer:
             )
         if isinstance(expression, SpriteCreate):
             return BuiltInType.SPRITE
+        if isinstance(expression, MetaspriteCreate):
+            return BuiltInType.METASPRITE
         if isinstance(expression, (UnaryExpression, BinaryExpression)):
             return BuiltInType.BYTE
         if isinstance(expression, HexLiteral):
@@ -2679,6 +3052,18 @@ class SemanticAnalyzer:
                 "hexadecimal",
                 expected_type,
                 assignment_target,
+            )
+        if expected_type in (
+            BuiltInType.METASPRITE,
+            BuiltInType.METASPRITE_FRAME,
+        ):
+            self._error(
+                literal.position,
+                DiagnosticCode.INVALID_METASPRITE_VALUE,
+                f"A hexadecimal literal cannot identify a {expected_type.value}.",
+                "Create a metasprite with nes.metasprite_create(frame) or use "
+                "an imported symbolic frame.",
+                len(literal.text),
             )
         if expected_type is BuiltInType.NES_COLOR and literal.value > 0x3F:
             self._error(
@@ -2894,6 +3279,10 @@ class SemanticAnalyzer:
 
 
 def analyze(
-    program: Program, source: str, filename: str = "<input>"
+    program: Program,
+    source: str,
+    filename: str = "<input>",
+    *,
+    metasprite_assets: tuple[MetaspriteAsset, ...] = (),
 ) -> ResolvedProgram:
-    return SemanticAnalyzer(source, filename).analyze(program)
+    return SemanticAnalyzer(source, filename, metasprite_assets).analyze(program)

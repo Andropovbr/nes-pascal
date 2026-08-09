@@ -1,0 +1,7 @@
+program DuplicateMetaspriteImport;
+begin
+    nes.import_metasprite(player);
+    nes.import_metasprite(player);
+    nes.set_background_color($0F);
+    nes.run;
+end.

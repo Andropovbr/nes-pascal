@@ -6,7 +6,7 @@ var
 begin
     PlayerSprite := nes.sprite_create();
     nes.set_sprite_palette($02, $0F, $16, $27, $30);
-    nes.sprite_set_position(PlayerSprite, $78, $70);
+    nes.sprite_set_position(PlayerSprite, $00, $70);
     nes.sprite_set_tile(PlayerSprite, $01);
     nes.sprite_set_palette(PlayerSprite, $02);
     nes.sprite_set_flip_horizontal(PlayerSprite, true);

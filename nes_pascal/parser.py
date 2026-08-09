@@ -29,7 +29,11 @@ from .ast import (
     HexLiteral,
     IfStatement,
     IncrementStatement,
+    ImportMetasprite,
     LoadBackground,
+    MetaspriteCreate,
+    MetaspriteOperation,
+    MetaspriteOperationKind,
     PaletteKind,
     Literal,
     Program,
@@ -174,10 +178,15 @@ class Parser:
 
     def _parse_type(self) -> BuiltInType:
         token = self._expect(TokenKind.IDENTIFIER, "Expected a type after ':'.")
-        for built_in_type in BuiltInType:
+        public_types = tuple(
+            type_
+            for type_ in BuiltInType
+            if type_ is not BuiltInType.METASPRITE_FRAME
+        )
+        for built_in_type in public_types:
             if token.text.lower() == built_in_type.value:
                 return built_in_type
-        supported = ", ".join(type_.value for type_ in BuiltInType)
+        supported = ", ".join(type_.value for type_ in public_types)
         self._error(
             token,
             DiagnosticCode.UNKNOWN_TYPE,
@@ -385,6 +394,42 @@ class Parser:
                 )
             return SpriteOperation(
                 sprite_kind,
+                arguments,
+                SourcePosition(namespace.line, namespace.column),
+            )
+        if normalized == "nes.import_metasprite":
+            arguments = self._parse_expression_arguments(normalized)
+            if consume_terminator:
+                self._expect(
+                    TokenKind.SEMICOLON,
+                    "Expected ';' after 'nes.import_metasprite(...)'.",
+                )
+            return ImportMetasprite(
+                arguments,
+                SourcePosition(namespace.line, namespace.column),
+            )
+        metasprite_commands = {
+            "nes.metasprite_set_position": MetaspriteOperationKind.SET_POSITION,
+            "nes.metasprite_set_frame": MetaspriteOperationKind.SET_FRAME,
+            "nes.metasprite_hide": MetaspriteOperationKind.HIDE,
+            "nes.metasprite_show": MetaspriteOperationKind.SHOW,
+            "nes.metasprite_set_flip_horizontal": (
+                MetaspriteOperationKind.SET_FLIP_HORIZONTAL
+            ),
+            "nes.metasprite_set_flip_vertical": (
+                MetaspriteOperationKind.SET_FLIP_VERTICAL
+            ),
+        }
+        metasprite_kind = metasprite_commands.get(normalized)
+        if metasprite_kind is not None:
+            arguments = self._parse_expression_arguments(normalized)
+            if consume_terminator:
+                self._expect(
+                    TokenKind.SEMICOLON,
+                    f"Expected ';' after '{normalized}(...)'.",
+                )
+            return MetaspriteOperation(
+                metasprite_kind,
                 arguments,
                 SourcePosition(namespace.line, namespace.column),
             )
@@ -904,6 +949,11 @@ class Parser:
                         self._parse_expression_arguments(normalized),
                         position,
                     )
+                if normalized == "nes.metasprite_create":
+                    return MetaspriteCreate(
+                        self._parse_expression_arguments(normalized),
+                        position,
+                    )
                 if normalized == "nes.get_tile":
                     return GetTile(
                         self._parse_expression_arguments(normalized),
@@ -947,6 +997,7 @@ class Parser:
             "a nes.set_* palette call, "
             "nes.set_scroll(...);, "
             "a nes.sprite_* call, "
+            "a nes.import_metasprite or nes.metasprite_* call, "
             "nes.set_sprite_zero(...);, "
             "nes.on_update(Procedure);, nes.on_vblank(Procedure);, "
             "nes.wait_frame;, or nes.run;.",

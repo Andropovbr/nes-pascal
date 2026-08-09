@@ -177,6 +177,28 @@ class SpriteMemoryAndBackendTests(unittest.TestCase):
         self.assertLess(page_load, dma)
         self.assertIn("$0200-$02FF", self.assembly)
 
+    def test_normal_rendering_includes_the_leftmost_sprite_pixels(self) -> None:
+        run = self.assembly.split("; Source: nes.run", 1)[1].split(
+            "; Runtime: implicit",
+            1,
+        )[0]
+        self.assertIn(
+            "lda runtime_ppumask_shadow\n"
+            "    ora #$1E\n"
+            "    sta runtime_ppumask_shadow ; preserve bits and enable rendering\n"
+            "    sta $2001",
+            run,
+        )
+        position = self.assembly.split(
+            "; Source: nes.sprite_set_position(...)",
+            1,
+        )[1].split("; Source:", 1)[0]
+        self.assertIn(
+            "lda #$00\n    sta runtime_sprite_value ; evaluate the property once",
+            position,
+        )
+        self.assertIn("jsr runtime_sprite_set_position", position)
+
     def test_constant_indexes_use_direct_oam_offsets_including_63(self) -> None:
         source = sprite_program(
             "nes.sprite_set_x($00, $11);\n"

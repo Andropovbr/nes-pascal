@@ -24,8 +24,16 @@ local function validateSpriteSupport()
     local tile = emu.read(0x0201, emu.memType.nesDebug)
     local attributes = emu.read(0x0202, emu.memType.nesDebug)
     local x = emu.read(0x0203, emu.memType.nesDebug)
-    if y ~= 0x70 or tile ~= 0x01 or attributes ~= 0x42 or x ~= 0x78 then
+    if y ~= 0x70 or tile ~= 0x01 or attributes ~= 0x42 or x ~= 0x00 then
         fail("Sprite 0 fields do not match the Pascal setters.", 2)
+        return
+    end
+    if emu.read(0x0343, emu.memType.nesDebug) ~= 0x1E then
+        fail("Normal rendering did not preserve the complete $1E PPUMASK state.", 8)
+        return
+    end
+    if emu.getPixel(3, 0x71) == emu.getPixel(0, 0x71) then
+        fail("The opaque sprite pixel at X=3 was masked from the leftmost 8 pixels.", 9)
         return
     end
     if emu.read(0x00, emu.memType.nesSpriteRam) ~= y
@@ -48,7 +56,7 @@ local function validateSpriteSupport()
         end
     end
 
-    emu.log("Static sprite allocation, combined positioning, and OAM DMA passed.")
+    emu.log("Static sprite rendering at X=0, PPUMASK, allocation, positioning, and OAM DMA passed.")
     emu.stop(0)
 end
 

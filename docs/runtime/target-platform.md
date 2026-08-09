@@ -40,8 +40,9 @@ byte preserves a pending NMI across slow callbacks and coalesces older backlog.
 The main thread polls standard controller ports once before each processed
 update. When sprite support is linked, NMI uploads the complete page-aligned
 OAM shadow by DMA; the legacy fixed sprite-0 helper first commits its complete
-staging record. There is no generic PPU command queue, metasprite/animation
-system, controller remapping, or audio.
+staging record. Metasprite geometry is composed into that shadow in main/update
+context; NMI does no layout calculation. There is no generic PPU command
+queue, automatic animation system, controller remapping, or audio.
 
 ## Memory
 
@@ -56,7 +57,9 @@ CHR-ROM is normally empty. One exactly 8192-byte raw file can be selected with
 the compiler's `--chr` option; relative paths use the source file directory.
 The controller example conditionally embeds two internal 8x8 player tiles when
 no file is selected. Configured CHR bytes occupy the existing CHR segment once
-and are not converted or modified.
+and are not converted or modified. Configured metasprite JSON is parsed only
+by the compiler. Its compact component geometry is emitted in PRG-ROM, while
+referenced tile graphics stay in the one configured CHR bank.
 
 One complete 1024-byte nametable can be embedded in PRG-ROM and uploaded to
 PPU nametable 0. It contains 960 tile indexes followed by the 64-byte attribute

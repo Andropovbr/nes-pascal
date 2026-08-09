@@ -21,7 +21,8 @@ Type-system diagnostics use the E4000-E4999 range.
   Unknown type: word.
   ```
 
-- **Suggested fix:** Use `nes_color`, `byte`, `boolean`, or `sprite`.
+- **Suggested fix:** Use `nes_color`, `byte`, `boolean`, `sprite`, or
+  `metasprite`.
 
 ## E4002 - Invalid `nes_color` value
 
@@ -105,9 +106,8 @@ Type-system diagnostics use the E4000-E4999 range.
 
 - **Category:** Type System
 - **Explanation:** The current value-parameter calling convention supports
-  only `byte` and `boolean`. Although `nes_color` and `sprite` remain valid
-  types for constants and global variables, they cannot be used for a
-  parameter yet.
+  only `byte` and `boolean`. Although `nes_color`, `sprite`, and `metasprite`
+  remain valid global types, they cannot be used for a parameter yet.
 - **Trigger:**
 
   ```pascal
@@ -162,3 +162,16 @@ Type-system diagnostics use the E4000-E4999 range.
 - **Expected compiler output:** `E4008` identifies the invalid literal and the
   supported `$00..$3F` range.
 - **Suggested fix:** Use a sprite index from `$00` through `$3F`.
+
+## E4009 - Invalid `metasprite` value
+
+- **Category:** Type System
+- **Explanation:** A `metasprite` is an opaque static instance identity. A
+  hexadecimal number is not a metasprite instance or symbolic frame.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/invalid_metasprite_value.nsp`, which assigns a
+  hexadecimal literal to a `metasprite` variable.
+- **Expected compiler output:** `E4009` rejects the literal without converting
+  it to an instance identity.
+- **Suggested fix:** Assign the result of
+  `nes.metasprite_create(imported.frame)` to the variable.

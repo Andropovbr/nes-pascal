@@ -75,6 +75,11 @@ the range reserved for their category.
 | [E3048](semantic.md) | Semantic Analysis | Invalid hardware sprite palette |
 | [E3049](semantic.md) | Semantic Analysis | Invalid sprite-create argument count |
 | [E3050](semantic.md) | Semantic Analysis | OAM hardware-sprite capacity exhausted |
+| [E3051](semantic.md) | Semantic Analysis | Invalid metasprite import |
+| [E3052](semantic.md) | Semantic Analysis | Duplicate metasprite import |
+| [E3053](semantic.md) | Semantic Analysis | Invalid metasprite creation |
+| [E3054](semantic.md) | Semantic Analysis | Invalid metasprite API argument count |
+| [E3055](semantic.md) | Semantic Analysis | Incompatible metasprite frame |
 | [E4001](type-system.md) | Type System | Unknown type |
 | [E4002](type-system.md) | Type System | Invalid `nes_color` value |
 | [E4003](type-system.md) | Type System | Invalid `byte` value |
@@ -83,6 +88,7 @@ the range reserved for their category.
 | [E4006](type-system.md) | Type System | Invalid controller argument type |
 | [E4007](type-system.md) | Type System | Invalid palette argument type |
 | [E4008](type-system.md) | Type System | Invalid `sprite` value |
+| [E4009](type-system.md) | Type System | Invalid `metasprite` value |
 | [E5001](code-generation.md) | Code Generation | Missing toolchain |
 | [E5002](code-generation.md) | Code Generation | Toolchain failure |
 | [E5003](code-generation.md) | Code Generation | User RAM exhausted |
@@ -99,6 +105,14 @@ the range reserved for their category.
 | [E6008](runtime-validation.md) | Runtime Validation | Invalid background asset size |
 | [E6009](runtime-validation.md) | Runtime Validation | Background asset required |
 | [E6010](runtime-validation.md) | Runtime Validation | Invalid mirroring configuration |
+| [E6011](runtime-validation.md) | Runtime Validation | Metasprite asset not found |
+| [E6012](runtime-validation.md) | Runtime Validation | Metasprite asset read failure |
+| [E6013](runtime-validation.md) | Runtime Validation | Malformed metasprite JSON metadata |
+| [E6014](runtime-validation.md) | Runtime Validation | Unsupported metasprite metadata format |
+| [E6015](runtime-validation.md) | Runtime Validation | Unsupported metasprite metadata version |
+| [E6016](runtime-validation.md) | Runtime Validation | Invalid metasprite metadata |
+| [E6017](runtime-validation.md) | Runtime Validation | Incompatible metasprite CHR data |
+| [E6018](runtime-validation.md) | Runtime Validation | Invalid metasprite asset configuration |
 
 ## Warnings
 

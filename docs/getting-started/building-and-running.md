@@ -26,6 +26,8 @@ python -m nes_pascal.cli examples/frame_callbacks.nsp -o build/frame_callbacks.n
 python -m nes_pascal.cli examples/slow_update_callback.nsp -o build/slow_update_callback.nes
 python -m nes_pascal.cli examples/controller_input.nsp -o build/controller_input.nes
 python -m nes_pascal.cli examples/sprite_support.nsp -o build/sprite_support.nes --chr assets/chr_asset.chr
+python -m nes_pascal.cli examples/metasprite_player.nsp -o build/metasprite_player.nes --chr assets/game.chr --metasprite assets/player_idle.json
+python -m nes_pascal.cli examples/metasprite_clipping.nsp -o build/metasprite_clipping.nes --chr assets/game.chr --metasprite assets/player_idle.json
 python -m nes_pascal.cli examples/chr_asset.nsp -o build/chr_asset.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/palette_support.nsp -o build/palette_support.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
@@ -62,6 +64,14 @@ The examples demonstrate:
   and two small embedded CHR tiles.
 - `sprite_support.nsp`: one statically allocated, strongly typed hardware
   sprite positioned through the OAM-shadow API and uploaded by NMI OAM DMA.
+- `metasprite_player.nsp`: the supplied PNG2CHR Studio player asset, movement
+  in all eight D-pad directions, centered-anchor facing flip, manual frame
+  selection with A, whole-object hide/show with Select, and explicit gameplay
+  bounds that keep every component visible at all four edges.
+- `metasprite_clipping.nsp`: a slow visual loop from center to the left, right,
+  top, and bottom boundaries and back, with explicit position, visibility, and
+  cleared flip state in every stage. Complete 8-by-8 components disappear and
+  return without wrapping as they cross an edge.
 - `chr_asset.nsp`: inclusion of one project-relative raw CHR-ROM asset.
 - `palette_support.nsp`: custom CHR data, initialized background and sprite
   palettes, then a safely queued full and individual palette update.
@@ -70,6 +80,14 @@ The examples demonstrate:
 - `background_updates.nsp`: bounded and repeated tile writes, confirmed-shadow
   reads, rejected tile and attribute overflow, pending cancellation, explicit
   overflow clearing, and one raw attribute update after runtime starts.
+
+The player example's `PlayerMinimumX`, `PlayerMaximumX`, `PlayerMinimumY`, and
+`PlayerMaximumY` constants are specific to the bundled asset rather than
+renderer clamps. Every imported frame has component top-left offsets from
+`-12` through `+4`, for a complete visible extent of `-12..+11` around the
+anchor. X therefore uses `$0C..$F4`. Metasprite component tops use logical Y
+`1..232`, so Y uses `$0D..$E4`. The clipping example intentionally does not use
+these gameplay limits.
 
 The loop, counting, and procedure-parameter examples select background color
 `$21` only when their expected final states are reached.
@@ -103,6 +121,11 @@ currently requires exactly 8192 bytes (8 KiB). A missing, unreadable, or
 incorrectly sized configured file stops compilation with a diagnostic. When
 `--chr` is omitted, the compiler generates an empty 8 KiB CHR-ROM (except for
 the existing fixed sprite-0 demonstration, which retains its internal tiles).
+
+Metasprite programs add one or more repeatable `--metasprite` JSON paths and
+must also configure the matching 8 KiB CHR bank. Both path types are resolved
+from the `.nsp` directory. See [Metasprites](../runtime/metasprites.md) for the
+metadata contract, symbolic frame names, and OAM cost.
 
 ## Nametable assets
 

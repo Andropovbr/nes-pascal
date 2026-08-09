@@ -68,6 +68,11 @@ class DiagnosticCode(StrEnum):
     INVALID_SPRITE_PALETTE = "E3048"
     INVALID_SPRITE_CREATE_ARGUMENT_COUNT = "E3049"
     OAM_SPRITE_CAPACITY_EXHAUSTED = "E3050"
+    INVALID_METASPRITE_IMPORT = "E3051"
+    DUPLICATE_METASPRITE_IMPORT = "E3052"
+    INVALID_METASPRITE_CREATE = "E3053"
+    INVALID_METASPRITE_ARGUMENT_COUNT = "E3054"
+    INCOMPATIBLE_METASPRITE_FRAME = "E3055"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -76,6 +81,7 @@ class DiagnosticCode(StrEnum):
     INVALID_CONTROLLER_ARGUMENT_TYPE = "E4006"
     INVALID_PALETTE_ARGUMENT_TYPE = "E4007"
     INVALID_SPRITE_VALUE = "E4008"
+    INVALID_METASPRITE_VALUE = "E4009"
     MISSING_TOOLCHAIN = "E5001"
     TOOLCHAIN_FAILURE = "E5002"
     USER_RAM_EXHAUSTED = "E5003"
@@ -92,6 +98,14 @@ class DiagnosticCode(StrEnum):
     INVALID_BACKGROUND_ASSET_SIZE = "E6008"
     BACKGROUND_ASSET_REQUIRED = "E6009"
     INVALID_MIRRORING_CONFIGURATION = "E6010"
+    METASPRITE_ASSET_NOT_FOUND = "E6011"
+    METASPRITE_ASSET_READ_FAILURE = "E6012"
+    MALFORMED_METASPRITE_METADATA = "E6013"
+    UNSUPPORTED_METASPRITE_FORMAT = "E6014"
+    UNSUPPORTED_METASPRITE_VERSION = "E6015"
+    INVALID_METASPRITE_METADATA = "E6016"
+    INCOMPATIBLE_METASPRITE_CHR = "E6017"
+    INVALID_METASPRITE_CONFIGURATION = "E6018"
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +283,21 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     DiagnosticCode.OAM_SPRITE_CAPACITY_EXHAUSTED: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "OAM hardware-sprite capacity exhausted"
     ),
+    DiagnosticCode.INVALID_METASPRITE_IMPORT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid metasprite import"
+    ),
+    DiagnosticCode.DUPLICATE_METASPRITE_IMPORT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Duplicate metasprite import"
+    ),
+    DiagnosticCode.INVALID_METASPRITE_CREATE: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid metasprite creation"
+    ),
+    DiagnosticCode.INVALID_METASPRITE_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid metasprite API argument count"
+    ),
+    DiagnosticCode.INCOMPATIBLE_METASPRITE_FRAME: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Incompatible metasprite frame"
+    ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"
     ),
@@ -292,6 +321,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INVALID_SPRITE_VALUE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Invalid sprite value"
+    ),
+    DiagnosticCode.INVALID_METASPRITE_VALUE: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Invalid metasprite value"
     ),
     DiagnosticCode.MISSING_TOOLCHAIN: DiagnosticDefinition(
         DiagnosticCategory.CODE_GENERATION, "Missing toolchain"
@@ -340,6 +372,30 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INVALID_MIRRORING_CONFIGURATION: DiagnosticDefinition(
         DiagnosticCategory.RUNTIME, "Invalid mirroring configuration"
+    ),
+    DiagnosticCode.METASPRITE_ASSET_NOT_FOUND: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Metasprite metadata not found"
+    ),
+    DiagnosticCode.METASPRITE_ASSET_READ_FAILURE: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Metasprite metadata read failure"
+    ),
+    DiagnosticCode.MALFORMED_METASPRITE_METADATA: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Malformed metasprite JSON metadata"
+    ),
+    DiagnosticCode.UNSUPPORTED_METASPRITE_FORMAT: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Unsupported metasprite metadata format"
+    ),
+    DiagnosticCode.UNSUPPORTED_METASPRITE_VERSION: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Unsupported metasprite metadata version"
+    ),
+    DiagnosticCode.INVALID_METASPRITE_METADATA: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Invalid metasprite metadata"
+    ),
+    DiagnosticCode.INCOMPATIBLE_METASPRITE_CHR: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Incompatible metasprite CHR data"
+    ),
+    DiagnosticCode.INVALID_METASPRITE_CONFIGURATION: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Invalid metasprite asset configuration"
     ),
 }
 

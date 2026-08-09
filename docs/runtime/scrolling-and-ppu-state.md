@@ -25,7 +25,10 @@ There are exactly two `$2005` writes in this final NMI restoration. PPUCTRL,
 PPUMASK, and both active scroll bytes occupy four regular-RAM bytes in every
 program. Programs using `nes.set_scroll` add three bytes for the pending pair
 and its publication flag. `nes.run` enables NMI and rendering by setting the
-required bits in the shadows, preserving unrelated bits.
+required bits in the shadows, preserving unrelated bits. Its normal PPUMASK
+enable value is `$1E`: background and sprites are rendered, including both in
+the leftmost eight pixels. Initialization and complete background uploads still
+keep the PPUMASK shadow at `$00` until `nes.run` reaches a safe VBlank.
 
 ## Mirroring
 

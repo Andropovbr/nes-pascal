@@ -81,7 +81,7 @@ local function validateBackgroundUpdates()
         end
     end
     if emu.read(0x0200, emu.memType.nesDebug) ~= 0x80
-        or emu.read(0x0201, emu.memType.nesDebug) ~= 0x08
+        or emu.read(0x0201, emu.memType.nesDebug) ~= 0x1E
         or emu.read(0x0202, emu.memType.nesDebug) ~= 0x00
         or emu.read(0x0203, emu.memType.nesDebug) ~= 0x00 then
         fail("The background uploader did not preserve PPU state shadows.", 13)

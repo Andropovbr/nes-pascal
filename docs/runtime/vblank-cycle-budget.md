@@ -69,6 +69,8 @@ jitter, and a safety margin. A program without a registered callback omits the
 background work; the final row then becomes 1,751 used and 522 remaining.
 Linking `nes.set_scroll` adds seven cycles when no pair is pending or 28 cycles
 when NMI commits one, reducing the corresponding remainder by that amount.
+Metasprites use the same general OAM DMA row: component layout is calculated
+before NMI in main/update context, so component count adds no VBlank work.
 Programs using the legacy `nes.set_sprite_zero` compatibility helper add up to
 44 cycles for its atomic record commit, reproducing the former 1,789-cycle
 combined worst case before cancellation or scroll work.
@@ -96,12 +98,12 @@ clearing omit the background uploader entirely.
 
 This design scales only while additional fixed NMI tasks remain explicitly
 bounded and their combined worst case leaves margin. Nametable streaming,
-metasprites, audio DMA, or other PPU uploads would need a revised
-central budget and scheduling policy; none are implemented here. The figures
-are NTSC-only and do not claim PAL timing support.
+automatic animation work in NMI, audio DMA, or other PPU uploads would need a
+revised central budget and scheduling policy; none are implemented here. The
+figures are NTSC-only and do not claim PAL timing support.
 
 One shared epilogue restores PPUCTRL, scroll X/Y, and PPUMASK after every
 runtime uploader and the optional user callback. `nes.run` preserves bits while
-enabling the current `$80` PPUCTRL and `$08` or `$18` PPUMASK defaults; scroll
+enabling the current `$80` PPUCTRL and `$1E` PPUMASK default; scroll
 starts at `($00, $00)`. This central cost replaces the former duplicate
 uploader-local restoration costs.

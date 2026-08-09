@@ -10,7 +10,9 @@ variables, exact-type assignments, one-byte arithmetic, comparisons,
 short-circuit Boolean expressions, structured conditionals and loops,
 increment and decrement operations, and acyclic procedures with `byte` and
 `boolean` value parameters. The one-byte `sprite` type strongly selects one of
-64 hardware OAM entries. The deterministic memory layout places mandatory
+64 hardware OAM entries, while the opaque `metasprite` type identifies a
+static multi-component object compiled from PNG2CHR Studio metadata. The
+deterministic memory layout places mandatory
 compiler temporaries in Zero Page and conservatively promotes frequently
 referenced globals with safe regular-RAM fallback. Its runtime installs a
 minimal register-safe NMI handler, maintains an 8-bit frame counter, and
@@ -32,7 +34,9 @@ flags, and upload it through NMI DMA. `nes.sprite_create()` reserves distinct
 hardware entries statically, while `nes.sprite_set_position()` updates both
 coordinates with one indexed-address calculation. Programs without sprite
 operations omit that shadow and reuse the RAM page for runtime state and
-variables.
+variables. Metasprites reserve from the same 64-entry pool, keep arbitrary
+signed component layouts in PRG-ROM, and provide whole-object positioning,
+manual frame selection, visibility, anchor-centered flip, and edge clipping.
 
 ## Documentation
 

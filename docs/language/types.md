@@ -1,6 +1,6 @@
 # Built-in types
 
-NES Pascal provides four built-in types. Each occupies one byte, but the
+NES Pascal provides five built-in types. Each occupies one byte, but the
 types are distinct and are not implicitly converted.
 
 ## `nes_color`
@@ -81,6 +81,28 @@ to the [hardware sprite API](../runtime/sprites.md). `nes.sprite_create()`
 produces a statically reserved `sprite` value; it is not a general function or
 runtime object allocation.
 
+## `metasprite`
+
+`metasprite` is an opaque one-byte identity for a statically created logical
+object composed of several hardware sprites. It is not an OAM index and no
+hexadecimal literal can be converted to it.
+
+```pascal
+var
+    Player: metasprite;
+
+begin
+    nes.import_metasprite(player);
+    Player := nes.metasprite_create(player.idle_0);
+end;
+```
+
+Each creation site has a stable identity and statically owned component slots.
+The type supports assignment and the [metasprite API](../runtime/metasprites.md),
+but not arithmetic, comparisons, `inc`, `dec`, constants, or procedure
+parameters. E4009 rejects numeric values in a metasprite context.
+
 Procedure value parameters currently support only `byte` and `boolean`.
-`nes_color` and `sprite` remain valid for constants and global variables but
-produce E4005 when used as a parameter type.
+`nes_color`, `sprite`, and `metasprite` remain valid global types but produce
+E4005 when used as a parameter type. `nes_color` and `sprite` also support
+typed constants; `metasprite` identities come only from creation sites.
