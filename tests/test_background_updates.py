@@ -245,6 +245,8 @@ class BackgroundUpdateBackendTests(unittest.TestCase):
         self.assertIn("clc                     ; accepted", queue)
 
     def test_shadow_is_omitted_for_write_only_background_updates(self) -> None:
+        from tools.measure_benchmarks import measure_memory_accounting
+
         source = """program WriteOnlyBackground;
 begin
     nes.set_background_color($0F);
@@ -259,6 +261,16 @@ end.
         self.assertNotIn("runtime_background_shadow", names)
         self.assertIn("runtime_background_queue_ready", names)
         self.assertEqual(layout.runtime_data.size, 26)
+        accounting = measure_memory_accounting(layout)
+        self.assertEqual(accounting.regular_runtime_user_allocated_bytes, 26)
+        self.assertEqual(accounting.oam_shadow_allocated_bytes, 0)
+        self.assertEqual(accounting.regular_allocator_visible_free_bytes, 1510)
+        self.assertEqual(accounting.zp_allocator_visible_free_bytes, 128)
+        self.assertEqual(accounting.total_allocator_visible_free_bytes, 1638)
+        self.assertEqual(
+            accounting.total_committed_or_reserved_address_space_bytes,
+            410,
+        )
         assembly = generate(program, layout)
         self.assertNotIn("runtime_background_shadow", assembly)
         self.assertNotIn("runtime_background_queue_cancel_lock", assembly)

@@ -267,6 +267,75 @@ end.
         self.assertIn("runtime_background_queue_ready", memory_map)
         self.assertIn("runtime_background_queue_overflow", memory_map)
 
+    def test_gameplay_full_stack_example_builds_with_cumulative_runtime_state(self) -> None:
+        from tools.measure_benchmarks import (
+            BENCHMARKS,
+            format_markdown_report,
+            measure_benchmark,
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            rom_path = Path(temporary_directory) / "gameplay_full_stack.nes"
+            compile_source(
+                ROOT / "examples" / "gameplay_full_stack.nsp",
+                rom_path,
+                chr_path="assets/game.chr",
+                nametable_path="assets/nametable_loading.nam",
+                metasprite_paths=("assets/player_consolidated.json",),
+            )
+            rom = rom_path.read_bytes()
+            memory_map = rom_path.with_suffix(".map").read_text(encoding="utf-8")
+
+        self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
+        self.assertIn("runtime_background_shadow", memory_map)
+        self.assertIn("runtime_oam_shadow", memory_map)
+        self.assertIn("runtime_metasprite_animation", memory_map)
+        self.assertIn("runtime_controller_1_current", memory_map)
+
+        specification = next(
+            item for item in BENCHMARKS if item.name == "gameplay_full_stack"
+        )
+        metrics = measure_benchmark(specification)
+        accounting = metrics.memory
+        self.assertEqual(metrics.prg_code_bytes, 3478)
+        self.assertEqual(metrics.prg_total_used_bytes, 3484)
+        self.assertEqual(metrics.max_expression_tree_depth, 1)
+        self.assertEqual(metrics.max_live_temporaries, 1)
+        self.assertEqual(metrics.pattern_stats.total_instructions, 874)
+        self.assertEqual(accounting.zp_runtime_symbol_bytes, 13)
+        self.assertEqual(accounting.zp_temporary_reserved_bytes, 16)
+        self.assertEqual(accounting.zp_temporary_required_bytes, 1)
+        self.assertEqual(accounting.zp_promoted_user_bytes, 4)
+        self.assertEqual(accounting.zp_benchmark_allocated_or_reserved_bytes, 33)
+        self.assertEqual(accounting.zp_policy_reserved_unavailable_bytes, 99)
+        self.assertEqual(accounting.zp_allocator_visible_free_bytes, 124)
+        self.assertEqual(accounting.regular_runtime_bytes, 1002)
+        self.assertEqual(accounting.regular_user_bytes, 2)
+        self.assertEqual(accounting.regular_runtime_user_allocated_bytes, 1004)
+        self.assertEqual(accounting.oam_shadow_allocated_bytes, 256)
+        self.assertEqual(accounting.non_zp_allocated_bytes, 1260)
+        self.assertEqual(accounting.hardware_stack_reserved_bytes, 256)
+        self.assertEqual(accounting.regular_allocator_visible_free_bytes, 276)
+        self.assertEqual(accounting.total_allocator_visible_free_bytes, 400)
+        self.assertEqual(
+            accounting.compiler_runtime_user_allocated_or_reserved_bytes,
+            1293,
+        )
+        self.assertEqual(
+            accounting.total_committed_or_reserved_address_space_bytes,
+            1648,
+        )
+        self.assertEqual(
+            accounting.total_committed_or_reserved_address_space_bytes
+            + accounting.total_allocator_visible_free_bytes,
+            2048,
+        )
+
+        benchmark_report = format_markdown_report([metrics])
+        self.assertNotIn("RAM Total", benchmark_report)
+        self.assertIn("Non-ZP Allocated", benchmark_report)
+        self.assertIn("Total Committed/Reserved", benchmark_report)
+
     def test_split_nametable_assets_build_as_one_complete_asset(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             project = Path(temporary_directory)

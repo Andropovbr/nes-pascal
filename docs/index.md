@@ -45,5 +45,6 @@ Planned work is tracked separately in the
 
 - [Reference](reference/index.md)
 - [Compiler pipeline](reference/compiler-pipeline.md)
+- [Optimization and architecture audit (0.5.5)](compiler/optimization-audit-0.5.5.md)
 - [Unsupported features](reference/unsupported-features.md)
 - [Compiler diagnostics](reference/diagnostics/index.md)
