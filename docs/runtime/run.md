@@ -1,5 +1,7 @@
 # `nes.run`
 
+English | [Português (Brasil)](..\pt-BR\runtime\run.md)
+
 `nes.run` completes initialization and starts the frame-synchronized runtime
 phase:
 

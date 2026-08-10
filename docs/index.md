@@ -1,5 +1,7 @@
 # NES Pascal documentation
 
+English | [Português (Brasil)](pt-BR/index.md)
+
 NES Pascal is a compiled, strongly typed language inspired by Pascal and
 specialized for Nintendo Entertainment System games. It compiles source code
 to ca65-compatible Assembly and produces an NROM-256 image for NTSC NES

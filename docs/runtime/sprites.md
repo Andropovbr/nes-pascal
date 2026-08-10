@@ -1,5 +1,7 @@
 # Hardware sprites
 
+English | [Português (Brasil)](..\pt-BR\runtime\sprites.md)
+
 NES Pascal exposes the NES's 64 hardware OAM entries as individually managed
 hardware sprites. One `sprite` value identifies exactly one four-byte OAM
 entry; it is not a game entity or a multi-tile metasprite. Use the separate

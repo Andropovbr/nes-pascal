@@ -1,5 +1,7 @@
 # Expressions
 
+English | [Português (Brasil)](..\pt-BR\language\expressions.md)
+
 ## Arithmetic expressions
 
 Arithmetic is defined only for `byte` values. Operands may be hexadecimal

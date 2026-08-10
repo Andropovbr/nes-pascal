@@ -1,5 +1,7 @@
 # Frame callbacks
 
+English | [Português (Brasil)](..\pt-BR\runtime\frame-callbacks.md)
+
 NES Pascal supports one static callback for normal per-frame update logic and
 one static callback for restricted VBlank work:
 

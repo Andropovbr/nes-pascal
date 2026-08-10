@@ -1,5 +1,7 @@
 # Prerequisites and installation
 
+English | [Português (Brasil)](../pt-BR/getting-started/prerequisites-and-installation.md)
+
 ## Prerequisites
 
 - Python 3.11 or newer;

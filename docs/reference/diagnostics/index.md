@@ -1,5 +1,7 @@
 # Compiler diagnostics
 
+English | [Português (Brasil)](..\..\pt-BR\reference\diagnostics\index.md)
+
 Diagnostic codes are part of the compiler's public API. Once retired, a code
 must never be assigned to a different diagnostic. Future diagnostics must use
 the range reserved for their category.

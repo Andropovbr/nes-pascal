@@ -1,5 +1,7 @@
 # NES Runtime
 
+English | [Português (Brasil)](..\pt-BR\runtime\index.md)
+
 The implemented runtime provides a small initialization sequence and a
 runtime-owned NMI handler for an NTSC NROM program. Its frame and controller
 APIs are:

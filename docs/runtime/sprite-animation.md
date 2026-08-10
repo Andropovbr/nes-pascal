@@ -1,5 +1,7 @@
 # Sprite animation
 
+English | [Português (Brasil)](..\pt-BR\runtime\sprite-animation.md)
+
 Sprite animation selects ordered metasprite frames automatically on the main
 thread. It reuses the metasprite's static OAM reservation, position,
 visibility, clipping, and whole-object flip state; animation never allocates

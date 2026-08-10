@@ -1,5 +1,7 @@
 # Testing the compiler
 
+English | [Português (Brasil)](../pt-BR/getting-started/testing.md)
+
 Run the complete suite with:
 
 ```text

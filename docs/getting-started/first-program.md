@@ -1,5 +1,7 @@
 # Your first program
 
+English | [Português (Brasil)](../pt-BR/getting-started/first-program.md)
+
 The minimal example exercises every built-in type and the two initialization
 commands:
 

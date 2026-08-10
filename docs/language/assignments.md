@@ -1,5 +1,7 @@
 # Assignments
 
+English | [Português (Brasil)](..\pt-BR\language\assignments.md)
+
 Assignment uses `:=`:
 
 ```pascal

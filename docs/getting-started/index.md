@@ -1,5 +1,7 @@
 # Getting Started
 
+English | [Português (Brasil)](../pt-BR/getting-started/index.md)
+
 The compiler runs directly from the repository and produces an NES ROM from a
 single `.nsp` source file.
 

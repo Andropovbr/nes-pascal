@@ -1,5 +1,7 @@
 # Program structure
 
+English | [Português (Brasil)](..\pt-BR\language\program-structure.md)
+
 A program contains:
 
 1. the `program` keyword;

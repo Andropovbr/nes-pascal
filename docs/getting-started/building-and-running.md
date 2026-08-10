@@ -1,5 +1,7 @@
 # Building and running programs
 
+English | [Português (Brasil)](../pt-BR/getting-started/building-and-running.md)
+
 ## Compilation
 
 Compile the minimal example with:
