@@ -3,7 +3,8 @@ import shutil
 import tempfile
 import unittest
 
-from nes_pascal.ast import ResolvedSetScroll, SetScroll
+from nes_pascal.ast import BuiltinCall, ResolvedBuiltinCall
+from nes_pascal.builtins import BuiltinId
 from nes_pascal.backend_ca65 import generate
 from nes_pascal.cli import compile_source
 from nes_pascal.diagnostics import CompilerError
@@ -40,9 +41,11 @@ class ScrollParserAndSemanticTests(unittest.TestCase):
 """,
         ).replace("    nes.set_background_color", "    X := $10;\n    nes.set_background_color")
         parsed = parse(source)
-        self.assertIsInstance(parsed.statements[-1], SetScroll)
+        self.assertIsInstance(parsed.statements[-1], BuiltinCall)
+        self.assertEqual(parsed.statements[-1].name, "nes.set_scroll")
         resolved = analyze(parsed, source, "scroll_test.nsp")
-        self.assertIsInstance(resolved.statements[-1], ResolvedSetScroll)
+        self.assertIsInstance(resolved.statements[-1], ResolvedBuiltinCall)
+        self.assertIs(resolved.statements[-1].builtin, BuiltinId.SET_SCROLL)
 
     def test_invalid_argument_count_has_stable_diagnostic(self) -> None:
         path = Path(__file__).parent / "fixtures" / "diagnostics" / "invalid_set_scroll_argument_count.nsp"

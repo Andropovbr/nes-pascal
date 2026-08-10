@@ -5,18 +5,15 @@ from typing import Iterator
 
 from .ast import (
     Assignment,
-    BackgroundUpdatesOverflowed,
     BinaryExpression,
     BooleanBinaryExpression,
     BooleanLiteral,
     BooleanNotExpression,
     BreakStatement,
+    BuiltinCall,
     BuiltInType,
     CallbackKind,
     CallbackRegistration,
-    ClearBackgroundUpdates,
-    ClearBackgroundUpdateOverflow,
-    ControllerQuery,
     ComparisonExpression,
     ComparisonOperator,
     ConstantDeclaration,
@@ -24,7 +21,6 @@ from .ast import (
     ContinueStatement,
     DecrementStatement,
     ForStatement,
-    GetTile,
     HexLiteral,
     IfStatement,
     ImmediateValue,
@@ -33,79 +29,54 @@ from .ast import (
     LoadBackground,
     MetaspriteAsset,
     MetaspriteAnimation,
-    MetaspriteAnimationFinished,
-    MetaspriteCreate,
     MetaspriteFrame,
     MetaspriteInstance,
-    MetaspriteOperation,
-    MetaspriteOperationKind,
     OamOwnerKind,
     OamReservation,
-    PaletteKind,
     Program,
     ProcedureCall,
     ProcedureDeclaration,
     RepeatStatement,
     ResolvedArgument,
     ResolvedAssignment,
-    ResolvedBackgroundUpdatesOverflowed,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
     ResolvedBreakStatement,
     ResolvedCallbackRegistration,
-    ResolvedClearBackgroundUpdates,
-    ResolvedClearBackgroundUpdateOverflow,
     ResolvedComparisonExpression,
-    ResolvedControllerQuery,
+    ResolvedBuiltinCall,
     ResolvedContinueStatement,
     ResolvedDecrementStatement,
     ResolvedForStatement,
-    ResolvedGetTile,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
     ResolvedImportMetasprite,
     ResolvedLoadBackground,
-    ResolvedMetaspriteCreate,
-    ResolvedMetaspriteAnimationFinished,
-    ResolvedMetaspriteOperation,
     ResolvedRepeatStatement,
     ResolvedProgram,
     ResolvedProcedure,
     ResolvedProcedureCall,
-    ResolvedSetBackgroundColor,
-    ResolvedSetAttribute,
-    ResolvedSetPalette,
-    ResolvedSetPaletteColor,
-    ResolvedSetSpriteZero,
-    ResolvedSpriteCreate,
-    ResolvedSpriteOperation,
-    ResolvedSetScroll,
-    ResolvedSetTile,
     ResolvedStatement,
     ResolvedValue,
     ResolvedVariable,
     ResolvedWhileStatement,
     ResolvedUnaryExpression,
     Run,
-    SetBackgroundColor,
-    SetAttribute,
-    SetPalette,
-    SetPaletteColor,
-    SetSpriteZero,
-    SetScroll,
-    SetTile,
     SourcePosition,
-    SpriteCreate,
-    SpriteOperation,
-    SpriteOperationKind,
     Statement,
     UnaryExpression,
     ValueExpression,
     VariableValue,
     VariableReference,
-    WaitFrame,
     WhileStatement,
+)
+from .builtins import (
+    BuiltinDescriptor,
+    BuiltinId,
+    BuiltinKind,
+    SemanticHook,
+    builtin_by_name,
 )
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
 
@@ -120,6 +91,47 @@ CONTROLLER_BUTTONS: dict[str, int] = {
     "nes.button_left": 0x40,
     "nes.button_right": 0x80,
 }
+
+SPRITE_OPERATION_IDS = frozenset(
+    {
+        BuiltinId.SPRITE_SET_POSITION,
+        BuiltinId.SPRITE_SET_X,
+        BuiltinId.SPRITE_SET_Y,
+        BuiltinId.SPRITE_SET_TILE,
+        BuiltinId.SPRITE_SET_PALETTE,
+        BuiltinId.SPRITE_SET_ATTRIBUTES,
+        BuiltinId.SPRITE_HIDE,
+        BuiltinId.SPRITE_SHOW,
+        BuiltinId.SPRITE_SET_FLIP_HORIZONTAL,
+        BuiltinId.SPRITE_SET_FLIP_VERTICAL,
+        BuiltinId.SPRITE_SET_BEHIND_BACKGROUND,
+    }
+)
+METASPRITE_OPERATION_IDS = frozenset(
+    {
+        BuiltinId.METASPRITE_SET_POSITION,
+        BuiltinId.METASPRITE_SET_FRAME,
+        BuiltinId.METASPRITE_SET_ANIMATION,
+        BuiltinId.METASPRITE_RESTART_ANIMATION,
+        BuiltinId.METASPRITE_HIDE,
+        BuiltinId.METASPRITE_SHOW,
+        BuiltinId.METASPRITE_SET_FLIP_HORIZONTAL,
+        BuiltinId.METASPRITE_SET_FLIP_VERTICAL,
+    }
+)
+CONTROLLER_QUERY_IDS = frozenset(
+    {
+        BuiltinId.CONTROLLER_DOWN,
+        BuiltinId.CONTROLLER_PRESSED,
+        BuiltinId.CONTROLLER_RELEASED,
+    }
+)
+
+
+def _parsed_builtin_id(call: BuiltinCall) -> BuiltinId:
+    descriptor = builtin_by_name(call.name)
+    assert descriptor is not None
+    return descriptor.id
 
 
 @dataclass(frozen=True, slots=True)
@@ -510,9 +522,16 @@ class SemanticAnalyzer:
                 )
 
         for node in self._walk_ast_nodes(program):
-            if isinstance(node, SetSpriteZero):
+            if (
+                isinstance(node, BuiltinCall)
+                and _parsed_builtin_id(node) is BuiltinId.SET_SPRITE_ZERO
+            ):
                 explicit_positions.setdefault(0, node.position)
-            elif isinstance(node, SpriteOperation) and node.arguments:
+            elif (
+                isinstance(node, BuiltinCall)
+                and _parsed_builtin_id(node) in SPRITE_OPERATION_IDS
+                and node.arguments
+            ):
                 explicit = self._explicit_sprite_index(
                     node.arguments[0],
                     constants,
@@ -533,7 +552,8 @@ class SemanticAnalyzer:
             (
                 node
                 for node in self._walk_ast_nodes(program)
-                if isinstance(node, SpriteCreate)
+                if isinstance(node, BuiltinCall)
+                and _parsed_builtin_id(node) is BuiltinId.SPRITE_CREATE
             ),
             key=lambda create: (create.position.line, create.position.column),
         )
@@ -579,7 +599,8 @@ class SemanticAnalyzer:
             (
                 node
                 for node in self._walk_ast_nodes(program)
-                if isinstance(node, MetaspriteCreate)
+                if isinstance(node, BuiltinCall)
+                and _parsed_builtin_id(node) is BuiltinId.METASPRITE_CREATE
             ),
             key=lambda create: (create.position.line, create.position.column),
         )
@@ -738,35 +759,7 @@ class SemanticAnalyzer:
 
     def _resolve_statements(
         self,
-        statements: tuple[
-            Assignment
-            | SetBackgroundColor
-            | SetPalette
-            | SetPaletteColor
-            | LoadBackground
-            | SetTile
-            | SetAttribute
-            | SetScroll
-            | ClearBackgroundUpdates
-            | ClearBackgroundUpdateOverflow
-            | Run
-            | WaitFrame
-            | CallbackRegistration
-            | SetSpriteZero
-            | SpriteOperation
-            | ImportMetasprite
-            | MetaspriteOperation
-            | IfStatement
-            | WhileStatement
-            | RepeatStatement
-            | BreakStatement
-            | ContinueStatement
-            | IncrementStatement
-            | DecrementStatement
-            | ForStatement
-            | ProcedureCall,
-            ...,
-        ],
+        statements: tuple[Statement, ...],
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
         assigned_variables: set[str],
@@ -1048,119 +1041,27 @@ class SemanticAnalyzer:
                     resolved_statements.append(ResolvedBreakStatement())
                 else:
                     resolved_statements.append(ResolvedContinueStatement())
-            elif isinstance(statement, SetSpriteZero):
-                if len(statement.arguments) != 4:
-                    self._error(
+            elif isinstance(statement, BuiltinCall):
+                descriptor = builtin_by_name(statement.name)
+                assert descriptor is not None
+                if descriptor.kind is not BuiltinKind.STATEMENT:
+                    self._invalid_builtin_context(statement, descriptor)
+                if (
+                    descriptor.id is BuiltinId.WAIT_FRAME
+                    and inside_procedure
+                ):
+                    self._procedure_runtime_command_error(
                         statement.position,
-                        DiagnosticCode.INVALID_SPRITE_ZERO_ARGUMENT_COUNT,
-                        "nes.set_sprite_zero expects exactly 4 arguments "
-                        "(x, y, tile, attributes), but "
-                        f"{len(statement.arguments)} were provided.",
-                        "Pass x, y, tile, and attributes as byte values.",
-                        len("nes.set_sprite_zero"),
+                        descriptor.public_name,
                     )
-                x, y, tile, attributes = (
-                    self._resolve_value(
-                        argument,
-                        BuiltInType.BYTE,
+                resolved_statements.append(
+                    self._resolve_builtin_call(
+                        statement,
+                        descriptor,
                         constants,
                         variables,
                         current_assignments,
-                    )
-                    for argument in statement.arguments
-                )
-                resolved_statements.append(
-                    ResolvedSetSpriteZero(x, y, tile, attributes)
-                )
-            elif isinstance(statement, SpriteOperation):
-                command = f"nes.sprite_{statement.kind.value}"
-                unary = statement.kind in (
-                    SpriteOperationKind.HIDE,
-                    SpriteOperationKind.SHOW,
-                )
-                set_position = (
-                    statement.kind is SpriteOperationKind.SET_POSITION
-                )
-                expected_count = 1 if unary else (3 if set_position else 2)
-                if len(statement.arguments) != expected_count:
-                    self._error(
-                        statement.position,
-                        DiagnosticCode.INVALID_SPRITE_ARGUMENT_COUNT,
-                        f"{command} expects exactly {expected_count} argument(s), "
-                        f"but {len(statement.arguments)} were provided.",
-                        (
-                            "Pass one sprite value."
-                            if unary
-                            else (
-                            "Pass one sprite value followed by x and y."
-                            if set_position
-                            else (
-                                "Pass one sprite value followed by the property "
-                                "value."
-                            )
-                            )
-                        ),
-                        len(command),
-                    )
-                sprite = self._resolve_value(
-                    statement.arguments[0],
-                    BuiltInType.SPRITE,
-                    constants,
-                    variables,
-                    current_assignments,
-                )
-                value: ResolvedValue | None = None
-                secondary_value: ResolvedValue | None = None
-                if not unary:
-                    value_type = (
-                        BuiltInType.BOOLEAN
-                        if statement.kind
-                        in (
-                            SpriteOperationKind.SET_FLIP_HORIZONTAL,
-                            SpriteOperationKind.SET_FLIP_VERTICAL,
-                            SpriteOperationKind.SET_BEHIND_BACKGROUND,
-                        )
-                        else BuiltInType.BYTE
-                    )
-                    value = self._resolve_value(
-                        statement.arguments[1],
-                        value_type,
-                        constants,
-                        variables,
-                        current_assignments,
-                    )
-                    if set_position:
-                        secondary_value = self._resolve_value(
-                            statement.arguments[2],
-                            BuiltInType.BYTE,
-                            constants,
-                            variables,
-                            current_assignments,
-                        )
-                    if (
-                        statement.kind is SpriteOperationKind.SET_PALETTE
-                        and isinstance(value, ImmediateValue)
-                        and value.value > 3
-                    ):
-                        argument = statement.arguments[1]
-                        text = getattr(
-                            argument,
-                            "text",
-                            getattr(argument, "name", str(value.value)),
-                        )
-                        self._error(
-                            argument.position,
-                            DiagnosticCode.INVALID_SPRITE_PALETTE,
-                            f"Sprite palette {text} is outside the valid range $00..$03.",
-                            "Use sprite palette $00, $01, $02, or $03.",
-                            len(text),
-                        )
-                resolved_statements.append(
-                    ResolvedSpriteOperation(
-                        statement.kind,
-                        sprite,
-                        value,
-                        secondary_value,
+                        queued=runtime_started or inside_procedure,
                     )
                 )
             elif isinstance(statement, ImportMetasprite):
@@ -1168,307 +1069,6 @@ class SemanticAnalyzer:
                 assert isinstance(reference, (ConstantReference, VariableReference))
                 resolved_statements.append(
                     ResolvedImportMetasprite(reference.name.lower())
-                )
-            elif isinstance(statement, MetaspriteOperation):
-                command = f"nes.metasprite_{statement.kind.value}"
-                unary = statement.kind in (
-                    MetaspriteOperationKind.HIDE,
-                    MetaspriteOperationKind.SHOW,
-                    MetaspriteOperationKind.RESTART_ANIMATION,
-                )
-                set_position = (
-                    statement.kind is MetaspriteOperationKind.SET_POSITION
-                )
-                expected_count = 1 if unary else (3 if set_position else 2)
-                if len(statement.arguments) != expected_count:
-                    self._error(
-                        statement.position,
-                        DiagnosticCode.INVALID_METASPRITE_ARGUMENT_COUNT,
-                        f"{command} expects exactly {expected_count} argument(s), "
-                        f"but {len(statement.arguments)} were provided.",
-                        "Pass the metasprite followed by the documented value(s).",
-                        len(command),
-                    )
-                instance = self._resolve_value(
-                    statement.arguments[0],
-                    BuiltInType.METASPRITE,
-                    constants,
-                    variables,
-                    current_assignments,
-                )
-                value: ResolvedValue | None = None
-                secondary_value: ResolvedValue | None = None
-                if set_position:
-                    value = self._resolve_value(
-                        statement.arguments[1],
-                        BuiltInType.BYTE,
-                        constants,
-                        variables,
-                        current_assignments,
-                    )
-                    secondary_value = self._resolve_value(
-                        statement.arguments[2],
-                        BuiltInType.BYTE,
-                        constants,
-                        variables,
-                        current_assignments,
-                    )
-                elif statement.kind is MetaspriteOperationKind.SET_FRAME:
-                    frame = self._static_metasprite_frame(
-                        statement.arguments[1],
-                        constants,
-                        command,
-                    )
-                    value = ImmediateValue(frame.id, BuiltInType.METASPRITE_FRAME)
-                    if isinstance(instance, ResolvedMetaspriteCreate):
-                        created = self.sprite_allocation_plan.metasprite_instances[
-                            instance.instance_index
-                        ]
-                        if created.asset_name != frame.asset_name:
-                            self._error(
-                                statement.arguments[1].position,
-                                DiagnosticCode.INCOMPATIBLE_METASPRITE_FRAME,
-                                f"Frame {frame.symbol} belongs to asset "
-                                f"{frame.asset_name}, but this instance owns "
-                                f"asset {created.asset_name}.",
-                                "Select a frame from the same imported asset.",
-                                len(frame.symbol),
-                            )
-                elif statement.kind is MetaspriteOperationKind.SET_ANIMATION:
-                    animation = self._static_metasprite_animation(
-                        statement.arguments[1],
-                        constants,
-                        command,
-                    )
-                    value = ImmediateValue(
-                        animation.id,
-                        BuiltInType.METASPRITE_ANIMATION,
-                    )
-                    if isinstance(instance, ResolvedMetaspriteCreate):
-                        created = self.sprite_allocation_plan.metasprite_instances[
-                            instance.instance_index
-                        ]
-                        if created.asset_name != animation.asset_name:
-                            self._error(
-                                statement.arguments[1].position,
-                                DiagnosticCode.INVALID_METASPRITE_ANIMATION,
-                                f"Animation {animation.symbol} belongs to asset "
-                                f"{animation.asset_name}, but this instance owns "
-                                f"asset {created.asset_name}.",
-                                "Select an animation from the same imported asset.",
-                                len(animation.symbol),
-                            )
-                elif not unary:
-                    value = self._resolve_value(
-                        statement.arguments[1],
-                        BuiltInType.BOOLEAN,
-                        constants,
-                        variables,
-                        current_assignments,
-                    )
-                resolved_statements.append(
-                    ResolvedMetaspriteOperation(
-                        statement.kind,
-                        instance,
-                        value,
-                        secondary_value,
-                    )
-                )
-            elif isinstance(statement, SetBackgroundColor):
-                resolved_statements.append(
-                    ResolvedSetBackgroundColor(
-                        self._resolve_value(
-                            statement.argument,
-                            BuiltInType.NES_COLOR,
-                            constants,
-                            variables,
-                            current_assignments,
-                        ),
-                        queued=runtime_started or inside_procedure,
-                    )
-                )
-            elif isinstance(statement, SetTile):
-                self._require_background_argument_count(
-                    statement.position,
-                    "nes.set_tile",
-                    statement.arguments,
-                    3,
-                    DiagnosticCode.INVALID_SET_TILE_ARGUMENT_COUNT,
-                    "Pass x, y, and tile as byte values.",
-                )
-                x, y, tile = (
-                    self._resolve_value(
-                        argument,
-                        BuiltInType.BYTE,
-                        constants,
-                        variables,
-                        current_assignments,
-                    )
-                    for argument in statement.arguments
-                )
-                self._validate_immediate_coordinate(
-                    x,
-                    31,
-                    "tile X",
-                    statement.position,
-                    DiagnosticCode.INVALID_TILE_COORDINATE,
-                )
-                self._validate_immediate_coordinate(
-                    y,
-                    29,
-                    "tile Y",
-                    statement.position,
-                    DiagnosticCode.INVALID_TILE_COORDINATE,
-                )
-                resolved_statements.append(ResolvedSetTile(x, y, tile))
-            elif isinstance(statement, SetAttribute):
-                self._require_background_argument_count(
-                    statement.position,
-                    "nes.set_attribute",
-                    statement.arguments,
-                    3,
-                    DiagnosticCode.INVALID_SET_ATTRIBUTE_ARGUMENT_COUNT,
-                    "Pass attribute X, attribute Y, and value as byte values.",
-                )
-                x, y, value = (
-                    self._resolve_value(
-                        argument,
-                        BuiltInType.BYTE,
-                        constants,
-                        variables,
-                        current_assignments,
-                    )
-                    for argument in statement.arguments
-                )
-                self._validate_immediate_coordinate(
-                    x,
-                    7,
-                    "attribute X",
-                    statement.position,
-                    DiagnosticCode.INVALID_ATTRIBUTE_COORDINATE,
-                )
-                self._validate_immediate_coordinate(
-                    y,
-                    7,
-                    "attribute Y",
-                    statement.position,
-                    DiagnosticCode.INVALID_ATTRIBUTE_COORDINATE,
-                )
-                resolved_statements.append(ResolvedSetAttribute(x, y, value))
-            elif isinstance(statement, SetScroll):
-                self._require_background_argument_count(
-                    statement.position,
-                    "nes.set_scroll",
-                    statement.arguments,
-                    2,
-                    DiagnosticCode.INVALID_SET_SCROLL_ARGUMENT_COUNT,
-                    "Pass horizontal and vertical scroll as byte values.",
-                )
-                x, y = (
-                    self._resolve_value(
-                        argument,
-                        BuiltInType.BYTE,
-                        constants,
-                        variables,
-                        current_assignments,
-                    )
-                    for argument in statement.arguments
-                )
-                resolved_statements.append(ResolvedSetScroll(x, y))
-            elif isinstance(statement, ClearBackgroundUpdates):
-                self._require_background_argument_count(
-                    statement.position,
-                    "nes.clear_background_updates",
-                    statement.arguments,
-                    0,
-                    DiagnosticCode.INVALID_CLEAR_BACKGROUND_UPDATES_ARGUMENT_COUNT,
-                    "Call nes.clear_background_updates(); without arguments.",
-                )
-                resolved_statements.append(ResolvedClearBackgroundUpdates())
-            elif isinstance(statement, ClearBackgroundUpdateOverflow):
-                self._require_background_argument_count(
-                    statement.position,
-                    "nes.clear_background_update_overflow",
-                    statement.arguments,
-                    0,
-                    DiagnosticCode.INVALID_BACKGROUND_OVERFLOW_CLEAR_ARGUMENT_COUNT,
-                    "Call nes.clear_background_update_overflow(); without arguments.",
-                )
-                resolved_statements.append(
-                    ResolvedClearBackgroundUpdateOverflow()
-                )
-            elif isinstance(statement, SetPalette):
-                command = f"nes.set_{statement.kind.value}_palette"
-                if len(statement.arguments) != 5:
-                    self._palette_argument_count_error(
-                        statement.position,
-                        command,
-                        5,
-                        len(statement.arguments),
-                    )
-                palette_index = self._resolve_palette_index(
-                    statement.arguments[0],
-                    statement.kind,
-                    constants,
-                    variables,
-                    command,
-                )
-                colors = tuple(
-                    self._resolve_palette_color(
-                        argument,
-                        constants,
-                        variables,
-                        current_assignments,
-                        command,
-                    )
-                    for argument in statement.arguments[1:]
-                )
-                assert len(colors) == 4
-                resolved_statements.append(
-                    ResolvedSetPalette(
-                        statement.kind,
-                        palette_index,
-                        colors,
-                        queued=runtime_started or inside_procedure,
-                    )
-                )
-            elif isinstance(statement, SetPaletteColor):
-                command = f"nes.set_{statement.kind.value}_palette_color"
-                if len(statement.arguments) != 3:
-                    self._palette_argument_count_error(
-                        statement.position,
-                        command,
-                        3,
-                        len(statement.arguments),
-                    )
-                palette_index = self._resolve_palette_index(
-                    statement.arguments[0],
-                    statement.kind,
-                    constants,
-                    variables,
-                    command,
-                )
-                color_index = self._resolve_palette_color_index(
-                    statement.arguments[1],
-                    constants,
-                    variables,
-                    command,
-                )
-                color = self._resolve_palette_color(
-                    statement.arguments[2],
-                    constants,
-                    variables,
-                    current_assignments,
-                    command,
-                )
-                resolved_statements.append(
-                    ResolvedSetPaletteColor(
-                        statement.kind,
-                        palette_index,
-                        color_index,
-                        color,
-                        queued=runtime_started or inside_procedure,
-                    )
                 )
             elif isinstance(statement, LoadBackground):
                 if statement.arguments:
@@ -1505,13 +1105,6 @@ class SemanticAnalyzer:
                         len("nes.load_background"),
                     )
                 resolved_statements.append(ResolvedLoadBackground())
-            elif isinstance(statement, WaitFrame):
-                if inside_procedure:
-                    self._procedure_runtime_command_error(
-                        statement.position,
-                        "nes.wait_frame",
-                    )
-                resolved_statements.append(WaitFrame())
             else:
                 assert isinstance(statement, Run)
                 if inside_procedure:
@@ -1725,7 +1318,10 @@ class SemanticAnalyzer:
                 if not self._vblank_expression_is_safe(statement.value):
                     self._vblank_unsafe_expression(statement.value, owner)
                 return
-            if isinstance(statement, SetSpriteZero):
+            if (
+                isinstance(statement, BuiltinCall)
+                and _parsed_builtin_id(statement) is BuiltinId.SET_SPRITE_ZERO
+            ):
                 self._error(
                     statement.position,
                     DiagnosticCode.VBLANK_UNSAFE_OPERATION,
@@ -1735,8 +1331,11 @@ class SemanticAnalyzer:
                     "commits it safely during NMI.",
                     len("nes.set_sprite_zero"),
                 )
-            if isinstance(statement, SpriteOperation):
-                command = f"nes.sprite_{statement.kind.value}"
+            if (
+                isinstance(statement, BuiltinCall)
+                and _parsed_builtin_id(statement) in SPRITE_OPERATION_IDS
+            ):
+                command = statement.name
                 self._error(
                     statement.position,
                     DiagnosticCode.VBLANK_UNSAFE_OPERATION,
@@ -1746,8 +1345,11 @@ class SemanticAnalyzer:
                     "NMI owns OAM DMA.",
                     len(command),
                 )
-            if isinstance(statement, MetaspriteOperation):
-                command = f"nes.metasprite_{statement.kind.value}"
+            if (
+                isinstance(statement, BuiltinCall)
+                and _parsed_builtin_id(statement) in METASPRITE_OPERATION_IDS
+            ):
+                command = statement.name
                 self._error(
                     statement.position,
                     DiagnosticCode.VBLANK_UNSAFE_OPERATION,
@@ -1757,20 +1359,19 @@ class SemanticAnalyzer:
                     "NMI owns OAM DMA.",
                     len(command),
                 )
-            if isinstance(
-                statement,
-                (
-                    SetBackgroundColor,
-                    SetPalette,
-                    SetPaletteColor,
-                    SetScroll,
-                ),
+            if (
+                isinstance(statement, BuiltinCall)
+                and _parsed_builtin_id(statement)
+                in {
+                    BuiltinId.SET_BACKGROUND_COLOR,
+                    BuiltinId.SET_BACKGROUND_PALETTE,
+                    BuiltinId.SET_SPRITE_PALETTE,
+                    BuiltinId.SET_BACKGROUND_PALETTE_COLOR,
+                    BuiltinId.SET_SPRITE_PALETTE_COLOR,
+                    BuiltinId.SET_SCROLL,
+                }
             ):
-                values = (
-                    (statement.argument,)
-                    if isinstance(statement, SetBackgroundColor)
-                    else statement.arguments
-                )
+                values = statement.arguments
                 for value in values:
                     if not self._vblank_expression_is_safe(value):
                         self._vblank_unsafe_expression(value, owner)
@@ -1834,7 +1435,11 @@ class SemanticAnalyzer:
         validate(root)
 
     def _vblank_expression_is_safe(self, value: ValueExpression) -> bool:
-        if isinstance(value, (ControllerQuery, GetTile)):
+        if (
+            isinstance(value, BuiltinCall)
+            and _parsed_builtin_id(value)
+            in (*CONTROLLER_QUERY_IDS, BuiltinId.GET_TILE)
+        ):
             return False
         if isinstance(value, (BinaryExpression, ComparisonExpression)):
             return False
@@ -1863,7 +1468,7 @@ class SemanticAnalyzer:
             )
         controller_query = self._first_controller_query(value)
         if controller_query is not None:
-            command = f"nes.controller_{controller_query.kind.value}"
+            command = controller_query.name
             self._error(
                 controller_query.position,
                 DiagnosticCode.VBLANK_UNSAFE_OPERATION,
@@ -1884,8 +1489,11 @@ class SemanticAnalyzer:
     def _first_controller_query(
         self,
         value: ValueExpression,
-    ) -> ControllerQuery | None:
-        if isinstance(value, ControllerQuery):
+    ) -> BuiltinCall | None:
+        if (
+            isinstance(value, BuiltinCall)
+            and _parsed_builtin_id(value) in CONTROLLER_QUERY_IDS
+        ):
             return value
         if isinstance(value, (UnaryExpression, BooleanNotExpression)):
             return self._first_controller_query(value.operand)
@@ -1896,10 +1504,18 @@ class SemanticAnalyzer:
             return self._first_controller_query(
                 value.left
             ) or self._first_controller_query(value.right)
+        if isinstance(value, BuiltinCall):
+            for argument in value.arguments:
+                found = self._first_controller_query(argument)
+                if found is not None:
+                    return found
         return None
 
-    def _first_get_tile(self, value: ValueExpression) -> GetTile | None:
-        if isinstance(value, GetTile):
+    def _first_get_tile(self, value: ValueExpression) -> BuiltinCall | None:
+        if (
+            isinstance(value, BuiltinCall)
+            and _parsed_builtin_id(value) is BuiltinId.GET_TILE
+        ):
             return value
         if isinstance(value, (UnaryExpression, BooleanNotExpression)):
             return self._first_get_tile(value.operand)
@@ -1908,6 +1524,11 @@ class SemanticAnalyzer:
             (BinaryExpression, BooleanBinaryExpression, ComparisonExpression),
         ):
             return self._first_get_tile(value.left) or self._first_get_tile(value.right)
+        if isinstance(value, BuiltinCall):
+            for argument in value.arguments:
+                found = self._first_get_tile(argument)
+                if found is not None:
+                    return found
         return None
 
     def _statement_position_for_callback(self, statement: Statement) -> SourcePosition:
@@ -1924,36 +1545,14 @@ class SemanticAnalyzer:
             return "repeat"
         if isinstance(statement, ForStatement):
             return "for"
-        if isinstance(statement, WaitFrame):
-            return "nes.wait_frame"
         if isinstance(statement, Run):
             return "nes.run"
-        if isinstance(statement, SetBackgroundColor):
-            return "nes.set_background_color"
-        if isinstance(statement, SetPalette):
-            return f"nes.set_{statement.kind.value}_palette"
-        if isinstance(statement, SetPaletteColor):
-            return f"nes.set_{statement.kind.value}_palette_color"
-        if isinstance(statement, SetSpriteZero):
-            return "nes.set_sprite_zero"
-        if isinstance(statement, SpriteOperation):
-            return f"nes.sprite_{statement.kind.value}"
-        if isinstance(statement, MetaspriteOperation):
-            return f"nes.metasprite_{statement.kind.value}"
+        if isinstance(statement, BuiltinCall):
+            return statement.name
         if isinstance(statement, ImportMetasprite):
             return "nes.import_metasprite"
         if isinstance(statement, LoadBackground):
             return "nes.load_background"
-        if isinstance(statement, SetTile):
-            return "nes.set_tile"
-        if isinstance(statement, SetAttribute):
-            return "nes.set_attribute"
-        if isinstance(statement, SetScroll):
-            return "nes.set_scroll"
-        if isinstance(statement, ClearBackgroundUpdates):
-            return "nes.clear_background_updates"
-        if isinstance(statement, ClearBackgroundUpdateOverflow):
-            return "nes.clear_background_update_overflow"
         if isinstance(statement, CallbackRegistration):
             return f"nes.on_{statement.kind.value}"
         if isinstance(statement, BreakStatement):
@@ -2204,6 +1803,300 @@ class SemanticAnalyzer:
             len(target.name),
         )
 
+    def _invalid_builtin_context(
+        self,
+        call: BuiltinCall,
+        descriptor: BuiltinDescriptor,
+    ) -> None:
+        expected = (
+            "a statement"
+            if descriptor.kind is BuiltinKind.STATEMENT
+            else "a value expression"
+        )
+        self._error(
+            call.position,
+            DiagnosticCode.INVALID_BUILTIN_CONTEXT,
+            f"{descriptor.public_name} is {expected} and cannot be used here.",
+            (
+                f"Use {descriptor.public_name} as a standalone statement."
+                if descriptor.kind is BuiltinKind.STATEMENT
+                else f"Use the result of {descriptor.public_name} in an expression."
+            ),
+            len(descriptor.public_name),
+        )
+
+    def _require_builtin_argument_count(
+        self,
+        call: BuiltinCall,
+        descriptor: BuiltinDescriptor,
+    ) -> None:
+        expected = len(descriptor.parameter_types)
+        actual = len(call.arguments)
+        if actual == expected:
+            return
+        self._error(
+            call.position,
+            descriptor.argument_count_diagnostic,
+            f"{descriptor.public_name} expects exactly {expected} arguments, "
+            f"but {actual} were provided.",
+            descriptor.argument_count_suggestion,
+            len(descriptor.public_name),
+        )
+
+    def _resolve_builtin_call(
+        self,
+        call: BuiltinCall,
+        descriptor: BuiltinDescriptor,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+        *,
+        queued: bool = False,
+    ) -> ResolvedBuiltinCall:
+        self._require_builtin_argument_count(call, descriptor)
+        hook = descriptor.semantic_hook
+
+        if hook is SemanticHook.CONTROLLER_QUERY:
+            controller = self._resolve_controller_index(
+                call.arguments[0], constants, variables, descriptor.public_name
+            )
+            _, button = self._resolve_controller_button(
+                call.arguments[1], constants, variables, descriptor.public_name
+            )
+            arguments = (
+                ImmediateValue(controller, BuiltInType.BYTE),
+                ImmediateValue(button, BuiltInType.BYTE),
+            )
+        elif hook is SemanticHook.SPRITE_CREATE:
+            arguments = (
+                ImmediateValue(
+                    self.sprite_allocation_plan.create_indexes[call.position],
+                    BuiltInType.BYTE,
+                ),
+            )
+        elif hook is SemanticHook.METASPRITE_CREATE:
+            frame = self._static_metasprite_frame(
+                call.arguments[0], constants, descriptor.public_name
+            )
+            arguments = (
+                ImmediateValue(
+                    self.sprite_allocation_plan.metasprite_create_indexes[
+                        call.position
+                    ],
+                    BuiltInType.BYTE,
+                ),
+                ImmediateValue(frame.id, BuiltInType.METASPRITE_FRAME),
+            )
+        elif hook is SemanticHook.PALETTE:
+            palette_index = self._resolve_palette_index(
+                call.arguments[0],
+                descriptor.id,
+                constants,
+                variables,
+                descriptor.public_name,
+            )
+            arguments = (
+                ImmediateValue(palette_index, BuiltInType.BYTE),
+                *(
+                    self._resolve_palette_color(
+                        argument,
+                        constants,
+                        variables,
+                        assigned_variables,
+                        descriptor.public_name,
+                    )
+                    for argument in call.arguments[1:]
+                ),
+            )
+        elif hook is SemanticHook.PALETTE_COLOR:
+            palette_index = self._resolve_palette_index(
+                call.arguments[0],
+                descriptor.id,
+                constants,
+                variables,
+                descriptor.public_name,
+            )
+            color_index = self._resolve_palette_color_index(
+                call.arguments[1],
+                constants,
+                variables,
+                descriptor.public_name,
+            )
+            arguments = (
+                ImmediateValue(palette_index, BuiltInType.BYTE),
+                ImmediateValue(color_index, BuiltInType.BYTE),
+                self._resolve_palette_color(
+                    call.arguments[2],
+                    constants,
+                    variables,
+                    assigned_variables,
+                    descriptor.public_name,
+                ),
+            )
+        elif hook is SemanticHook.METASPRITE_OPERATION:
+            arguments = self._resolve_metasprite_builtin_arguments(
+                call,
+                descriptor,
+                constants,
+                variables,
+                assigned_variables,
+            )
+        else:
+            arguments = tuple(
+                self._resolve_value(
+                    argument,
+                    expected_type,
+                    constants,
+                    variables,
+                    assigned_variables,
+                )
+                for argument, expected_type in zip(
+                    call.arguments, descriptor.parameter_types, strict=True
+                )
+            )
+            if hook is SemanticHook.TILE_COORDINATES:
+                self._validate_immediate_coordinate(
+                    arguments[0],
+                    31,
+                    "tile X",
+                    call.position,
+                    DiagnosticCode.INVALID_TILE_COORDINATE,
+                )
+                self._validate_immediate_coordinate(
+                    arguments[1],
+                    29,
+                    "tile Y",
+                    call.position,
+                    DiagnosticCode.INVALID_TILE_COORDINATE,
+                )
+            elif hook is SemanticHook.ATTRIBUTE_COORDINATES:
+                self._validate_immediate_coordinate(
+                    arguments[0],
+                    7,
+                    "attribute X",
+                    call.position,
+                    DiagnosticCode.INVALID_ATTRIBUTE_COORDINATE,
+                )
+                self._validate_immediate_coordinate(
+                    arguments[1],
+                    7,
+                    "attribute Y",
+                    call.position,
+                    DiagnosticCode.INVALID_ATTRIBUTE_COORDINATE,
+                )
+            elif (
+                hook is SemanticHook.SPRITE_OPERATION
+                and descriptor.id is BuiltinId.SPRITE_SET_PALETTE
+                and isinstance(arguments[1], ImmediateValue)
+                and arguments[1].value > 3
+            ):
+                argument = call.arguments[1]
+                text = getattr(
+                    argument,
+                    "text",
+                    getattr(argument, "name", str(arguments[1].value)),
+                )
+                self._error(
+                    argument.position,
+                    DiagnosticCode.INVALID_SPRITE_PALETTE,
+                    f"Sprite palette {text} is outside the valid range $00..$03.",
+                    "Use sprite palette $00, $01, $02, or $03.",
+                    len(text),
+                )
+
+        return ResolvedBuiltinCall(
+            descriptor.id,
+            tuple(arguments),
+            queued and bool(descriptor.queued_runtime_features),
+        )
+
+    def _resolve_metasprite_builtin_arguments(
+        self,
+        call: BuiltinCall,
+        descriptor: BuiltinDescriptor,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+    ) -> tuple[ResolvedValue, ...]:
+        instance = self._resolve_value(
+            call.arguments[0],
+            BuiltInType.METASPRITE,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        if descriptor.id is BuiltinId.METASPRITE_SET_FRAME:
+            frame = self._static_metasprite_frame(
+                call.arguments[1], constants, descriptor.public_name
+            )
+            self._validate_metasprite_asset(instance, frame.asset_name, frame.symbol, call)
+            return (instance, ImmediateValue(frame.id, BuiltInType.METASPRITE_FRAME))
+        if descriptor.id is BuiltinId.METASPRITE_SET_ANIMATION:
+            animation = self._static_metasprite_animation(
+                call.arguments[1], constants, descriptor.public_name
+            )
+            self._validate_metasprite_asset(
+                instance, animation.asset_name, animation.symbol, call, animation=True
+            )
+            return (
+                instance,
+                ImmediateValue(animation.id, BuiltInType.METASPRITE_ANIMATION),
+            )
+        return (
+            instance,
+            *(
+                self._resolve_value(
+                    argument,
+                    expected_type,
+                    constants,
+                    variables,
+                    assigned_variables,
+                )
+                for argument, expected_type in zip(
+                    call.arguments[1:],
+                    descriptor.parameter_types[1:],
+                    strict=True,
+                )
+            ),
+        )
+
+    def _validate_metasprite_asset(
+        self,
+        instance: ResolvedValue,
+        asset_name: str,
+        symbol: str,
+        call: BuiltinCall,
+        *,
+        animation: bool = False,
+    ) -> None:
+        if not (
+            isinstance(instance, ResolvedBuiltinCall)
+            and instance.builtin is BuiltinId.METASPRITE_CREATE
+        ):
+            return
+        instance_index = instance.arguments[0]
+        assert isinstance(instance_index, ImmediateValue)
+        created = self.sprite_allocation_plan.metasprite_instances[
+            instance_index.value
+        ]
+        if created.asset_name == asset_name:
+            return
+        code = (
+            DiagnosticCode.INVALID_METASPRITE_ANIMATION
+            if animation
+            else DiagnosticCode.INCOMPATIBLE_METASPRITE_FRAME
+        )
+        noun = "Animation" if animation else "Frame"
+        self._error(
+            call.arguments[1].position,
+            code,
+            f"{noun} {symbol} belongs to asset {asset_name}, but this "
+            f"instance owns asset {created.asset_name}.",
+            f"Select {'an animation' if animation else 'a frame'} from the "
+            "same imported asset.",
+            len(symbol),
+        )
+
     def _resolve_assignment(
         self,
         assignment: Assignment,
@@ -2246,144 +2139,25 @@ class SemanticAnalyzer:
         assigned_variables: set[str],
         assignment_target: ResolvedVariable | None = None,
     ) -> ResolvedValue:
-        if isinstance(expression, MetaspriteAnimationFinished):
+        if isinstance(expression, BuiltinCall):
+            descriptor = builtin_by_name(expression.name)
+            assert descriptor is not None
+            if descriptor.kind is not BuiltinKind.VALUE:
+                self._invalid_builtin_context(expression, descriptor)
+            assert descriptor.return_type is not None
             self._require_expression_result_type(
                 expression.position,
-                BuiltInType.BOOLEAN,
+                descriptor.return_type,
                 expected_type,
-                "nes.metasprite_animation_finished result",
+                f"{descriptor.public_name} result",
                 assignment_target,
             )
-            if len(expression.arguments) != 1:
-                self._error(
-                    expression.position,
-                    DiagnosticCode.INVALID_METASPRITE_ARGUMENT_COUNT,
-                    "nes.metasprite_animation_finished expects exactly one "
-                    f"argument, but {len(expression.arguments)} were provided.",
-                    "Pass the metasprite instance to query.",
-                    len("nes.metasprite_animation_finished"),
-                )
-            return ResolvedMetaspriteAnimationFinished(
-                self._resolve_value(
-                    expression.arguments[0],
-                    BuiltInType.METASPRITE,
-                    constants,
-                    variables,
-                    assigned_variables,
-                )
-            )
-        if isinstance(expression, MetaspriteCreate):
-            self._require_expression_result_type(
-                expression.position,
-                BuiltInType.METASPRITE,
-                expected_type,
-                "nes.metasprite_create result",
-                assignment_target,
-            )
-            if len(expression.arguments) != 1:
-                self._error(
-                    expression.position,
-                    DiagnosticCode.INVALID_METASPRITE_CREATE,
-                    "nes.metasprite_create expects exactly one symbolic frame, "
-                    f"but {len(expression.arguments)} arguments were provided.",
-                    "Pass an imported frame such as player.idle_0.",
-                    len("nes.metasprite_create"),
-                )
-            frame = self._static_metasprite_frame(
-                expression.arguments[0],
-                constants,
-                "nes.metasprite_create",
-            )
-            instance_index = (
-                self.sprite_allocation_plan.metasprite_create_indexes[
-                    expression.position
-                ]
-            )
-            return ResolvedMetaspriteCreate(instance_index, frame.id)
-        if isinstance(expression, SpriteCreate):
-            self._require_expression_result_type(
-                expression.position,
-                BuiltInType.SPRITE,
-                expected_type,
-                "nes.sprite_create result",
-                assignment_target,
-            )
-            if expression.arguments:
-                self._error(
-                    expression.position,
-                    DiagnosticCode.INVALID_SPRITE_CREATE_ARGUMENT_COUNT,
-                    "nes.sprite_create expects exactly 0 arguments, but "
-                    f"{len(expression.arguments)} were provided.",
-                    "Call nes.sprite_create() without arguments.",
-                    len("nes.sprite_create"),
-                )
-            index = self.sprite_allocation_plan.create_indexes[expression.position]
-            return ResolvedSpriteCreate(index)
-        if isinstance(expression, BackgroundUpdatesOverflowed):
-            self._require_expression_result_type(
-                expression.position,
-                BuiltInType.BOOLEAN,
-                expected_type,
-                "nes.background_updates_overflowed result",
-                assignment_target,
-            )
-            self._require_background_argument_count(
-                expression.position,
-                "nes.background_updates_overflowed",
-                expression.arguments,
-                0,
-                DiagnosticCode.INVALID_BACKGROUND_OVERFLOW_QUERY_ARGUMENT_COUNT,
-                "Call nes.background_updates_overflowed() without arguments.",
-            )
-            return ResolvedBackgroundUpdatesOverflowed()
-        if isinstance(expression, GetTile):
-            self._require_expression_result_type(
-                expression.position,
-                BuiltInType.BYTE,
-                expected_type,
-                "nes.get_tile result",
-                assignment_target,
-            )
-            self._require_background_argument_count(
-                expression.position,
-                "nes.get_tile",
-                expression.arguments,
-                2,
-                DiagnosticCode.INVALID_GET_TILE_ARGUMENT_COUNT,
-                "Pass x and y as byte values.",
-            )
-            x, y = (
-                self._resolve_value(
-                    argument,
-                    BuiltInType.BYTE,
-                    constants,
-                    variables,
-                    assigned_variables,
-                )
-                for argument in expression.arguments
-            )
-            self._validate_immediate_coordinate(
-                x,
-                31,
-                "tile X",
-                expression.position,
-                DiagnosticCode.INVALID_TILE_COORDINATE,
-            )
-            self._validate_immediate_coordinate(
-                y,
-                29,
-                "tile Y",
-                expression.position,
-                DiagnosticCode.INVALID_TILE_COORDINATE,
-            )
-            return ResolvedGetTile(x, y)
-        if isinstance(expression, ControllerQuery):
-            return self._resolve_controller_query(
+            return self._resolve_builtin_call(
                 expression,
-                expected_type,
+                descriptor,
                 constants,
                 variables,
-                assignment_target,
+                assigned_variables,
             )
         if isinstance(
             expression,
@@ -2466,53 +2240,6 @@ class SemanticAnalyzer:
                     len(expression.name),
                 )
         return VariableValue(variable)
-
-    def _resolve_controller_query(
-        self,
-        expression: ControllerQuery,
-        expected_type: BuiltInType,
-        constants: dict[str, TypedConstant],
-        variables: dict[str, ResolvedVariable],
-        assignment_target: ResolvedVariable | None,
-    ) -> ResolvedControllerQuery:
-        command = f"nes.controller_{expression.kind.value}"
-        self._require_expression_result_type(
-            expression.position,
-            BuiltInType.BOOLEAN,
-            expected_type,
-            f"{command} result",
-            assignment_target,
-        )
-        if len(expression.arguments) != 2:
-            self._error(
-                expression.position,
-                DiagnosticCode.INVALID_CONTROLLER_ARGUMENT_COUNT,
-                f"{command} expects exactly 2 arguments, but "
-                f"{len(expression.arguments)} were provided.",
-                f"Use {command}($01, nes.button_a) with one controller "
-                "index and one button constant.",
-                len(command),
-            )
-
-        controller_argument, button_argument = expression.arguments
-        controller_index = self._resolve_controller_index(
-            controller_argument,
-            constants,
-            variables,
-            command,
-        )
-        button_name, button_mask = self._resolve_controller_button(
-            button_argument,
-            constants,
-            variables,
-            command,
-        )
-        return ResolvedControllerQuery(
-            expression.kind,
-            controller_index,
-            button_mask,
-            button_name,
-        )
 
     def _resolve_controller_index(
         self,
@@ -2600,26 +2327,6 @@ class SemanticAnalyzer:
             )
         return value
 
-    def _require_background_argument_count(
-        self,
-        position: SourcePosition,
-        command: str,
-        arguments: tuple[ValueExpression, ...],
-        expected: int,
-        code: DiagnosticCode,
-        suggestion: str,
-    ) -> None:
-        if len(arguments) == expected:
-            return
-        self._error(
-            position,
-            code,
-            f"{command} expects exactly {expected} arguments, but "
-            f"{len(arguments)} were provided.",
-            suggestion,
-            len(command),
-        )
-
     def _validate_immediate_coordinate(
         self,
         value: ResolvedValue,
@@ -2638,38 +2345,21 @@ class SemanticAnalyzer:
             f"Use a {description} coordinate from 0 through {maximum}.",
         )
 
-    def _palette_argument_count_error(
-        self,
-        position: SourcePosition,
-        command: str,
-        expected: int,
-        actual: int,
-    ) -> None:
-        self._error(
-            position,
-            DiagnosticCode.INVALID_PALETTE_ARGUMENT_COUNT,
-            f"{command} expects exactly {expected} arguments, but {actual} "
-            "were provided.",
-            (
-                "Pass a byte palette index followed by four nes_color values."
-                if expected == 5
-                else "Pass byte palette and color indexes followed by one "
-                "nes_color value."
-            ),
-            len(command),
-        )
-
     def _resolve_palette_index(
         self,
         argument: ValueExpression,
-        kind: PaletteKind,
+        builtin_id: BuiltinId,
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
         command: str,
     ) -> int:
         code = (
             DiagnosticCode.INVALID_BACKGROUND_PALETTE_INDEX
-            if kind is PaletteKind.BACKGROUND
+            if builtin_id
+            in (
+                BuiltinId.SET_BACKGROUND_PALETTE,
+                BuiltinId.SET_BACKGROUND_PALETTE_COLOR,
+            )
             else DiagnosticCode.INVALID_SPRITE_PALETTE_INDEX
         )
         return self._resolve_fixed_palette_index(
@@ -3030,6 +2720,10 @@ class SemanticAnalyzer:
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
     ) -> BuiltInType | None:
+        if isinstance(expression, BuiltinCall):
+            descriptor = builtin_by_name(expression.name)
+            assert descriptor is not None
+            return descriptor.return_type
         if isinstance(
             expression,
             (
@@ -3037,21 +2731,9 @@ class SemanticAnalyzer:
                 BooleanNotExpression,
                 BooleanBinaryExpression,
                 ComparisonExpression,
-                ControllerQuery,
-                GetTile,
-                BackgroundUpdatesOverflowed,
-                MetaspriteAnimationFinished,
             ),
         ):
-            return (
-                BuiltInType.BYTE
-                if isinstance(expression, GetTile)
-                else BuiltInType.BOOLEAN
-            )
-        if isinstance(expression, SpriteCreate):
-            return BuiltInType.SPRITE
-        if isinstance(expression, MetaspriteCreate):
-            return BuiltInType.METASPRITE
+            return BuiltInType.BOOLEAN
         if isinstance(expression, (UnaryExpression, BinaryExpression)):
             return BuiltInType.BYTE
         if isinstance(expression, HexLiteral):
@@ -3235,7 +2917,9 @@ class SemanticAnalyzer:
         color_commands = [
             (index, statement)
             for index, statement in enumerate(program.statements)
-            if isinstance(statement, SetBackgroundColor) and index < run_index
+            if isinstance(statement, BuiltinCall)
+            and _parsed_builtin_id(statement) is BuiltinId.SET_BACKGROUND_COLOR
+            and index < run_index
         ]
         if len(color_commands) != 1:
             position = (
@@ -3277,9 +2961,12 @@ class SemanticAnalyzer:
     def _first_wait_frame(
         self,
         statements: tuple[Statement, ...],
-    ) -> WaitFrame | None:
+    ) -> BuiltinCall | None:
         for statement in statements:
-            if isinstance(statement, WaitFrame):
+            if (
+                isinstance(statement, BuiltinCall)
+                and _parsed_builtin_id(statement) is BuiltinId.WAIT_FRAME
+            ):
                 return statement
             if isinstance(statement, IfStatement):
                 found = self._first_wait_frame(statement.then_branch)
@@ -3300,23 +2987,7 @@ class SemanticAnalyzer:
 
     def _statement_position(
         self,
-        statement: (
-            Assignment
-            | SetBackgroundColor
-            | SetPalette
-            | SetPaletteColor
-            | LoadBackground
-            | Run
-            | WaitFrame
-            | IfStatement
-            | WhileStatement
-            | RepeatStatement
-            | BreakStatement
-            | ContinueStatement
-            | IncrementStatement
-            | DecrementStatement
-            | ForStatement
-        ),
+        statement: Statement,
         program: Program,
     ) -> SourcePosition:
         if isinstance(statement, Assignment):
@@ -3334,7 +3005,7 @@ class SemanticAnalyzer:
                 DecrementStatement,
                 ForStatement,
                 ProcedureCall,
-                WaitFrame,
+                BuiltinCall,
             ),
         ):
             return statement.position

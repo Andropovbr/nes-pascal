@@ -19,13 +19,13 @@ from nes_pascal.ast import (
     ResolvedIncrementStatement,
     ResolvedProcedureCall,
     ResolvedRepeatStatement,
-    ResolvedSetBackgroundColor,
+    ResolvedBuiltinCall,
     ResolvedUnaryExpression,
     ResolvedWhileStatement,
     Run,
     VariableValue,
-    WaitFrame,
 )
+from nes_pascal.builtins import BuiltinId
 from nes_pascal.diagnostics import CompilerError
 from nes_pascal.parser import parse
 from nes_pascal.semantic import analyze
@@ -53,7 +53,8 @@ end.
         loop = resolved.statements[2]
         self.assertIsInstance(loop, ResolvedWhileStatement)
         assert isinstance(loop, ResolvedWhileStatement)
-        self.assertEqual(loop.body, (WaitFrame(),))
+        self.assertIsInstance(loop.body[0], ResolvedBuiltinCall)
+        self.assertIs(loop.body[0].builtin, BuiltinId.WAIT_FRAME)
 
     def test_rejects_frame_wait_before_runtime_start(self) -> None:
         path = (
@@ -108,8 +109,9 @@ end.
         self.assertEqual(
             resolved.statements,
             (
-                ResolvedSetBackgroundColor(
-                    ImmediateValue(0x21, BuiltInType.NES_COLOR)
+                ResolvedBuiltinCall(
+                    BuiltinId.SET_BACKGROUND_COLOR,
+                    (ImmediateValue(0x21, BuiltInType.NES_COLOR),),
                 ),
                 Run(),
             ),
@@ -207,9 +209,10 @@ end.
         )
         self.assertIsInstance(resolved.statements[0], ResolvedAssignment)
         color_command = resolved.statements[3]
-        self.assertIsInstance(color_command, ResolvedSetBackgroundColor)
-        assert isinstance(color_command, ResolvedSetBackgroundColor)
-        self.assertIsInstance(color_command.argument, VariableValue)
+        self.assertIsInstance(color_command, ResolvedBuiltinCall)
+        assert isinstance(color_command, ResolvedBuiltinCall)
+        self.assertIs(color_command.builtin, BuiltinId.SET_BACKGROUND_COLOR)
+        self.assertIsInstance(color_command.arguments[0], VariableValue)
 
     def test_resolves_byte_and_boolean_constants_in_assignments(self) -> None:
         source = """program Variables;

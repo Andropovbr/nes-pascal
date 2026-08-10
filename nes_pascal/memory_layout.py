@@ -7,42 +7,28 @@ from enum import StrEnum
 
 from .ast import (
     OamOwnerKind,
-    MetaspriteOperationKind,
     ResolvedAssignment,
-    ResolvedBackgroundUpdatesOverflowed,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
     ResolvedComparisonExpression,
-    ResolvedClearBackgroundUpdates,
-    ResolvedClearBackgroundUpdateOverflow,
     ResolvedDecrementStatement,
     ResolvedForStatement,
-    ResolvedGetTile,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
-    ResolvedMetaspriteOperation,
-    ResolvedMetaspriteAnimationFinished,
+    ResolvedBuiltinCall,
     ResolvedProcedureCall,
     ResolvedProgram,
     ResolvedRepeatStatement,
-    ResolvedSetBackgroundColor,
-    ResolvedSetAttribute,
-    ResolvedSetPalette,
-    ResolvedSetPaletteColor,
-    ResolvedSetSpriteZero,
-    ResolvedSpriteOperation,
-    ResolvedSetScroll,
-    ResolvedSetTile,
     ResolvedStatement,
     ResolvedUnaryExpression,
     ResolvedValue,
     ResolvedVariable,
     ResolvedWhileStatement,
     SourcePosition,
-    SpriteOperationKind,
     VariableValue,
 )
+from .builtins import BuiltinId, RuntimeFeature, builtin_by_id
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
 
 
@@ -1523,239 +1509,78 @@ def _global_variable_reference_counts(program: ResolvedProgram) -> dict[str, int
     return counts
 
 
-def detect_sprite_runtime_features(program: ResolvedProgram) -> SpriteRuntimeFeatures:
-    """Collect legacy and general sprite entry-point use recursively."""
+def collect_runtime_features(
+    program: ResolvedProgram,
+) -> frozenset[RuntimeFeature]:
+    """Collect descriptor-declared runtime dependencies recursively."""
 
-    legacy_sprite_zero = False
-    sprite_api = any(
-        reservation.owner is OamOwnerKind.INDIVIDUAL_CREATED
-        for reservation in program.oam_reservations
-    )
-    set_position = False
-    metasprite_animation = False
+    features: set[RuntimeFeature] = set()
 
-    def contains_animation_query(value: object) -> bool:
-        if isinstance(value, ResolvedMetaspriteAnimationFinished):
-            return True
+    def visit(value: object) -> None:
+        if isinstance(value, ResolvedBuiltinCall):
+            descriptor = builtin_by_id(value.builtin)
+            features.update(descriptor.runtime_features)
+            if value.queued:
+                features.update(descriptor.queued_runtime_features)
+            for argument in value.arguments:
+                visit(argument)
+            return
         if isinstance(value, tuple):
-            return any(contains_animation_query(item) for item in value)
+            for item in value:
+                visit(item)
+            return
         if is_dataclass(value):
-            return any(
-                contains_animation_query(getattr(value, field.name))
-                for field in fields(value)
-            )
-        return False
-
-    def visit(statements: tuple[ResolvedStatement, ...]) -> None:
-        nonlocal legacy_sprite_zero, sprite_api, set_position, metasprite_animation
-        for statement in statements:
-            if isinstance(statement, ResolvedSetSpriteZero):
-                legacy_sprite_zero = True
-            elif isinstance(statement, ResolvedSpriteOperation):
-                sprite_api = True
-                if statement.kind is SpriteOperationKind.SET_POSITION:
-                    set_position = True
-            elif isinstance(statement, ResolvedMetaspriteOperation) and statement.kind in (
-                MetaspriteOperationKind.SET_ANIMATION,
-                MetaspriteOperationKind.RESTART_ANIMATION,
-            ):
-                metasprite_animation = True
-            if contains_animation_query(statement):
-                metasprite_animation = True
-            if isinstance(statement, ResolvedIfStatement):
-                visit(statement.then_branch)
-                if statement.else_branch is not None:
-                    visit(statement.else_branch)
-            elif isinstance(
-                statement,
-                (ResolvedWhileStatement, ResolvedRepeatStatement, ResolvedForStatement),
-            ):
-                visit(statement.body)
+            for field in fields(value):
+                visit(getattr(value, field.name))
 
     visit(program.statements)
     for procedure in program.procedures:
         visit(procedure.body)
+    return frozenset(features)
+
+
+def detect_sprite_runtime_features(program: ResolvedProgram) -> SpriteRuntimeFeatures:
+    """Derive sprite storage from resolved builtin dependencies."""
+
+    features = collect_runtime_features(program)
+    sprite_api = (
+        RuntimeFeature.SPRITE_API in features
+        or any(
+            reservation.owner is OamOwnerKind.INDIVIDUAL_CREATED
+            for reservation in program.oam_reservations
+        )
+    )
     return SpriteRuntimeFeatures(
-        legacy_sprite_zero=legacy_sprite_zero,
+        legacy_sprite_zero=RuntimeFeature.LEGACY_SPRITE_ZERO in features,
         sprite_api=sprite_api,
-        set_position=set_position,
+        set_position=RuntimeFeature.SPRITE_SET_POSITION in features,
         metasprite_instances=len(program.metasprite_instances),
-        metasprite_animation=metasprite_animation,
+        metasprite_animation=RuntimeFeature.METASPRITE_ANIMATION in features,
     )
 
 
 def _uses_runtime_palette(program: ResolvedProgram) -> bool:
-    def contains(statements: tuple[ResolvedStatement, ...]) -> bool:
-        for statement in statements:
-            if isinstance(
-                statement,
-                (ResolvedSetBackgroundColor, ResolvedSetPalette, ResolvedSetPaletteColor),
-            ) and statement.queued:
-                return True
-            if isinstance(statement, ResolvedIfStatement):
-                if contains(statement.then_branch):
-                    return True
-                if statement.else_branch is not None and contains(
-                    statement.else_branch
-                ):
-                    return True
-            elif isinstance(
-                statement,
-                (ResolvedWhileStatement, ResolvedRepeatStatement, ResolvedForStatement),
-            ) and contains(statement.body):
-                return True
-        return False
-
-    return contains(program.statements) or any(
-        contains(procedure.body) for procedure in program.procedures
-    )
+    return RuntimeFeature.PALETTE_QUEUE in collect_runtime_features(program)
 
 
 def _uses_set_scroll(program: ResolvedProgram) -> bool:
-    def contains(statements: tuple[ResolvedStatement, ...]) -> bool:
-        for statement in statements:
-            if isinstance(statement, ResolvedSetScroll):
-                return True
-            if isinstance(statement, ResolvedIfStatement):
-                if contains(statement.then_branch):
-                    return True
-                if statement.else_branch is not None and contains(
-                    statement.else_branch
-                ):
-                    return True
-            elif isinstance(
-                statement,
-                (ResolvedWhileStatement, ResolvedRepeatStatement, ResolvedForStatement),
-            ) and contains(statement.body):
-                return True
-        return False
-
-    return contains(program.statements) or any(
-        contains(procedure.body) for procedure in program.procedures
-    )
+    return RuntimeFeature.SCROLL in collect_runtime_features(program)
 
 
 def detect_background_runtime_features(
     program: ResolvedProgram,
 ) -> BackgroundRuntimeFeatures:
-    """Collect direct background API use before deriving runtime dependencies."""
+    """Derive isolated background storage from registry dependencies."""
 
-    used = {
-        "set_tile": False,
-        "get_tile": False,
-        "set_attribute": False,
-        "clear_updates": False,
-        "inspect_overflow": False,
-        "clear_overflow": False,
-    }
-
-    def visit_value(value: ResolvedValue) -> None:
-        if isinstance(value, ResolvedGetTile):
-            used["get_tile"] = True
-            visit_value(value.x)
-            visit_value(value.y)
-        elif isinstance(value, ResolvedBackgroundUpdatesOverflowed):
-            used["inspect_overflow"] = True
-        elif isinstance(
-            value,
-            (ResolvedUnaryExpression, ResolvedBooleanNotExpression),
-        ):
-            visit_value(value.operand)
-        elif isinstance(
-            value,
-            (
-                ResolvedBinaryExpression,
-                ResolvedComparisonExpression,
-                ResolvedBooleanBinaryExpression,
-            ),
-        ):
-            visit_value(value.left)
-            visit_value(value.right)
-
-    def visit_statements(statements: tuple[ResolvedStatement, ...]) -> None:
-        for statement in statements:
-            values: tuple[ResolvedValue, ...] = ()
-            if isinstance(statement, ResolvedSetTile):
-                used["set_tile"] = True
-            elif isinstance(statement, ResolvedSetAttribute):
-                used["set_attribute"] = True
-            elif isinstance(statement, ResolvedClearBackgroundUpdates):
-                used["clear_updates"] = True
-            elif isinstance(statement, ResolvedClearBackgroundUpdateOverflow):
-                used["clear_overflow"] = True
-            if isinstance(statement, ResolvedAssignment):
-                values = (statement.value,)
-            elif isinstance(statement, ResolvedSetBackgroundColor):
-                values = (statement.argument,)
-            elif isinstance(statement, ResolvedSetPalette):
-                values = statement.colors
-            elif isinstance(statement, ResolvedSetPaletteColor):
-                values = (statement.color,)
-            elif isinstance(statement, ResolvedSetSpriteZero):
-                values = (
-                    statement.x,
-                    statement.y,
-                    statement.tile,
-                    statement.attributes,
-                )
-            elif isinstance(statement, ResolvedSpriteOperation):
-                values = tuple(
-                    value
-                    for value in (
-                        statement.sprite,
-                        statement.value,
-                        statement.secondary_value,
-                    )
-                    if value is not None
-                )
-            elif isinstance(statement, ResolvedMetaspriteOperation):
-                values = tuple(
-                    value
-                    for value in (
-                        statement.instance,
-                        statement.value,
-                        statement.secondary_value,
-                    )
-                    if value is not None
-                )
-            elif isinstance(statement, ResolvedSetTile):
-                values = (statement.x, statement.y, statement.tile)
-            elif isinstance(statement, ResolvedSetAttribute):
-                values = (statement.x, statement.y, statement.value)
-            elif isinstance(statement, ResolvedSetScroll):
-                values = (statement.x, statement.y)
-            elif isinstance(
-                statement,
-                (ResolvedIncrementStatement, ResolvedDecrementStatement),
-            ):
-                values = (statement.amount,) if statement.amount is not None else ()
-            elif isinstance(statement, ResolvedIfStatement):
-                visit_value(statement.condition)
-                visit_statements(statement.then_branch)
-                if statement.else_branch is not None:
-                    visit_statements(statement.else_branch)
-                continue
-            elif isinstance(
-                statement,
-                (ResolvedWhileStatement, ResolvedRepeatStatement),
-            ):
-                visit_value(statement.condition)
-                visit_statements(statement.body)
-                continue
-            elif isinstance(statement, ResolvedForStatement):
-                visit_value(statement.initial)
-                visit_value(statement.final)
-                visit_statements(statement.body)
-                continue
-            elif isinstance(statement, ResolvedProcedureCall):
-                values = tuple(argument.value for argument in statement.arguments)
-            for value in values:
-                visit_value(value)
-
-    visit_statements(program.statements)
-    for procedure in program.procedures:
-        visit_statements(procedure.body)
-    return BackgroundRuntimeFeatures(**used)
+    features = collect_runtime_features(program)
+    return BackgroundRuntimeFeatures(
+        set_tile=RuntimeFeature.BACKGROUND_SET_TILE in features,
+        get_tile=RuntimeFeature.BACKGROUND_GET_TILE in features,
+        set_attribute=RuntimeFeature.BACKGROUND_SET_ATTRIBUTE in features,
+        clear_updates=RuntimeFeature.BACKGROUND_CLEAR_UPDATES in features,
+        inspect_overflow=RuntimeFeature.BACKGROUND_INSPECT_OVERFLOW in features,
+        clear_overflow=RuntimeFeature.BACKGROUND_CLEAR_OVERFLOW in features,
+    )
 
 
 def _count_statement_variable_references(
@@ -1765,41 +1590,8 @@ def _count_statement_variable_references(
     if isinstance(statement, ResolvedAssignment):
         _count_variable(statement.target, counts)
         _count_value_variable_references(statement.value, counts)
-    elif isinstance(statement, ResolvedSetBackgroundColor):
-        _count_value_variable_references(statement.argument, counts)
-    elif isinstance(statement, ResolvedSetPalette):
-        for value in statement.colors:
-            _count_value_variable_references(value, counts)
-    elif isinstance(statement, ResolvedSetPaletteColor):
-        _count_value_variable_references(statement.color, counts)
-    elif isinstance(statement, ResolvedSetSpriteZero):
-        for value in (
-            statement.x,
-            statement.y,
-            statement.tile,
-            statement.attributes,
-        ):
-            _count_value_variable_references(value, counts)
-    elif isinstance(statement, ResolvedSpriteOperation):
-        _count_value_variable_references(statement.sprite, counts)
-        if statement.value is not None:
-            _count_value_variable_references(statement.value, counts)
-        if statement.secondary_value is not None:
-            _count_value_variable_references(statement.secondary_value, counts)
-    elif isinstance(statement, ResolvedMetaspriteOperation):
-        _count_value_variable_references(statement.instance, counts)
-        if statement.value is not None:
-            _count_value_variable_references(statement.value, counts)
-        if statement.secondary_value is not None:
-            _count_value_variable_references(statement.secondary_value, counts)
-    elif isinstance(statement, ResolvedSetTile):
-        for value in (statement.x, statement.y, statement.tile):
-            _count_value_variable_references(value, counts)
-    elif isinstance(statement, ResolvedSetAttribute):
-        for value in (statement.x, statement.y, statement.value):
-            _count_value_variable_references(value, counts)
-    elif isinstance(statement, ResolvedSetScroll):
-        for value in (statement.x, statement.y):
+    elif isinstance(statement, ResolvedBuiltinCall):
+        for value in statement.arguments:
             _count_value_variable_references(value, counts)
     elif isinstance(
         statement,
@@ -1838,9 +1630,9 @@ def _count_value_variable_references(
         _count_variable(value.variable, counts)
     elif isinstance(value, (ResolvedUnaryExpression, ResolvedBooleanNotExpression)):
         _count_value_variable_references(value.operand, counts)
-    elif isinstance(value, ResolvedGetTile):
-        _count_value_variable_references(value.x, counts)
-        _count_value_variable_references(value.y, counts)
+    elif isinstance(value, ResolvedBuiltinCall):
+        for argument in value.arguments:
+            _count_value_variable_references(argument, counts)
     elif isinstance(
         value,
         (
@@ -1879,8 +1671,8 @@ def _temporary_symbol_names(program: ResolvedProgram) -> tuple[str, ...]:
 
 
 def _expression_depth(value: ResolvedValue) -> int:
-    if isinstance(value, ResolvedGetTile):
-        return max(_expression_depth(value.x), _expression_depth(value.y))
+    if isinstance(value, ResolvedBuiltinCall):
+        return max((_expression_depth(item) for item in value.arguments), default=0)
     if isinstance(value, (ResolvedBinaryExpression, ResolvedComparisonExpression)):
         return 1 + max(_expression_depth(value.left), _expression_depth(value.right))
     if isinstance(value, (ResolvedUnaryExpression, ResolvedBooleanNotExpression)):
@@ -1893,49 +1685,11 @@ def _expression_depth(value: ResolvedValue) -> int:
 def _statement_expression_depth(statement: ResolvedStatement) -> int:
     if isinstance(statement, ResolvedAssignment):
         return _expression_depth(statement.value)
-    if isinstance(statement, ResolvedSetBackgroundColor):
-        return _expression_depth(statement.argument)
-    if isinstance(statement, ResolvedSetPalette):
-        return max(_expression_depth(value) for value in statement.colors)
-    if isinstance(statement, ResolvedSetPaletteColor):
-        return _expression_depth(statement.color)
-    if isinstance(statement, ResolvedSetSpriteZero):
+    if isinstance(statement, ResolvedBuiltinCall):
         return max(
-            _expression_depth(statement.x),
-            _expression_depth(statement.y),
-            _expression_depth(statement.tile),
-            _expression_depth(statement.attributes),
+            (_expression_depth(value) for value in statement.arguments),
+            default=0,
         )
-    if isinstance(statement, ResolvedSpriteOperation):
-        return max(
-            _expression_depth(statement.sprite),
-            _expression_depth(statement.value) if statement.value is not None else 0,
-            _expression_depth(statement.secondary_value)
-            if statement.secondary_value is not None
-            else 0,
-        )
-    if isinstance(statement, ResolvedMetaspriteOperation):
-        return max(
-            _expression_depth(statement.instance),
-            _expression_depth(statement.value) if statement.value is not None else 0,
-            _expression_depth(statement.secondary_value)
-            if statement.secondary_value is not None
-            else 0,
-        )
-    if isinstance(statement, ResolvedSetTile):
-        return max(
-            _expression_depth(statement.x),
-            _expression_depth(statement.y),
-            _expression_depth(statement.tile),
-        )
-    if isinstance(statement, ResolvedSetAttribute):
-        return max(
-            _expression_depth(statement.x),
-            _expression_depth(statement.y),
-            _expression_depth(statement.value),
-        )
-    if isinstance(statement, ResolvedSetScroll):
-        return max(_expression_depth(statement.x), _expression_depth(statement.y))
     if isinstance(statement, ResolvedIncrementStatement):
         return _expression_depth(statement.amount) if statement.amount else 0
     if isinstance(statement, ResolvedDecrementStatement):

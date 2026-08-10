@@ -29,9 +29,9 @@ from nes_pascal.ast import (
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
+    ResolvedBuiltinCall,
     ResolvedComparisonExpression,
     ResolvedForStatement,
-    ResolvedGetTile,
     ResolvedIfStatement,
     ResolvedProcedure,
     ResolvedProcedureCall,
@@ -44,6 +44,7 @@ from nes_pascal.ast import (
     UnaryExpression,
     ValueExpression,
 )
+from nes_pascal.builtins import BuiltinId
 from nes_pascal.backend_ca65 import generate
 from nes_pascal.memory_layout import (
     DEFAULT_MEMORY_LAYOUT_SETTINGS,
@@ -146,10 +147,18 @@ def get_expression_metrics(val: ResolvedValue) -> tuple[int, int]:
     if isinstance(val, (ResolvedBooleanNotExpression, ResolvedUnaryExpression)):
         d, t = get_expression_metrics(val.operand)
         return 1 + d, t
-    if isinstance(val, ResolvedGetTile):
-        d_x, t_x = get_expression_metrics(val.x)
-        d_y, t_y = get_expression_metrics(val.y)
-        return 1 + max(d_x, d_y), max(t_x, 1 + t_y)
+    if isinstance(val, ResolvedBuiltinCall):
+        metrics = [get_expression_metrics(argument) for argument in val.arguments]
+        if not metrics:
+            return 0, 0
+        depth = max(item[0] for item in metrics)
+        temporaries = max(item[1] for item in metrics)
+        if val.builtin is BuiltinId.GET_TILE:
+            return 1 + depth, max(
+                metrics[0][1],
+                1 + metrics[1][1],
+            )
+        return depth, temporaries
     return 0, 0
 
 
@@ -159,6 +168,10 @@ def collect_statement_metrics(stmts: tuple[ResolvedStatement, ...]) -> tuple[int
         if isinstance(s, ResolvedAssignment):
             d, t = get_expression_metrics(s.value)
             max_d, max_t = max(max_d, d), max(max_t, t)
+        elif isinstance(s, ResolvedBuiltinCall):
+            for value in s.arguments:
+                d, t = get_expression_metrics(value)
+                max_d, max_t = max(max_d, d), max(max_t, t)
         elif isinstance(s, ResolvedIfStatement):
             d, t = get_expression_metrics(s.condition)
             max_d, max_t = max(max_d, d), max(max_t, t)

@@ -12,8 +12,9 @@ from nes_pascal.ast import (
     MetaspriteFrame,
     OamOwnerKind,
     ResolvedAssignment,
-    ResolvedMetaspriteCreate,
+    ResolvedBuiltinCall,
 )
+from nes_pascal.builtins import BuiltinId
 from nes_pascal.backend_ca65 import generate
 from nes_pascal.cli import compile_source
 from nes_pascal.diagnostics import CompilerError, DiagnosticCode
@@ -422,7 +423,12 @@ class MetaspriteSemanticAndOwnershipTests(unittest.TestCase):
             for statement in resolved.statements
             if isinstance(statement, ResolvedAssignment)
         )
-        self.assertEqual(assignment.value, ResolvedMetaspriteCreate(0, 0))
+        self.assertIsInstance(assignment.value, ResolvedBuiltinCall)
+        self.assertIs(assignment.value.builtin, BuiltinId.METASPRITE_CREATE)
+        self.assertEqual(
+            [argument.value for argument in assignment.value.arguments],
+            [0, 0],
+        )
         self.assertEqual(resolved.metasprite_instances[0].oam_indexes, tuple(range(7)))
 
     def test_individual_and_metasprite_reservations_share_one_pool(self) -> None:

@@ -7,11 +7,10 @@ import unittest
 
 from nes_pascal.ast import (
     ImmediateValue,
-    MetaspriteOperationKind,
     ResolvedAssignment,
-    ResolvedMetaspriteAnimationFinished,
-    ResolvedMetaspriteOperation,
+    ResolvedBuiltinCall,
 )
+from nes_pascal.builtins import BuiltinId
 from nes_pascal.backend_ca65 import generate
 from nes_pascal.cli import compile_source
 from nes_pascal.diagnostics import CompilerError, DiagnosticCode
@@ -330,23 +329,35 @@ class SpriteAnimationSemanticTests(unittest.TestCase):
         operations = [
             statement
             for statement in resolved.statements
-            if isinstance(statement, ResolvedMetaspriteOperation)
+            if isinstance(statement, ResolvedBuiltinCall)
+            and statement.builtin
+            in {
+                BuiltinId.METASPRITE_SET_ANIMATION,
+                BuiltinId.METASPRITE_RESTART_ANIMATION,
+            }
         ]
         self.assertEqual(
-            [operation.kind for operation in operations],
+            [operation.builtin for operation in operations],
             [
-                MetaspriteOperationKind.SET_ANIMATION,
-                MetaspriteOperationKind.RESTART_ANIMATION,
+                BuiltinId.METASPRITE_SET_ANIMATION,
+                BuiltinId.METASPRITE_RESTART_ANIMATION,
             ],
         )
-        self.assertEqual(operations[0].value, ImmediateValue(0, operations[0].value.type))
+        self.assertEqual(
+            operations[0].arguments[1],
+            ImmediateValue(0, operations[0].arguments[1].type),
+        )
         assignment = next(
             statement
             for statement in resolved.statements
             if isinstance(statement, ResolvedAssignment)
             and statement.target.name == "Finished"
         )
-        self.assertIsInstance(assignment.value, ResolvedMetaspriteAnimationFinished)
+        self.assertIsInstance(assignment.value, ResolvedBuiltinCall)
+        self.assertIs(
+            assignment.value.builtin,
+            BuiltinId.METASPRITE_ANIMATION_FINISHED,
+        )
 
     def test_numeric_animation_is_rejected_by_the_public_diagnostic(self) -> None:
         source = animation_program("nes.metasprite_set_animation(Player, $00);")
