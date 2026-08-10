@@ -3,11 +3,12 @@ import unittest
 
 from nes_pascal.ast import (
     Assignment,
-    ControllerQuery,
-    ControllerQueryKind,
+    BuiltinCall,
+    ImmediateValue,
     ResolvedAssignment,
-    ResolvedControllerQuery,
+    ResolvedBuiltinCall,
 )
+from nes_pascal.builtins import BuiltinId
 from nes_pascal.backend_ca65 import generate
 from nes_pascal.diagnostics import CompilerError
 from nes_pascal.memory_layout import build_memory_layout
@@ -47,16 +48,16 @@ class ControllerParserTests(unittest.TestCase):
         for statement in program.statements[:3]:
             self.assertIsInstance(statement, Assignment)
             assert isinstance(statement, Assignment)
-            self.assertIsInstance(statement.value, ControllerQuery)
-            assert isinstance(statement.value, ControllerQuery)
-            queries.append(statement.value.kind)
+            self.assertIsInstance(statement.value, BuiltinCall)
+            assert isinstance(statement.value, BuiltinCall)
+            queries.append(statement.value.name)
 
         self.assertEqual(
             queries,
             [
-                ControllerQueryKind.DOWN,
-                ControllerQueryKind.PRESSED,
-                ControllerQueryKind.RELEASED,
+                "nes.controller_down",
+                "nes.controller_pressed",
+                "nes.controller_released",
             ],
         )
 
@@ -67,7 +68,7 @@ class ControllerParserTests(unittest.TestCase):
         statement = parse(source).statements[0]
         assert isinstance(statement, Assignment)
         query = statement.value
-        assert isinstance(query, ControllerQuery)
+        assert isinstance(query, BuiltinCall)
         self.assertEqual(query.arguments[1].name, "nes.button_right")
 
 
@@ -94,11 +95,14 @@ class ControllerSemanticTests(unittest.TestCase):
         queries = []
         for statement in resolved.statements[: len(buttons)]:
             assert isinstance(statement, ResolvedAssignment)
-            assert isinstance(statement.value, ResolvedControllerQuery)
+            assert isinstance(statement.value, ResolvedBuiltinCall)
             queries.append(statement.value)
 
         self.assertEqual(
-            [(item.controller_index, item.button_mask) for item in queries],
+            [
+                (item.arguments[0].value, item.arguments[1].value)
+                for item in queries
+            ],
             [
                 (1 if index % 2 == 0 else 2, mask)
                 for index, (_, mask) in enumerate(buttons)
@@ -120,8 +124,11 @@ end.
         resolved = analyze_source(source)
         statement = resolved.statements[0]
         assert isinstance(statement, ResolvedAssignment)
-        assert isinstance(statement.value, ResolvedControllerQuery)
-        self.assertEqual(statement.value.controller_index, 2)
+        assert isinstance(statement.value, ResolvedBuiltinCall)
+        self.assertIs(statement.value.builtin, BuiltinId.CONTROLLER_DOWN)
+        controller = statement.value.arguments[0]
+        assert isinstance(controller, ImmediateValue)
+        self.assertEqual(controller.value, 2)
 
     def test_rejects_zero_three_and_dynamic_indexes(self) -> None:
         cases = {

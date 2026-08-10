@@ -849,3 +849,31 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
   incompatible animation selection.
 - **Suggested fix:** Pass a symbol such as `player.movement_right` from the
   same imported asset used by `nes.metasprite_create`.
+
+## E3057 - Invalid builtin context
+
+- **Category:** Semantic Analysis
+- **Explanation:** Ordinary builtins are registered as either standalone
+  statements or value-producing expressions. A statement builtin cannot be
+  assigned or nested in an expression, and a value builtin cannot be used as
+  a standalone statement.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/invalid_builtin_context.nsp`, or write
+  `nes.sprite_create();` as a standalone statement.
+- **Expected compiler output:** `E3057` names the builtin and its registered
+  context.
+- **Suggested fix:** Use statement builtins directly and consume value builtin
+  results in a type-compatible expression.
+
+## E3058 - Invalid builtin argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** The centralized builtin signature requires a fixed number
+  of arguments. Builtins with an existing operation-specific count diagnostic
+  retain that code; `E3058` covers ordinary signatures that did not previously
+  have a dedicated diagnostic.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/invalid_builtin_argument_count.nsp`.
+- **Expected compiler output:** `E3058` reports the expected and provided
+  argument counts.
+- **Suggested fix:** Pass exactly the arguments documented for the builtin.

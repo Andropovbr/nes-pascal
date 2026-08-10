@@ -8,6 +8,7 @@ from nes_pascal.ast import (
     BooleanNotExpression,
     BooleanOperator,
     BooleanLiteral,
+    BuiltinCall,
     BuiltInType,
     BreakStatement,
     ConstantDeclaration,
@@ -25,17 +26,16 @@ from nes_pascal.ast import (
     ProcedureDeclaration,
     ProcedureParameter,
     RepeatStatement,
-    ResolvedSetBackgroundColor,
+    ResolvedBuiltinCall,
     Run,
-    SetBackgroundColor,
     SourcePosition,
     UnaryExpression,
     UnaryOperator,
     VariableDeclaration,
     VariableReference,
-    WaitFrame,
     WhileStatement,
 )
+from nes_pascal.builtins import BuiltinId
 from nes_pascal.diagnostics import CompilerError
 from nes_pascal.parser import parse
 from nes_pascal.semantic import analyze
@@ -59,7 +59,11 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(
             program.statements,
             (
-                SetBackgroundColor(HexLiteral(0x21, "$21", SourcePosition(3, 26))),
+                BuiltinCall(
+                    "nes.set_background_color",
+                    (HexLiteral(0x21, "$21", SourcePosition(3, 26)),),
+                    SourcePosition(3, 1),
+                ),
                 Run(),
             ),
         )
@@ -85,8 +89,10 @@ class ParserTests(unittest.TestCase):
         )
         self.assertEqual(
             program.statements[0],
-            SetBackgroundColor(
-                ConstantReference("BackgroundColor", SourcePosition(5, 26))
+            BuiltinCall(
+                "nes.set_background_color",
+                (ConstantReference("BackgroundColor", SourcePosition(5, 26)),),
+                SourcePosition(5, 1),
             ),
         )
 
@@ -99,10 +105,10 @@ class ParserTests(unittest.TestCase):
             )
         )
         statement = program.statements[0]
-        self.assertIsInstance(statement, SetBackgroundColor)
-        assert isinstance(statement, SetBackgroundColor)
-        self.assertEqual(statement.argument.value, 0x0F)
-        self.assertIsInstance(program.statements[2], WaitFrame)
+        self.assertIsInstance(statement, BuiltinCall)
+        assert isinstance(statement, BuiltinCall)
+        self.assertEqual(statement.arguments[0].value, 0x0F)
+        self.assertEqual(program.statements[2].name, "nes.wait_frame")
 
     def test_parses_wait_frame_inside_main_loop(self) -> None:
         program = parse(
@@ -117,7 +123,7 @@ class ParserTests(unittest.TestCase):
         loop = program.statements[2]
         self.assertIsInstance(loop, WhileStatement)
         assert isinstance(loop, WhileStatement)
-        self.assertEqual(loop.body, (WaitFrame(),))
+        self.assertEqual(loop.body[0].name, "nes.wait_frame")
 
     def test_rejects_color_outside_palette_range(self) -> None:
         source = program_with("nes.set_background_color($40);\nnes.run;")
@@ -136,8 +142,9 @@ class ParserTests(unittest.TestCase):
         )
         resolved = analyze(parse(source), source)
         command = resolved.statements[2]
-        self.assertIsInstance(command, ResolvedSetBackgroundColor)
-        assert isinstance(command, ResolvedSetBackgroundColor)
+        self.assertIsInstance(command, ResolvedBuiltinCall)
+        assert isinstance(command, ResolvedBuiltinCall)
+        self.assertIs(command.builtin, BuiltinId.SET_BACKGROUND_COLOR)
         self.assertTrue(command.queued)
 
     def test_rejects_unknown_command_without_traceback(self) -> None:
@@ -189,9 +196,9 @@ class ParserTests(unittest.TestCase):
             BooleanLiteral(True, "true", assignment.value.position),
         )
         color_command = program.statements[2]
-        self.assertIsInstance(color_command, SetBackgroundColor)
-        assert isinstance(color_command, SetBackgroundColor)
-        self.assertIsInstance(color_command.argument, VariableReference)
+        self.assertIsInstance(color_command, BuiltinCall)
+        assert isinstance(color_command, BuiltinCall)
+        self.assertIsInstance(color_command.arguments[0], VariableReference)
 
     def test_parses_all_milestone_three_variable_types(self) -> None:
         program = parse(

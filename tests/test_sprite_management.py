@@ -3,13 +3,14 @@ import unittest
 
 from nes_pascal.ast import (
     Assignment,
+    BuiltinCall,
+    BuiltInType,
+    ImmediateValue,
     OamOwnerKind,
     ResolvedAssignment,
-    ResolvedSpriteCreate,
-    SpriteCreate,
-    SpriteOperation,
-    SpriteOperationKind,
+    ResolvedBuiltinCall,
 )
+from nes_pascal.builtins import BuiltinId
 from nes_pascal.backend_ca65 import generate
 from nes_pascal.diagnostics import CompilerError
 from nes_pascal.memory_layout import build_memory_layout
@@ -43,13 +44,20 @@ class SpriteAllocationTests(unittest.TestCase):
         assignment = parsed.statements[0]
         self.assertIsInstance(assignment, Assignment)
         assert isinstance(assignment, Assignment)
-        self.assertIsInstance(assignment.value, SpriteCreate)
+        self.assertIsInstance(assignment.value, BuiltinCall)
+        self.assertEqual(assignment.value.name, "nes.sprite_create")
 
         resolved = resolve(source)
         resolved_assignment = resolved.statements[0]
         self.assertIsInstance(resolved_assignment, ResolvedAssignment)
         assert isinstance(resolved_assignment, ResolvedAssignment)
-        self.assertEqual(resolved_assignment.value, ResolvedSpriteCreate(0))
+        self.assertEqual(
+            resolved_assignment.value,
+            ResolvedBuiltinCall(
+                BuiltinId.SPRITE_CREATE,
+                (ImmediateValue(0, BuiltInType.BYTE),),
+            ),
+        )
         self.assertEqual(
             [(item.index, item.owner) for item in resolved.oam_reservations],
             [(0, OamOwnerKind.INDIVIDUAL_CREATED)],
@@ -64,10 +72,11 @@ class SpriteAllocationTests(unittest.TestCase):
         )
         resolved = resolve(source)
         values = [
-            statement.value.index
+            statement.value.arguments[0].value
             for statement in resolved.statements[:3]
             if isinstance(statement, ResolvedAssignment)
-            and isinstance(statement.value, ResolvedSpriteCreate)
+            and isinstance(statement.value, ResolvedBuiltinCall)
+            and statement.value.builtin is BuiltinId.SPRITE_CREATE
         ]
         self.assertEqual(values, [0, 1, 2])
         self.assertEqual(len(values), len(set(values)))
@@ -208,11 +217,12 @@ class SpritePositionTests(unittest.TestCase):
         operations = [
             statement
             for statement in parsed.statements
-            if isinstance(statement, SpriteOperation)
+            if isinstance(statement, BuiltinCall)
+            and statement.name == "nes.sprite_set_position"
         ]
         self.assertEqual(
-            [operation.kind for operation in operations],
-            [SpriteOperationKind.SET_POSITION, SpriteOperationKind.SET_POSITION],
+            [operation.name for operation in operations],
+            ["nes.sprite_set_position", "nes.sprite_set_position"],
         )
         resolve(source)
 

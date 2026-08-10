@@ -74,6 +74,8 @@ class DiagnosticCode(StrEnum):
     INVALID_METASPRITE_ARGUMENT_COUNT = "E3054"
     INCOMPATIBLE_METASPRITE_FRAME = "E3055"
     INVALID_METASPRITE_ANIMATION = "E3056"
+    INVALID_BUILTIN_CONTEXT = "E3057"
+    INVALID_BUILTIN_ARGUMENT_COUNT = "E3058"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -301,6 +303,12 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INVALID_METASPRITE_ANIMATION: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Invalid metasprite animation"
+    ),
+    DiagnosticCode.INVALID_BUILTIN_CONTEXT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid builtin context"
+    ),
+    DiagnosticCode.INVALID_BUILTIN_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid builtin argument count"
     ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"

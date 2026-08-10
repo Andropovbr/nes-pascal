@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .builtins import BuiltinId
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,42 +53,6 @@ class BooleanOperator(Enum):
 class CallbackKind(Enum):
     UPDATE = "update"
     VBLANK = "vblank"
-
-
-class ControllerQueryKind(Enum):
-    DOWN = "down"
-    PRESSED = "pressed"
-    RELEASED = "released"
-
-
-class PaletteKind(Enum):
-    BACKGROUND = "background"
-    SPRITE = "sprite"
-
-
-class SpriteOperationKind(Enum):
-    SET_POSITION = "set_position"
-    SET_X = "set_x"
-    SET_Y = "set_y"
-    SET_TILE = "set_tile"
-    SET_PALETTE = "set_palette"
-    SET_ATTRIBUTES = "set_attributes"
-    HIDE = "hide"
-    SHOW = "show"
-    SET_FLIP_HORIZONTAL = "set_flip_horizontal"
-    SET_FLIP_VERTICAL = "set_flip_vertical"
-    SET_BEHIND_BACKGROUND = "set_behind_background"
-
-
-class MetaspriteOperationKind(Enum):
-    SET_POSITION = "set_position"
-    SET_FRAME = "set_frame"
-    SET_ANIMATION = "set_animation"
-    RESTART_ANIMATION = "restart_animation"
-    HIDE = "hide"
-    SHOW = "show"
-    SET_FLIP_HORIZONTAL = "set_flip_horizontal"
-    SET_FLIP_VERTICAL = "set_flip_vertical"
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,38 +145,8 @@ class BooleanBinaryExpression:
 
 
 @dataclass(frozen=True, slots=True)
-class ControllerQuery:
-    kind: ControllerQueryKind
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
-class SpriteCreate:
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
-class MetaspriteCreate:
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
-class MetaspriteAnimationFinished:
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
-class GetTile:
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
-class BackgroundUpdatesOverflowed:
+class BuiltinCall:
+    name: str
     arguments: tuple[ValueExpression, ...]
     position: SourcePosition
 
@@ -223,12 +161,7 @@ ValueExpression = (
     | ComparisonExpression
     | BooleanNotExpression
     | BooleanBinaryExpression
-    | ControllerQuery
-    | SpriteCreate
-    | MetaspriteCreate
-    | MetaspriteAnimationFinished
-    | GetTile
-    | BackgroundUpdatesOverflowed
+    | BuiltinCall
 )
 
 
@@ -240,68 +173,13 @@ class Assignment:
 
 
 @dataclass(frozen=True, slots=True)
-class SetBackgroundColor:
-    argument: ValueExpression
-    position: SourcePosition | None = field(default=None, compare=False)
-
-
-@dataclass(frozen=True, slots=True)
-class SetPalette:
-    kind: PaletteKind
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
-class SetPaletteColor:
-    kind: PaletteKind
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
 class LoadBackground:
     arguments: tuple[ValueExpression, ...]
     position: SourcePosition
 
 
 @dataclass(frozen=True, slots=True)
-class SetTile:
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
-class SetAttribute:
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
-class SetScroll:
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
-class ClearBackgroundUpdates:
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
-class ClearBackgroundUpdateOverflow:
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
 class Run:
-    position: SourcePosition | None = field(default=None, compare=False)
-
-
-@dataclass(frozen=True, slots=True)
-class WaitFrame:
     position: SourcePosition | None = field(default=None, compare=False)
 
 
@@ -314,27 +192,7 @@ class CallbackRegistration:
 
 
 @dataclass(frozen=True, slots=True)
-class SetSpriteZero:
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
-class SpriteOperation:
-    kind: SpriteOperationKind
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
 class ImportMetasprite:
-    arguments: tuple[ValueExpression, ...]
-    position: SourcePosition
-
-
-@dataclass(frozen=True, slots=True)
-class MetaspriteOperation:
-    kind: MetaspriteOperationKind
     arguments: tuple[ValueExpression, ...]
     position: SourcePosition
 
@@ -412,22 +270,11 @@ class ProcedureCall:
 
 Statement = (
     Assignment
-    | SetBackgroundColor
-    | SetPalette
-    | SetPaletteColor
+    | BuiltinCall
     | LoadBackground
-    | SetTile
-    | SetAttribute
-    | SetScroll
-    | ClearBackgroundUpdates
-    | ClearBackgroundUpdateOverflow
     | Run
-    | WaitFrame
     | CallbackRegistration
-    | SetSpriteZero
-    | SpriteOperation
     | ImportMetasprite
-    | MetaspriteOperation
     | IfStatement
     | WhileStatement
     | RepeatStatement
@@ -510,38 +357,10 @@ class ResolvedBooleanBinaryExpression:
 
 
 @dataclass(frozen=True, slots=True)
-class ResolvedControllerQuery:
-    kind: ControllerQueryKind
-    controller_index: int
-    button_mask: int
-    button_name: str
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedSpriteCreate:
-    index: int
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedMetaspriteCreate:
-    instance_index: int
-    initial_frame_id: int
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedMetaspriteAnimationFinished:
-    instance: ResolvedValue
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedGetTile:
-    x: ResolvedValue
-    y: ResolvedValue
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedBackgroundUpdatesOverflowed:
-    pass
+class ResolvedBuiltinCall:
+    builtin: BuiltinId
+    arguments: tuple[ResolvedValue, ...]
+    queued: bool = False
 
 
 ResolvedValue = (
@@ -552,12 +371,7 @@ ResolvedValue = (
     | ResolvedComparisonExpression
     | ResolvedBooleanNotExpression
     | ResolvedBooleanBinaryExpression
-    | ResolvedControllerQuery
-    | ResolvedSpriteCreate
-    | ResolvedMetaspriteCreate
-    | ResolvedMetaspriteAnimationFinished
-    | ResolvedGetTile
-    | ResolvedBackgroundUpdatesOverflowed
+    | ResolvedBuiltinCall
 )
 
 
@@ -568,60 +382,7 @@ class ResolvedAssignment:
 
 
 @dataclass(frozen=True, slots=True)
-class ResolvedSetBackgroundColor:
-    argument: ResolvedValue
-    queued: bool = False
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedSetPalette:
-    kind: PaletteKind
-    palette_index: int
-    colors: tuple[ResolvedValue, ResolvedValue, ResolvedValue, ResolvedValue]
-    queued: bool
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedSetPaletteColor:
-    kind: PaletteKind
-    palette_index: int
-    color_index: int
-    color: ResolvedValue
-    queued: bool
-
-
-@dataclass(frozen=True, slots=True)
 class ResolvedLoadBackground:
-    pass
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedSetTile:
-    x: ResolvedValue
-    y: ResolvedValue
-    tile: ResolvedValue
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedSetAttribute:
-    x: ResolvedValue
-    y: ResolvedValue
-    value: ResolvedValue
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedSetScroll:
-    x: ResolvedValue
-    y: ResolvedValue
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedClearBackgroundUpdates:
-    pass
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedClearBackgroundUpdateOverflow:
     pass
 
 
@@ -696,32 +457,8 @@ class ResolvedCallbackRegistration:
 
 
 @dataclass(frozen=True, slots=True)
-class ResolvedSetSpriteZero:
-    x: ResolvedValue
-    y: ResolvedValue
-    tile: ResolvedValue
-    attributes: ResolvedValue
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedSpriteOperation:
-    kind: SpriteOperationKind
-    sprite: ResolvedValue
-    value: ResolvedValue | None = None
-    secondary_value: ResolvedValue | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class ResolvedImportMetasprite:
     asset_name: str
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedMetaspriteOperation:
-    kind: MetaspriteOperationKind
-    instance: ResolvedValue
-    value: ResolvedValue | None = None
-    secondary_value: ResolvedValue | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -799,22 +536,11 @@ class OamReservation:
 
 ResolvedStatement = (
     ResolvedAssignment
-    | ResolvedSetBackgroundColor
-    | ResolvedSetPalette
-    | ResolvedSetPaletteColor
+    | ResolvedBuiltinCall
     | ResolvedLoadBackground
-    | ResolvedSetTile
-    | ResolvedSetAttribute
-    | ResolvedSetScroll
-    | ResolvedClearBackgroundUpdates
-    | ResolvedClearBackgroundUpdateOverflow
     | Run
-    | WaitFrame
     | ResolvedCallbackRegistration
-    | ResolvedSetSpriteZero
-    | ResolvedSpriteOperation
     | ResolvedImportMetasprite
-    | ResolvedMetaspriteOperation
     | ResolvedIfStatement
     | ResolvedWhileStatement
     | ResolvedRepeatStatement

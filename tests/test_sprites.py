@@ -3,10 +3,10 @@ import unittest
 
 from nes_pascal.ast import (
     BuiltInType,
-    ResolvedSpriteOperation,
-    SpriteOperation,
-    SpriteOperationKind,
+    BuiltinCall,
+    ResolvedBuiltinCall,
 )
+from nes_pascal.builtins import BuiltinId
 from nes_pascal.backend_ca65 import generate
 from nes_pascal.diagnostics import CompilerError
 from nes_pascal.memory_layout import build_memory_layout
@@ -63,18 +63,45 @@ end.
         operations = [
             statement
             for statement in parsed.statements
-            if isinstance(statement, SpriteOperation)
+            if isinstance(statement, BuiltinCall)
+            and statement.name.startswith("nes.sprite_")
         ]
         self.assertEqual(
-            [operation.kind for operation in operations],
-            list(SpriteOperationKind),
+            [operation.name for operation in operations],
+            [
+                "nes.sprite_set_position",
+                "nes.sprite_set_x",
+                "nes.sprite_set_y",
+                "nes.sprite_set_tile",
+                "nes.sprite_set_palette",
+                "nes.sprite_set_attributes",
+                "nes.sprite_hide",
+                "nes.sprite_show",
+                "nes.sprite_set_flip_horizontal",
+                "nes.sprite_set_flip_vertical",
+                "nes.sprite_set_behind_background",
+            ],
         )
 
         resolved = resolved_source(source)
         resolved_operations = [
             statement
             for statement in resolved.statements
-            if isinstance(statement, ResolvedSpriteOperation)
+            if isinstance(statement, ResolvedBuiltinCall)
+            and statement.builtin
+            in {
+                BuiltinId.SPRITE_SET_POSITION,
+                BuiltinId.SPRITE_SET_X,
+                BuiltinId.SPRITE_SET_Y,
+                BuiltinId.SPRITE_SET_TILE,
+                BuiltinId.SPRITE_SET_PALETTE,
+                BuiltinId.SPRITE_SET_ATTRIBUTES,
+                BuiltinId.SPRITE_HIDE,
+                BuiltinId.SPRITE_SHOW,
+                BuiltinId.SPRITE_SET_FLIP_HORIZONTAL,
+                BuiltinId.SPRITE_SET_FLIP_VERTICAL,
+                BuiltinId.SPRITE_SET_BEHIND_BACKGROUND,
+            }
         ]
         self.assertEqual(len(resolved_operations), 11)
 

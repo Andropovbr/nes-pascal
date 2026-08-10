@@ -257,7 +257,7 @@ Result := CalculateDamage(Base + GetModifier(EnemyType));
 - When `GetModifier` returns, the outer addition resumes with corrupted operand data.
 
 ### Conclusion and Recommendations
-- **Arrays (Milestone 0.5.6):** Indexed expressions (`Arr[Index + $01] := Val + $02`) increase temporary pressure but do not introduce arbitrary call nesting.
+- **Arrays (Milestone 0.5.8):** Indexed expressions (`Arr[Index + $01] := Val + $02`) increase temporary pressure but do not introduce arbitrary call nesting.
 - **Functions:** Scoped compile-time temporary pooling / liveness is a **hard correctness prerequisite before Functions**.
 - **Recommendation:** Separate temporary allocation into its own prerequisite milestone prior to Functions.
 

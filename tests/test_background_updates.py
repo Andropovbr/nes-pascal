@@ -3,19 +3,10 @@ import tempfile
 import unittest
 
 from nes_pascal.ast import (
-    BackgroundUpdatesOverflowed,
-    ClearBackgroundUpdateOverflow,
-    ClearBackgroundUpdates,
-    GetTile,
-    ResolvedBackgroundUpdatesOverflowed,
-    ResolvedClearBackgroundUpdateOverflow,
-    ResolvedClearBackgroundUpdates,
-    ResolvedGetTile,
-    ResolvedSetAttribute,
-    ResolvedSetTile,
-    SetAttribute,
-    SetTile,
+    BuiltinCall,
+    ResolvedBuiltinCall,
 )
+from nes_pascal.builtins import BuiltinId
 from nes_pascal.backend_ca65 import generate
 from nes_pascal.cli import compile_source
 from nes_pascal.diagnostics import CompilerError
@@ -60,32 +51,39 @@ def analyze_source(source: str = SOURCE, filename: str = "background_updates.nsp
 class BackgroundUpdateLanguageTests(unittest.TestCase):
     def test_parser_and_semantic_model_all_background_update_operations(self) -> None:
         parsed = parse(SOURCE)
-        self.assertIsInstance(parsed.statements[5], SetTile)
+        self.assertEqual(parsed.statements[5].name, "nes.set_tile")
         assignment = parsed.statements[6]
-        self.assertIsInstance(assignment.value, GetTile)
-        self.assertIsInstance(parsed.statements[7], SetAttribute)
+        self.assertEqual(assignment.value.name, "nes.get_tile")
+        self.assertEqual(parsed.statements[7].name, "nes.set_attribute")
         overflow_assignment = parsed.statements[8]
         self.assertIsInstance(
-            overflow_assignment.value, BackgroundUpdatesOverflowed
+            overflow_assignment.value, BuiltinCall
         )
-        self.assertIsInstance(parsed.statements[9], ClearBackgroundUpdates)
-        self.assertIsInstance(
-            parsed.statements[10], ClearBackgroundUpdateOverflow
+        self.assertEqual(parsed.statements[9].name, "nes.clear_background_updates")
+        self.assertEqual(
+            parsed.statements[10].name,
+            "nes.clear_background_update_overflow",
         )
 
         resolved = analyze_source()
-        self.assertIsInstance(resolved.statements[5], ResolvedSetTile)
-        self.assertIsInstance(resolved.statements[6].value, ResolvedGetTile)
-        self.assertIsInstance(resolved.statements[7], ResolvedSetAttribute)
+        self.assertIs(resolved.statements[5].builtin, BuiltinId.SET_TILE)
+        self.assertIs(resolved.statements[6].value.builtin, BuiltinId.GET_TILE)
+        self.assertIs(resolved.statements[7].builtin, BuiltinId.SET_ATTRIBUTE)
         self.assertIsInstance(
             resolved.statements[8].value,
-            ResolvedBackgroundUpdatesOverflowed,
+            ResolvedBuiltinCall,
         )
-        self.assertIsInstance(
-            resolved.statements[9], ResolvedClearBackgroundUpdates
+        self.assertIs(
+            resolved.statements[8].value.builtin,
+            BuiltinId.BACKGROUND_UPDATES_OVERFLOWED,
         )
-        self.assertIsInstance(
-            resolved.statements[10], ResolvedClearBackgroundUpdateOverflow
+        self.assertIs(
+            resolved.statements[9].builtin,
+            BuiltinId.CLEAR_BACKGROUND_UPDATES,
+        )
+        self.assertIs(
+            resolved.statements[10].builtin,
+            BuiltinId.CLEAR_BACKGROUND_UPDATE_OVERFLOW,
         )
 
     def test_dynamic_coordinates_and_boundaries_are_accepted(self) -> None:

@@ -6,9 +6,9 @@ progression. Do not infer the current or next milestone from numbering alone.
 ## Current roadmap state
 
 - **Current release:** Release 0.5 — Sprites and Gameplay
-- **Last completed milestone:** [`0.5.5 — Compiler Architecture and Code Generation Audit`](0.md#compiler-architecture-and-code-generation-audit)
-- **Next milestone:** [`0.5.6 — Arrays`](0.md#arrays)
-- **Next milestone file:** [Version 0 roadmap](0.md#arrays)
+- **Last completed milestone:** [`0.5.6 — Builtin / Intrinsic Infrastructure`](0.md#builtin--intrinsic-infrastructure)
+- **Next milestone:** [`0.5.7 — Low-Risk Code Generation Improvements`](0.md#low-risk-code-generation-improvements)
+- **Next milestone file:** [Version 0 roadmap](0.md#low-risk-code-generation-improvements)
 
 ## Philosophy
 

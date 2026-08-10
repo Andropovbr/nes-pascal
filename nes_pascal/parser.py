@@ -2,7 +2,6 @@
 
 from .ast import (
     Assignment,
-    BackgroundUpdatesOverflowed,
     BinaryExpression,
     BinaryOperator,
     BooleanBinaryExpression,
@@ -10,13 +9,10 @@ from .ast import (
     BooleanNotExpression,
     BooleanOperator,
     BreakStatement,
+    BuiltinCall,
     BuiltInType,
     CallbackKind,
     CallbackRegistration,
-    ClearBackgroundUpdates,
-    ClearBackgroundUpdateOverflow,
-    ControllerQuery,
-    ControllerQueryKind,
     ConstantDeclaration,
     ConstantReference,
     ComparisonExpression,
@@ -25,17 +21,11 @@ from .ast import (
     DecrementStatement,
     ForDirection,
     ForStatement,
-    GetTile,
     HexLiteral,
     IfStatement,
     IncrementStatement,
     ImportMetasprite,
     LoadBackground,
-    MetaspriteCreate,
-    MetaspriteAnimationFinished,
-    MetaspriteOperation,
-    MetaspriteOperationKind,
-    PaletteKind,
     Literal,
     Program,
     ProcedureCall,
@@ -43,26 +33,16 @@ from .ast import (
     ProcedureParameter,
     RepeatStatement,
     Run,
-    SetBackgroundColor,
-    SetAttribute,
-    SetPalette,
-    SetPaletteColor,
-    SetSpriteZero,
-    SetScroll,
-    SetTile,
     SourcePosition,
-    SpriteCreate,
-    SpriteOperation,
-    SpriteOperationKind,
     Statement,
     UnaryExpression,
     UnaryOperator,
     ValueExpression,
     VariableDeclaration,
     VariableReference,
-    WaitFrame,
     WhileStatement,
 )
+from .builtins import builtin_by_name
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
 from .lexer import Token, TokenKind, tokenize
 
@@ -356,49 +336,21 @@ class Parser:
 
         if namespace.text.lower() != "nes":
             self._unknown_command(namespace, qualified_name)
-        if normalized == "nes.set_background_color":
-            return self._parse_background_color(
-                SourcePosition(namespace.line, namespace.column),
-                consume_terminator,
+        descriptor = builtin_by_name(normalized)
+        if descriptor is not None:
+            arguments = (
+                ()
+                if descriptor.bare_statement
+                else self._parse_expression_arguments(normalized)
             )
-        if normalized == "nes.set_sprite_zero":
-            arguments = self._parse_expression_arguments(normalized)
             if consume_terminator:
+                suffix = normalized if descriptor.bare_statement else f"{normalized}(...)"
                 self._expect(
                     TokenKind.SEMICOLON,
-                    "Expected ';' after 'nes.set_sprite_zero(...)'.",
+                    f"Expected ';' after '{suffix}'.",
                 )
-            return SetSpriteZero(
-                arguments,
-                SourcePosition(namespace.line, namespace.column),
-            )
-        sprite_commands = {
-            "nes.sprite_set_position": SpriteOperationKind.SET_POSITION,
-            "nes.sprite_set_x": SpriteOperationKind.SET_X,
-            "nes.sprite_set_y": SpriteOperationKind.SET_Y,
-            "nes.sprite_set_tile": SpriteOperationKind.SET_TILE,
-            "nes.sprite_set_palette": SpriteOperationKind.SET_PALETTE,
-            "nes.sprite_set_attributes": SpriteOperationKind.SET_ATTRIBUTES,
-            "nes.sprite_hide": SpriteOperationKind.HIDE,
-            "nes.sprite_show": SpriteOperationKind.SHOW,
-            "nes.sprite_set_flip_horizontal": (
-                SpriteOperationKind.SET_FLIP_HORIZONTAL
-            ),
-            "nes.sprite_set_flip_vertical": SpriteOperationKind.SET_FLIP_VERTICAL,
-            "nes.sprite_set_behind_background": (
-                SpriteOperationKind.SET_BEHIND_BACKGROUND
-            ),
-        }
-        sprite_kind = sprite_commands.get(normalized)
-        if sprite_kind is not None:
-            arguments = self._parse_expression_arguments(normalized)
-            if consume_terminator:
-                self._expect(
-                    TokenKind.SEMICOLON,
-                    f"Expected ';' after '{normalized}(...)'.",
-                )
-            return SpriteOperation(
-                sprite_kind,
+            return BuiltinCall(
+                normalized,
                 arguments,
                 SourcePosition(namespace.line, namespace.column),
             )
@@ -413,35 +365,6 @@ class Parser:
                 arguments,
                 SourcePosition(namespace.line, namespace.column),
             )
-        metasprite_commands = {
-            "nes.metasprite_set_position": MetaspriteOperationKind.SET_POSITION,
-            "nes.metasprite_set_frame": MetaspriteOperationKind.SET_FRAME,
-            "nes.metasprite_set_animation": MetaspriteOperationKind.SET_ANIMATION,
-            "nes.metasprite_restart_animation": (
-                MetaspriteOperationKind.RESTART_ANIMATION
-            ),
-            "nes.metasprite_hide": MetaspriteOperationKind.HIDE,
-            "nes.metasprite_show": MetaspriteOperationKind.SHOW,
-            "nes.metasprite_set_flip_horizontal": (
-                MetaspriteOperationKind.SET_FLIP_HORIZONTAL
-            ),
-            "nes.metasprite_set_flip_vertical": (
-                MetaspriteOperationKind.SET_FLIP_VERTICAL
-            ),
-        }
-        metasprite_kind = metasprite_commands.get(normalized)
-        if metasprite_kind is not None:
-            arguments = self._parse_expression_arguments(normalized)
-            if consume_terminator:
-                self._expect(
-                    TokenKind.SEMICOLON,
-                    f"Expected ';' after '{normalized}(...)'.",
-                )
-            return MetaspriteOperation(
-                metasprite_kind,
-                arguments,
-                SourcePosition(namespace.line, namespace.column),
-            )
         if normalized == "nes.load_background":
             arguments = self._parse_expression_arguments(normalized)
             if consume_terminator:
@@ -453,65 +376,10 @@ class Parser:
                 arguments,
                 SourcePosition(namespace.line, namespace.column),
             )
-        background_update_commands = {
-            "nes.set_tile": SetTile,
-            "nes.set_attribute": SetAttribute,
-            "nes.clear_background_updates": ClearBackgroundUpdates,
-            "nes.clear_background_update_overflow": ClearBackgroundUpdateOverflow,
-        }
-        background_update = background_update_commands.get(normalized)
-        if background_update is not None:
-            arguments = self._parse_expression_arguments(normalized)
-            if consume_terminator:
-                self._expect(
-                    TokenKind.SEMICOLON,
-                    f"Expected ';' after '{normalized}(...)'.",
-                )
-            return background_update(
-                arguments,
-                SourcePosition(namespace.line, namespace.column),
-            )
-        if normalized == "nes.set_scroll":
-            arguments = self._parse_expression_arguments(normalized)
-            if consume_terminator:
-                self._expect(
-                    TokenKind.SEMICOLON,
-                    "Expected ';' after 'nes.set_scroll(...)'.",
-                )
-            return SetScroll(
-                arguments,
-                SourcePosition(namespace.line, namespace.column),
-            )
-        palette_commands = {
-            "nes.set_background_palette": (PaletteKind.BACKGROUND, False),
-            "nes.set_sprite_palette": (PaletteKind.SPRITE, False),
-            "nes.set_background_palette_color": (PaletteKind.BACKGROUND, True),
-            "nes.set_sprite_palette_color": (PaletteKind.SPRITE, True),
-        }
-        palette_command = palette_commands.get(normalized)
-        if palette_command is not None:
-            kind, individual = palette_command
-            arguments = self._parse_expression_arguments(normalized)
-            if consume_terminator:
-                self._expect(
-                    TokenKind.SEMICOLON,
-                    f"Expected ';' after '{normalized}(...)'.",
-                )
-            position = SourcePosition(namespace.line, namespace.column)
-            if individual:
-                return SetPaletteColor(kind, arguments, position)
-            return SetPalette(kind, arguments, position)
         if normalized == "nes.run":
             if consume_terminator:
                 self._expect(TokenKind.SEMICOLON, "Expected ';' after 'nes.run'.")
             return Run(SourcePosition(namespace.line, namespace.column))
-        if normalized == "nes.wait_frame":
-            if consume_terminator:
-                self._expect(
-                    TokenKind.SEMICOLON,
-                    "Expected ';' after 'nes.wait_frame'.",
-                )
-            return WaitFrame(SourcePosition(namespace.line, namespace.column))
         if normalized in ("nes.on_update", "nes.on_vblank"):
             kind = (
                 CallbackKind.UPDATE
@@ -573,27 +441,6 @@ class Parser:
             SourcePosition(name.line, name.column),
             tuple(arguments),
         )
-
-    def _parse_background_color(
-        self,
-        position: SourcePosition,
-        consume_terminator: bool,
-    ) -> SetBackgroundColor:
-        self._expect(
-            TokenKind.LEFT_PAREN,
-            "Expected '(' after 'nes.set_background_color'.",
-        )
-        argument = self._parse_expression()
-        self._expect(
-            TokenKind.RIGHT_PAREN,
-            "Expected ')' after the background color.",
-        )
-        if consume_terminator:
-            self._expect(
-                TokenKind.SEMICOLON,
-                "Expected ';' after 'nes.set_background_color(...)'.",
-            )
-        return SetBackgroundColor(argument, position)
 
     def _parse_callback_registration(
         self,
@@ -941,40 +788,9 @@ class Parser:
                 )
                 qualified_name = f"{token.text}.{member.text}"
                 normalized = qualified_name.lower()
-                query_kinds = {
-                    "nes.controller_down": ControllerQueryKind.DOWN,
-                    "nes.controller_pressed": ControllerQueryKind.PRESSED,
-                    "nes.controller_released": ControllerQueryKind.RELEASED,
-                }
-                query_kind = query_kinds.get(normalized)
-                if query_kind is not None:
-                    return ControllerQuery(
-                        query_kind,
-                        self._parse_expression_arguments(normalized),
-                        position,
-                    )
-                if normalized == "nes.sprite_create":
-                    return SpriteCreate(
-                        self._parse_expression_arguments(normalized),
-                        position,
-                    )
-                if normalized == "nes.metasprite_create":
-                    return MetaspriteCreate(
-                        self._parse_expression_arguments(normalized),
-                        position,
-                    )
-                if normalized == "nes.metasprite_animation_finished":
-                    return MetaspriteAnimationFinished(
-                        self._parse_expression_arguments(normalized),
-                        position,
-                    )
-                if normalized == "nes.get_tile":
-                    return GetTile(
-                        self._parse_expression_arguments(normalized),
-                        position,
-                    )
-                if normalized == "nes.background_updates_overflowed":
-                    return BackgroundUpdatesOverflowed(
+                if builtin_by_name(normalized) is not None:
+                    return BuiltinCall(
+                        normalized,
                         self._parse_expression_arguments(normalized),
                         position,
                     )

@@ -5,56 +5,41 @@ from .ast import (
     BooleanOperator,
     BuiltInType,
     CallbackKind,
-    ControllerQueryKind,
     ComparisonOperator,
     ForDirection,
     ImmediateValue,
-    PaletteKind,
     ResolvedLoadBackground,
     ResolvedImportMetasprite,
     ResolvedAssignment,
-    ResolvedBackgroundUpdatesOverflowed,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
     ResolvedBreakStatement,
     ResolvedCallbackRegistration,
-    ResolvedClearBackgroundUpdates,
-    ResolvedClearBackgroundUpdateOverflow,
     ResolvedComparisonExpression,
-    ResolvedControllerQuery,
+    ResolvedBuiltinCall,
     ResolvedContinueStatement,
     ResolvedDecrementStatement,
     ResolvedForStatement,
-    ResolvedGetTile,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
-    ResolvedMetaspriteCreate,
-    ResolvedMetaspriteAnimationFinished,
-    ResolvedMetaspriteOperation,
     ResolvedProgram,
     ResolvedProcedure,
     ResolvedProcedureCall,
     ResolvedRepeatStatement,
-    ResolvedSetBackgroundColor,
-    ResolvedSetAttribute,
-    ResolvedSetPalette,
-    ResolvedSetPaletteColor,
-    ResolvedSetSpriteZero,
-    ResolvedSpriteCreate,
-    ResolvedSpriteOperation,
-    ResolvedSetScroll,
-    ResolvedSetTile,
     ResolvedStatement,
     ResolvedUnaryExpression,
     ResolvedValue,
     ResolvedWhileStatement,
     Run,
-    MetaspriteOperationKind,
-    SpriteOperationKind,
     UnaryOperator,
     VariableValue,
-    WaitFrame,
+)
+from .builtins import (
+    BackendEmitter,
+    BuiltinId,
+    PaletteKind,
+    builtin_by_id,
 )
 from .memory_layout import (
     BackgroundRuntimeFeatures,
@@ -75,7 +60,8 @@ def generate(
     color_commands = [
         statement
         for statement in program.statements
-        if isinstance(statement, ResolvedSetBackgroundColor)
+        if isinstance(statement, ResolvedBuiltinCall)
+        and statement.builtin is BuiltinId.SET_BACKGROUND_COLOR
     ]
     run_commands = [
         statement for statement in program.statements if isinstance(statement, Run)
@@ -568,40 +554,9 @@ def _generate_statements(
                     f"    sta {statement.target.label}",
                 ]
             )
-        elif isinstance(statement, ResolvedSetBackgroundColor):
-            if statement.queued:
-                statement_lines.extend(
-                    _queue_universal_color(statement.argument, label_counter)
-                )
-            else:
-                statement_lines.extend(
-                    [
-                        "",
-                        "; Source: nes.set_background_color(value)",
-                        "    lda #$3F",
-                        "    sta $2006               ; universal palette address, high byte",
-                        "    lda #$00",
-                        "    sta $2006               ; low byte",
-                        *_load_value(statement.argument, label_counter),
-                        "    sta $2007",
-                        *(
-                            ["    sta runtime_palette_shadow"]
-                            if palette_runtime_enabled
-                            else []
-                        ),
-                    ]
-                )
-        elif isinstance(statement, ResolvedSetPalette):
+        elif isinstance(statement, ResolvedBuiltinCall):
             statement_lines.extend(
-                _generate_set_palette(
-                    statement,
-                    label_counter,
-                    palette_runtime_enabled,
-                )
-            )
-        elif isinstance(statement, ResolvedSetPaletteColor):
-            statement_lines.extend(
-                _generate_set_palette_color(
+                _generate_builtin_statement(
                     statement,
                     label_counter,
                     palette_runtime_enabled,
@@ -673,130 +628,9 @@ def _generate_statements(
                     *ppu_state_lines,
                 ]
             )
-        elif isinstance(statement, WaitFrame):
-            wait_frame_label = _new_label(label_counter, "wait_frame")
-            statement_lines.extend(
-                [
-                    "",
-                    "; Source: nes.wait_frame",
-                    "; Runtime: wait for the volatile frame counter to change",
-                    "    lda runtime_frame_counter",
-                    f"{wait_frame_label}:",
-                    "    cmp runtime_frame_counter",
-                    f"    beq {wait_frame_label}",
-                    "    lda #$00",
-                    "    sta runtime_frame_ready ; consume advisory signal",
-                    "    lda runtime_frame_counter ; accepted frame for polling",
-                    "    jsr runtime_update_controllers ; fresh state for this frame",
-                ]
-            )
-        elif isinstance(statement, ResolvedSetSpriteZero):
-            statement_lines.extend(
-                [
-                    "",
-                    "; Source: nes.set_sprite_zero(x, y, tile, attributes)",
-                    "; Runtime: invalidate, stage all bytes, then publish atomically",
-                    "    lda #$00",
-                    "    sta runtime_sprite_zero_ready",
-                    *_load_value(statement.x, label_counter),
-                    "    sta runtime_sprite_zero_pending_x",
-                    *_load_value(statement.y, label_counter),
-                    "    sta runtime_sprite_zero_pending_y",
-                    *_load_value(statement.tile, label_counter),
-                    "    sta runtime_sprite_zero_pending_tile",
-                    *_load_value(statement.attributes, label_counter),
-                    "    sta runtime_sprite_zero_pending_attributes",
-                    "    lda #$01",
-                    "    sta runtime_sprite_zero_ready",
-                ]
-            )
-        elif isinstance(statement, ResolvedSpriteOperation):
-            statement_lines.extend(
-                _generate_sprite_operation(statement, label_counter)
-            )
-        elif isinstance(statement, ResolvedMetaspriteOperation):
-            statement_lines.extend(
-                _generate_metasprite_operation(statement, label_counter)
-            )
         elif isinstance(statement, ResolvedImportMetasprite):
             statement_lines.extend(
                 ["", f"; Source: nes.import_metasprite({statement.asset_name})"]
-            )
-        elif isinstance(statement, ResolvedSetTile):
-            statement_lines.extend(
-                [
-                    "",
-                    "; Source: nes.set_tile(x, y, tile)",
-                    *_load_value(statement.x, label_counter),
-                    "    pha                     ; preserve X across expressions",
-                    *_load_value(statement.y, label_counter),
-                    "    pha                     ; preserve Y across tile expression",
-                    *_load_value(statement.tile, label_counter),
-                    "    sta runtime_background_pending_value",
-                    "    pla",
-                    "    sta runtime_background_y",
-                    "    pla",
-                    "    sta runtime_background_x",
-                    "    jsr runtime_set_tile",
-                ]
-            )
-        elif isinstance(statement, ResolvedSetAttribute):
-            statement_lines.extend(
-                [
-                    "",
-                    "; Source: nes.set_attribute(x, y, value)",
-                    *_load_value(statement.x, label_counter),
-                    "    pha                     ; preserve X across expressions",
-                    *_load_value(statement.y, label_counter),
-                    "    pha                     ; preserve Y across value expression",
-                    *_load_value(statement.value, label_counter),
-                    "    sta runtime_background_pending_value",
-                    "    pla",
-                    "    sta runtime_background_y",
-                    "    pla",
-                    "    sta runtime_background_x",
-                    "    jsr runtime_set_attribute",
-                ]
-            )
-        elif isinstance(statement, ResolvedSetScroll):
-            statement_lines.extend(
-                [
-                    "",
-                    "; Source: nes.set_scroll(x, y)",
-                    "; Runtime: invalidate, stage both axes, then publish atomically",
-                    "    lda #$00",
-                    "    sta runtime_scroll_ready",
-                    *_load_value(statement.x, label_counter),
-                    "    sta runtime_scroll_pending_x",
-                    *_load_value(statement.y, label_counter),
-                    "    sta runtime_scroll_pending_y",
-                    "    lda #$01",
-                    "    sta runtime_scroll_ready",
-                ]
-            )
-        elif isinstance(statement, ResolvedClearBackgroundUpdates):
-            statement_lines.extend(
-                [
-                    "",
-                    "; Source: nes.clear_background_updates()",
-                    "    lda #$01",
-                    "    sta runtime_background_queue_cancel_lock ; block whole-queue NMI consumption",
-                    "    lda #$00",
-                    "    sta runtime_background_queue_ready",
-                    "    sta runtime_background_queue_ready + 1",
-                    "    sta runtime_background_queue_ready + 2",
-                    "    sta runtime_background_queue_ready + 3",
-                    "    sta runtime_background_queue_cancel_lock ; release after every slot is cancelled",
-                ]
-            )
-        elif isinstance(statement, ResolvedClearBackgroundUpdateOverflow):
-            statement_lines.extend(
-                [
-                    "",
-                    "; Source: nes.clear_background_update_overflow()",
-                    "    lda #$00",
-                    "    sta runtime_background_queue_overflow",
-                ]
             )
         elif isinstance(statement, ResolvedIfStatement):
             then_label = _new_label(label_counter, "if_then")
@@ -1013,14 +847,266 @@ def _generate_statements(
     return statement_lines
 
 
+def _generate_builtin_statement(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    descriptor = builtin_by_id(statement.builtin)
+    emitter = _BUILTIN_STATEMENT_EMITTERS.get(descriptor.emitter)
+    if emitter is None:
+        raise ValueError(
+            f"builtin {descriptor.public_name} is not a statement emitter"
+        )
+    return emitter(statement, label_counter, palette_runtime_enabled)
+
+
+def _emit_set_background_color(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    value = statement.arguments[0]
+    if statement.queued:
+        return _queue_universal_color(value, label_counter)
+    return [
+        "",
+        "; Source: nes.set_background_color(value)",
+        "    lda #$3F",
+        "    sta $2006               ; universal palette address, high byte",
+        "    lda #$00",
+        "    sta $2006               ; low byte",
+        *_load_value(value, label_counter),
+        "    sta $2007",
+        *(
+            ["    sta runtime_palette_shadow"]
+            if palette_runtime_enabled
+            else []
+        ),
+    ]
+
+
+def _emit_wait_frame(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    del statement, palette_runtime_enabled
+    wait_frame_label = _new_label(label_counter, "wait_frame")
+    return [
+        "",
+        "; Source: nes.wait_frame",
+        "; Runtime: wait for the volatile frame counter to change",
+        "    lda runtime_frame_counter",
+        f"{wait_frame_label}:",
+        "    cmp runtime_frame_counter",
+        f"    beq {wait_frame_label}",
+        "    lda #$00",
+        "    sta runtime_frame_ready ; consume advisory signal",
+        "    lda runtime_frame_counter ; accepted frame for polling",
+        "    jsr runtime_update_controllers ; fresh state for this frame",
+    ]
+
+
+def _emit_set_sprite_zero(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    del palette_runtime_enabled
+    x, y, tile, attributes = statement.arguments
+    return [
+        "",
+        "; Source: nes.set_sprite_zero(x, y, tile, attributes)",
+        "; Runtime: invalidate, stage all bytes, then publish atomically",
+        "    lda #$00",
+        "    sta runtime_sprite_zero_ready",
+        *_load_value(x, label_counter),
+        "    sta runtime_sprite_zero_pending_x",
+        *_load_value(y, label_counter),
+        "    sta runtime_sprite_zero_pending_y",
+        *_load_value(tile, label_counter),
+        "    sta runtime_sprite_zero_pending_tile",
+        *_load_value(attributes, label_counter),
+        "    sta runtime_sprite_zero_pending_attributes",
+        "    lda #$01",
+        "    sta runtime_sprite_zero_ready",
+    ]
+
+
+def _emit_sprite_operation(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    del palette_runtime_enabled
+    return _generate_sprite_operation(statement, label_counter)
+
+
+def _emit_metasprite_operation(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    del palette_runtime_enabled
+    return _generate_metasprite_operation(statement, label_counter)
+
+
+def _emit_set_palette(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    return _generate_set_palette(
+        statement, label_counter, palette_runtime_enabled
+    )
+
+
+def _emit_set_palette_color(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    return _generate_set_palette_color(
+        statement, label_counter, palette_runtime_enabled
+    )
+
+
+def _emit_set_tile(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    del palette_runtime_enabled
+    x, y, tile = statement.arguments
+    return [
+        "",
+        "; Source: nes.set_tile(x, y, tile)",
+        *_load_value(x, label_counter),
+        "    pha                     ; preserve X across expressions",
+        *_load_value(y, label_counter),
+        "    pha                     ; preserve Y across tile expression",
+        *_load_value(tile, label_counter),
+        "    sta runtime_background_pending_value",
+        "    pla",
+        "    sta runtime_background_y",
+        "    pla",
+        "    sta runtime_background_x",
+        "    jsr runtime_set_tile",
+    ]
+
+
+def _emit_set_attribute(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    del palette_runtime_enabled
+    x, y, value = statement.arguments
+    return [
+        "",
+        "; Source: nes.set_attribute(x, y, value)",
+        *_load_value(x, label_counter),
+        "    pha                     ; preserve X across expressions",
+        *_load_value(y, label_counter),
+        "    pha                     ; preserve Y across value expression",
+        *_load_value(value, label_counter),
+        "    sta runtime_background_pending_value",
+        "    pla",
+        "    sta runtime_background_y",
+        "    pla",
+        "    sta runtime_background_x",
+        "    jsr runtime_set_attribute",
+    ]
+
+
+def _emit_set_scroll(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    del palette_runtime_enabled
+    x, y = statement.arguments
+    return [
+        "",
+        "; Source: nes.set_scroll(x, y)",
+        "; Runtime: invalidate, stage both axes, then publish atomically",
+        "    lda #$00",
+        "    sta runtime_scroll_ready",
+        *_load_value(x, label_counter),
+        "    sta runtime_scroll_pending_x",
+        *_load_value(y, label_counter),
+        "    sta runtime_scroll_pending_y",
+        "    lda #$01",
+        "    sta runtime_scroll_ready",
+    ]
+
+
+def _emit_clear_background_updates(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    del statement, label_counter, palette_runtime_enabled
+    return [
+        "",
+        "; Source: nes.clear_background_updates()",
+        "    lda #$01",
+        "    sta runtime_background_queue_cancel_lock ; block whole-queue NMI consumption",
+        "    lda #$00",
+        "    sta runtime_background_queue_ready",
+        "    sta runtime_background_queue_ready + 1",
+        "    sta runtime_background_queue_ready + 2",
+        "    sta runtime_background_queue_ready + 3",
+        "    sta runtime_background_queue_cancel_lock ; release after every slot is cancelled",
+    ]
+
+
+def _emit_clear_background_update_overflow(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    del statement, label_counter, palette_runtime_enabled
+    return [
+        "",
+        "; Source: nes.clear_background_update_overflow()",
+        "    lda #$00",
+        "    sta runtime_background_queue_overflow",
+    ]
+
+
+_BUILTIN_STATEMENT_EMITTERS = {
+    BackendEmitter.SET_BACKGROUND_COLOR: _emit_set_background_color,
+    BackendEmitter.SET_PALETTE: _emit_set_palette,
+    BackendEmitter.SET_PALETTE_COLOR: _emit_set_palette_color,
+    BackendEmitter.SET_TILE: _emit_set_tile,
+    BackendEmitter.SET_ATTRIBUTE: _emit_set_attribute,
+    BackendEmitter.CLEAR_BACKGROUND_UPDATES: _emit_clear_background_updates,
+    BackendEmitter.CLEAR_BACKGROUND_UPDATE_OVERFLOW: (
+        _emit_clear_background_update_overflow
+    ),
+    BackendEmitter.SET_SCROLL: _emit_set_scroll,
+    BackendEmitter.WAIT_FRAME: _emit_wait_frame,
+    BackendEmitter.SET_SPRITE_ZERO: _emit_set_sprite_zero,
+    BackendEmitter.SPRITE_OPERATION: _emit_sprite_operation,
+    BackendEmitter.METASPRITE_OPERATION: _emit_metasprite_operation,
+}
+
+
 def _has_initial_sprite_palette(
     statements: tuple[ResolvedStatement, ...],
 ) -> bool:
     for statement in statements:
-        if isinstance(
-            statement,
-            (ResolvedSetPalette, ResolvedSetPaletteColor),
-        ) and statement.kind is PaletteKind.SPRITE and not statement.queued:
+        if (
+            isinstance(statement, ResolvedBuiltinCall)
+            and statement.builtin
+            in (
+                BuiltinId.SET_SPRITE_PALETTE,
+                BuiltinId.SET_SPRITE_PALETTE_COLOR,
+            )
+            and not statement.queued
+        ):
             return True
         if isinstance(statement, ResolvedIfStatement):
             if _has_initial_sprite_palette(statement.then_branch):
@@ -1037,40 +1123,76 @@ def _has_initial_sprite_palette(
     return False
 
 
+_SPRITE_OPERATION_SUFFIXES = {
+    BuiltinId.SPRITE_SET_POSITION: "set_position",
+    BuiltinId.SPRITE_SET_X: "set_x",
+    BuiltinId.SPRITE_SET_Y: "set_y",
+    BuiltinId.SPRITE_SET_TILE: "set_tile",
+    BuiltinId.SPRITE_SET_PALETTE: "set_palette",
+    BuiltinId.SPRITE_SET_ATTRIBUTES: "set_attributes",
+    BuiltinId.SPRITE_HIDE: "hide",
+    BuiltinId.SPRITE_SHOW: "show",
+    BuiltinId.SPRITE_SET_FLIP_HORIZONTAL: "set_flip_horizontal",
+    BuiltinId.SPRITE_SET_FLIP_VERTICAL: "set_flip_vertical",
+    BuiltinId.SPRITE_SET_BEHIND_BACKGROUND: "set_behind_background",
+}
+
+_METASPRITE_OPERATION_SUFFIXES = {
+    BuiltinId.METASPRITE_SET_POSITION: "set_position",
+    BuiltinId.METASPRITE_SET_FRAME: "set_frame",
+    BuiltinId.METASPRITE_SET_ANIMATION: "set_animation",
+    BuiltinId.METASPRITE_RESTART_ANIMATION: "restart_animation",
+    BuiltinId.METASPRITE_HIDE: "hide",
+    BuiltinId.METASPRITE_SHOW: "show",
+    BuiltinId.METASPRITE_SET_FLIP_HORIZONTAL: "set_flip_horizontal",
+    BuiltinId.METASPRITE_SET_FLIP_VERTICAL: "set_flip_vertical",
+}
+
+
 def _generate_sprite_operation(
-    statement: ResolvedSpriteOperation,
+    statement: ResolvedBuiltinCall,
     label_counter: list[int],
 ) -> list[str]:
-    command = f"nes.sprite_{statement.kind.value}"
+    suffix = _SPRITE_OPERATION_SUFFIXES[statement.builtin]
+    command = f"nes.sprite_{suffix}"
     lines = ["", f"; Source: {command}(...)"]
-    if statement.value is not None:
+    sprite = statement.arguments[0]
+    value = statement.arguments[1] if len(statement.arguments) > 1 else None
+    secondary_value = (
+        statement.arguments[2] if len(statement.arguments) > 2 else None
+    )
+    if value is not None:
         lines.extend(
             [
-                *_load_value(statement.value, label_counter),
+                *_load_value(value, label_counter),
                 "    sta runtime_sprite_value ; evaluate the property once",
             ]
         )
-    if statement.secondary_value is not None:
+    if secondary_value is not None:
         lines.extend(
             [
-                *_load_value(statement.secondary_value, label_counter),
+                *_load_value(secondary_value, label_counter),
                 "    sta runtime_sprite_secondary_value ; evaluate Y once",
             ]
         )
 
-    if not isinstance(statement.sprite, (ImmediateValue, ResolvedSpriteCreate)):
+    created = (
+        isinstance(sprite, ResolvedBuiltinCall)
+        and sprite.builtin is BuiltinId.SPRITE_CREATE
+    )
+    if not isinstance(sprite, ImmediateValue) and not created:
         lines.extend(
             [
-                *_load_value(statement.sprite, label_counter),
-                f"    jsr runtime_sprite_{statement.kind.value}",
+                *_load_value(sprite, label_counter),
+                f"    jsr runtime_sprite_{suffix}",
             ]
         )
         return lines
 
     sprite_index = (
-        statement.sprite.value
-        if isinstance(statement.sprite, ImmediateValue)
-        else statement.sprite.index
+        sprite.value
+        if isinstance(sprite, ImmediateValue)
+        else statement.arguments[0].arguments[0].value
     )
     oam_offset = sprite_index * 4
     oam = (
@@ -1083,8 +1205,8 @@ def _generate_sprite_operation(
         if sprite_index == 0
         else f"runtime_sprite_logical_y + {sprite_index}"
     )
-    kind = statement.kind
-    if kind is SpriteOperationKind.SET_POSITION:
+    kind = statement.builtin
+    if kind is BuiltinId.SPRITE_SET_POSITION:
         skip = _new_label(label_counter, "sprite_hidden")
         lines.extend(
             [
@@ -1100,13 +1222,13 @@ def _generate_sprite_operation(
                 f"{skip}:",
             ]
         )
-    elif kind is SpriteOperationKind.SET_X:
+    elif kind is BuiltinId.SPRITE_SET_X:
         lines.extend(["    lda runtime_sprite_value", f"    sta {oam} + 3"])
-    elif kind is SpriteOperationKind.SET_TILE:
+    elif kind is BuiltinId.SPRITE_SET_TILE:
         lines.extend(["    lda runtime_sprite_value", f"    sta {oam} + 1"])
-    elif kind is SpriteOperationKind.SET_ATTRIBUTES:
+    elif kind is BuiltinId.SPRITE_SET_ATTRIBUTES:
         lines.extend(["    lda runtime_sprite_value", f"    sta {oam} + 2"])
-    elif kind is SpriteOperationKind.SET_Y:
+    elif kind is BuiltinId.SPRITE_SET_Y:
         skip = _new_label(label_counter, "sprite_hidden")
         lines.extend(
             [
@@ -1120,7 +1242,7 @@ def _generate_sprite_operation(
                 f"{skip}:",
             ]
         )
-    elif kind is SpriteOperationKind.HIDE:
+    elif kind is BuiltinId.SPRITE_HIDE:
         skip = _new_label(label_counter, "sprite_already_hidden")
         lines.extend(
             [
@@ -1133,9 +1255,9 @@ def _generate_sprite_operation(
                 f"{skip}:",
             ]
         )
-    elif kind is SpriteOperationKind.SHOW:
+    elif kind is BuiltinId.SPRITE_SHOW:
         lines.extend([f"    lda {logical_y}", f"    sta {oam}"])
-    elif kind is SpriteOperationKind.SET_PALETTE:
+    elif kind is BuiltinId.SPRITE_SET_PALETTE:
         skip = _new_label(label_counter, "sprite_invalid_palette")
         lines.extend(
             [
@@ -1151,9 +1273,9 @@ def _generate_sprite_operation(
         )
     else:
         masks = {
-            SpriteOperationKind.SET_FLIP_HORIZONTAL: 0x40,
-            SpriteOperationKind.SET_FLIP_VERTICAL: 0x80,
-            SpriteOperationKind.SET_BEHIND_BACKGROUND: 0x20,
+            BuiltinId.SPRITE_SET_FLIP_HORIZONTAL: 0x40,
+            BuiltinId.SPRITE_SET_FLIP_VERTICAL: 0x80,
+            BuiltinId.SPRITE_SET_BEHIND_BACKGROUND: 0x20,
         }
         mask = masks[kind]
         clear = _new_label(label_counter, "sprite_clear_attribute")
@@ -1176,29 +1298,35 @@ def _generate_sprite_operation(
 
 
 def _generate_metasprite_operation(
-    statement: ResolvedMetaspriteOperation,
+    statement: ResolvedBuiltinCall,
     label_counter: list[int],
 ) -> list[str]:
-    command = f"nes.metasprite_{statement.kind.value}"
+    suffix = _METASPRITE_OPERATION_SUFFIXES[statement.builtin]
+    command = f"nes.metasprite_{suffix}"
     lines = ["", f"; Source: {command}(...)"]
-    if statement.value is not None:
+    instance = statement.arguments[0]
+    value = statement.arguments[1] if len(statement.arguments) > 1 else None
+    secondary_value = (
+        statement.arguments[2] if len(statement.arguments) > 2 else None
+    )
+    if value is not None:
         lines.extend(
             [
-                *_load_value(statement.value, label_counter),
+                *_load_value(value, label_counter),
                 "    sta runtime_metasprite_offset_x ; evaluate the value once",
             ]
         )
-    if statement.secondary_value is not None:
+    if secondary_value is not None:
         lines.extend(
             [
-                *_load_value(statement.secondary_value, label_counter),
+                *_load_value(secondary_value, label_counter),
                 "    sta runtime_metasprite_offset_y ; evaluate Y once",
             ]
         )
     lines.extend(
         [
-            *_load_value(statement.instance, label_counter),
-            f"    jsr runtime_metasprite_{statement.kind.value}",
+            *_load_value(instance, label_counter),
+            f"    jsr runtime_metasprite_{suffix}",
         ]
     )
     return lines
@@ -1979,32 +2107,40 @@ def _queue_universal_color(
 
 
 def _generate_set_palette(
-    statement: ResolvedSetPalette,
+    statement: ResolvedBuiltinCall,
     label_counter: list[int],
     palette_runtime_enabled: bool,
 ) -> list[str]:
-    command = f"nes.set_{statement.kind.value}_palette"
-    base = _palette_shadow_base(statement.kind, statement.palette_index)
+    kind = (
+        PaletteKind.BACKGROUND
+        if statement.builtin is BuiltinId.SET_BACKGROUND_PALETTE
+        else PaletteKind.SPRITE
+    )
+    palette_index = statement.arguments[0]
+    assert isinstance(palette_index, ImmediateValue)
+    colors = statement.arguments[1:]
+    command = f"nes.set_{kind.value}_palette"
+    base = _palette_shadow_base(kind, palette_index.value)
     if not statement.queued:
         lines = [
             "",
             f"; Source: {command}(index, color0, color1, color2, color3)",
             "; Initialization: color 0 uses the canonical universal color",
-            *_direct_palette_write(0x00, (statement.colors[0],), label_counter),
+            *_direct_palette_write(0x00, (colors[0],), label_counter),
             *_direct_palette_write(
                 base + 1,
-                statement.colors[1:],
+                colors[1:],
                 label_counter,
             ),
         ]
         if palette_runtime_enabled:
             lines.extend(
                 [
-                    *_load_value(statement.colors[0], label_counter),
+                    *_load_value(colors[0], label_counter),
                     "    sta runtime_palette_shadow",
                 ]
             )
-            for index, value in enumerate(statement.colors[1:], start=1):
+            for index, value in enumerate(colors[1:], start=1):
                 lines.extend(
                     [
                         *_load_value(value, label_counter),
@@ -2013,7 +2149,7 @@ def _generate_set_palette(
                 )
         return lines
 
-    dirty = _palette_dirty_symbol(statement.kind, statement.palette_index)
+    dirty = _palette_dirty_symbol(kind, palette_index.value)
     lines = [
         "",
         f"; Source: {command}(index, color0, color1, color2, color3)",
@@ -2021,10 +2157,10 @@ def _generate_set_palette(
         "    lda #$00",
         f"    sta {dirty}",
         "    sta runtime_palette_universal_dirty",
-        *_load_value(statement.colors[0], label_counter),
+        *_load_value(colors[0], label_counter),
         "    sta runtime_palette_shadow ; canonical universal color",
     ]
-    for index, value in enumerate(statement.colors[1:], start=1):
+    for index, value in enumerate(colors[1:], start=1):
         lines.extend(
             [
                 *_load_value(value, label_counter),
@@ -2042,56 +2178,64 @@ def _generate_set_palette(
 
 
 def _generate_set_palette_color(
-    statement: ResolvedSetPaletteColor,
+    statement: ResolvedBuiltinCall,
     label_counter: list[int],
     palette_runtime_enabled: bool,
 ) -> list[str]:
-    command = f"nes.set_{statement.kind.value}_palette_color"
-    if statement.color_index == 0:
+    kind = (
+        PaletteKind.BACKGROUND
+        if statement.builtin is BuiltinId.SET_BACKGROUND_PALETTE_COLOR
+        else PaletteKind.SPRITE
+    )
+    palette_index, color_index, color = statement.arguments
+    assert isinstance(palette_index, ImmediateValue)
+    assert isinstance(color_index, ImmediateValue)
+    command = f"nes.set_{kind.value}_palette_color"
+    if color_index.value == 0:
         if statement.queued:
-            lines = _queue_universal_color(statement.color, label_counter)
+            lines = _queue_universal_color(color, label_counter)
             lines[1] = f"; Source: {command}(palette, color, value)"
             return lines
         lines = [
             "",
             f"; Source: {command}(palette, color, value)",
             "; Initialization: color 0 uses the canonical universal color",
-            *_direct_palette_write(0x00, (statement.color,), label_counter),
+            *_direct_palette_write(0x00, (color,), label_counter),
         ]
         if palette_runtime_enabled:
             lines.extend(
                 [
-                    *_load_value(statement.color, label_counter),
+                    *_load_value(color, label_counter),
                     "    sta runtime_palette_shadow",
                 ]
             )
         return lines
 
-    base = _palette_shadow_base(statement.kind, statement.palette_index)
-    offset = base + statement.color_index
+    base = _palette_shadow_base(kind, palette_index.value)
+    offset = base + color_index.value
     if not statement.queued:
         lines = [
             "",
             f"; Source: {command}(palette, color, value)",
-            *_direct_palette_write(offset, (statement.color,), label_counter),
+            *_direct_palette_write(offset, (color,), label_counter),
         ]
         if palette_runtime_enabled:
             lines.extend(
                 [
-                    *_load_value(statement.color, label_counter),
+                    *_load_value(color, label_counter),
                     f"    sta runtime_palette_shadow + {offset}",
                 ]
             )
         return lines
 
-    dirty = _palette_dirty_symbol(statement.kind, statement.palette_index)
+    dirty = _palette_dirty_symbol(kind, palette_index.value)
     return [
         "",
         f"; Source: {command}(palette, color, value)",
         "; Runtime: invalidate, stage one color, then publish the palette",
         "    lda #$00",
         f"    sta {dirty}",
-        *_load_value(statement.color, label_counter),
+        *_load_value(color, label_counter),
         f"    sta runtime_palette_shadow + {offset}",
         "    lda #$01",
         f"    sta {dirty}",
@@ -2542,20 +2686,8 @@ def _generate_decrement(
 
 
 def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
-    if isinstance(value, ResolvedSpriteCreate):
-        return [
-            f"    lda #${value.index:02X}              ; static sprite reservation"
-        ]
-    if isinstance(value, ResolvedMetaspriteCreate):
-        return [
-            f"    lda #${value.instance_index:02X}              ; static metasprite reservation"
-        ]
-    if isinstance(value, ResolvedMetaspriteAnimationFinished):
-        return [
-            "    ; nes.metasprite_animation_finished(instance)",
-            *_load_value(value.instance, label_counter),
-            "    jsr runtime_metasprite_animation_finished",
-        ]
+    if isinstance(value, ResolvedBuiltinCall):
+        return _load_builtin_value(value, 0, label_counter)
     if isinstance(value, ImmediateValue):
         if value.type is BuiltInType.BOOLEAN:
             description = "true" if value.value else "false"
@@ -2563,15 +2695,6 @@ def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
         return [f"    lda #${value.value:02X}"]
     if isinstance(value, VariableValue):
         return [f"    lda {value.variable.label}"]
-    if isinstance(value, ResolvedControllerQuery):
-        return _load_controller_query(value, label_counter)
-    if isinstance(value, ResolvedBackgroundUpdatesOverflowed):
-        return [
-            "    ; nes.background_updates_overflowed(): sticky queue state",
-            "    lda runtime_background_queue_overflow",
-        ]
-    if isinstance(value, ResolvedGetTile):
-        return _load_get_tile(value, 0, label_counter)
     if isinstance(value, ResolvedUnaryExpression):
         lines = _load_value(value.operand, label_counter)
         if value.operator is UnaryOperator.PLUS:
@@ -2593,41 +2716,118 @@ def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
     return _load_boolean_binary_expression(value, 0, label_counter)
 
 
-def _load_controller_query(
-    query: ResolvedControllerQuery,
+_CONTROLLER_BUTTON_NAMES = {
+    0x01: "nes.button_a",
+    0x02: "nes.button_b",
+    0x04: "nes.button_select",
+    0x08: "nes.button_start",
+    0x10: "nes.button_up",
+    0x20: "nes.button_down",
+    0x40: "nes.button_left",
+    0x80: "nes.button_right",
+}
+
+
+def _load_builtin_value(
+    value: ResolvedBuiltinCall,
+    depth: int,
     label_counter: list[int],
 ) -> list[str]:
-    current = f"runtime_controller_{query.controller_index}_current"
-    previous = f"runtime_controller_{query.controller_index}_previous"
+    descriptor = builtin_by_id(value.builtin)
+    loader = _BUILTIN_VALUE_LOADERS.get(descriptor.emitter)
+    if loader is None:
+        raise ValueError(f"builtin {descriptor.public_name} has no value loader")
+    return loader(value, depth, label_counter)
+
+
+def _load_sprite_create(
+    value: ResolvedBuiltinCall,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
+    del depth, label_counter
+    index = value.arguments[0]
+    assert isinstance(index, ImmediateValue)
+    return [f"    lda #${index.value:02X}              ; static sprite reservation"]
+
+
+def _load_metasprite_create(
+    value: ResolvedBuiltinCall,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
+    del depth, label_counter
+    index = value.arguments[0]
+    assert isinstance(index, ImmediateValue)
+    return [
+        f"    lda #${index.value:02X}              ; static metasprite reservation"
+    ]
+
+
+def _load_metasprite_animation_finished(
+    value: ResolvedBuiltinCall,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
+    return [
+        "    ; nes.metasprite_animation_finished(instance)",
+        *_load_value_at_depth(value.arguments[0], depth, label_counter),
+        "    jsr runtime_metasprite_animation_finished",
+    ]
+
+
+def _load_background_updates_overflowed(
+    value: ResolvedBuiltinCall,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
+    del value, depth, label_counter
+    return [
+        "    ; nes.background_updates_overflowed(): sticky queue state",
+        "    lda runtime_background_queue_overflow",
+    ]
+
+
+def _load_controller_query(
+    query: ResolvedBuiltinCall,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
+    del depth
+    controller, button = query.arguments
+    assert isinstance(controller, ImmediateValue)
+    assert isinstance(button, ImmediateValue)
+    current = f"runtime_controller_{controller.value}_current"
+    previous = f"runtime_controller_{controller.value}_previous"
     true_label = _new_label(label_counter, "controller_true")
     false_label = _new_label(label_counter, "controller_false")
     end_label = _new_label(label_counter, "controller_end")
     prefix = [
-        f"    ; nes.controller_{query.kind.value}"
-        f"(${query.controller_index:02X}, {query.button_name})",
+        f"    ; {builtin_by_id(query.builtin).public_name}"
+        f"(${controller.value:02X}, {_CONTROLLER_BUTTON_NAMES[button.value]})",
     ]
-    if query.kind is ControllerQueryKind.DOWN:
+    if query.builtin is BuiltinId.CONTROLLER_DOWN:
         checks = [
             f"    lda {current}",
-            f"    and #${query.button_mask:02X}",
+            f"    and #${button.value:02X}",
             f"    bne {true_label}",
         ]
-    elif query.kind is ControllerQueryKind.PRESSED:
+    elif query.builtin is BuiltinId.CONTROLLER_PRESSED:
         checks = [
             f"    lda {current}",
-            f"    and #${query.button_mask:02X}",
+            f"    and #${button.value:02X}",
             f"    beq {false_label}",
             f"    lda {previous}",
-            f"    and #${query.button_mask:02X}",
+            f"    and #${button.value:02X}",
             f"    beq {true_label}",
         ]
     else:
         checks = [
             f"    lda {current}",
-            f"    and #${query.button_mask:02X}",
+            f"    and #${button.value:02X}",
             f"    bne {false_label}",
             f"    lda {previous}",
-            f"    and #${query.button_mask:02X}",
+            f"    and #${button.value:02X}",
             f"    bne {true_label}",
         ]
     return [
@@ -2643,20 +2843,35 @@ def _load_controller_query(
 
 
 def _load_get_tile(
-    query: ResolvedGetTile,
+    query: ResolvedBuiltinCall,
     depth: int,
     label_counter: list[int],
 ) -> list[str]:
+    x, y = query.arguments
     return [
         "    ; nes.get_tile(x, y): read the confirmed PPU tile shadow",
-        *_load_value_at_depth(query.x, depth, label_counter),
+        *_load_value_at_depth(x, depth, label_counter),
         "    pha                     ; preserve X across Y expression",
-        *_load_value_at_depth(query.y, depth, label_counter),
+        *_load_value_at_depth(y, depth, label_counter),
         "    sta runtime_background_y",
         "    pla",
         "    sta runtime_background_x",
         "    jsr runtime_get_tile",
     ]
+
+
+_BUILTIN_VALUE_LOADERS = {
+    BackendEmitter.SPRITE_CREATE: _load_sprite_create,
+    BackendEmitter.METASPRITE_CREATE: _load_metasprite_create,
+    BackendEmitter.METASPRITE_ANIMATION_FINISHED: (
+        _load_metasprite_animation_finished
+    ),
+    BackendEmitter.CONTROLLER_QUERY: _load_controller_query,
+    BackendEmitter.BACKGROUND_UPDATES_OVERFLOWED: (
+        _load_background_updates_overflowed
+    ),
+    BackendEmitter.GET_TILE: _load_get_tile,
+}
 
 
 def _load_binary_expression(
@@ -2682,8 +2897,8 @@ def _load_value_at_depth(
     depth: int,
     label_counter: list[int],
 ) -> list[str]:
-    if isinstance(value, ResolvedGetTile):
-        return _load_get_tile(value, depth, label_counter)
+    if isinstance(value, ResolvedBuiltinCall):
+        return _load_builtin_value(value, depth, label_counter)
     if isinstance(value, ResolvedBinaryExpression):
         return _load_binary_expression(value, depth, label_counter)
     if isinstance(value, ResolvedComparisonExpression):

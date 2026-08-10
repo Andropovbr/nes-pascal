@@ -2,13 +2,10 @@ from pathlib import Path
 import unittest
 
 from nes_pascal.ast import (
-    PaletteKind,
-    ResolvedSetBackgroundColor,
-    ResolvedSetPalette,
-    ResolvedSetPaletteColor,
-    SetPalette,
-    SetPaletteColor,
+    BuiltinCall,
+    ResolvedBuiltinCall,
 )
+from nes_pascal.builtins import BuiltinId
 from nes_pascal.backend_ca65 import generate
 from nes_pascal.diagnostics import CompilerError
 from nes_pascal.memory_layout import build_memory_layout, generate_linker_config
@@ -41,12 +38,18 @@ class PaletteParserTests(unittest.TestCase):
 
         parsed = parse(source)
 
-        self.assertIsInstance(parsed.statements[0], SetPalette)
-        self.assertIsInstance(parsed.statements[1], SetPalette)
-        self.assertIsInstance(parsed.statements[2], SetPaletteColor)
-        self.assertIsInstance(parsed.statements[3], SetPaletteColor)
-        self.assertEqual(parsed.statements[0].kind, PaletteKind.BACKGROUND)
-        self.assertEqual(parsed.statements[1].kind, PaletteKind.SPRITE)
+        self.assertTrue(
+            all(isinstance(statement, BuiltinCall) for statement in parsed.statements[:4])
+        )
+        self.assertEqual(
+            [statement.name for statement in parsed.statements[:4]],
+            [
+                "nes.set_background_palette",
+                "nes.set_sprite_palette",
+                "nes.set_background_palette_color",
+                "nes.set_sprite_palette_color",
+            ],
+        )
 
 
 class PaletteSemanticTests(unittest.TestCase):
@@ -83,9 +86,22 @@ class PaletteSemanticTests(unittest.TestCase):
 
         resolved = analyze_source(source)
 
-        full = [s for s in resolved.statements if isinstance(s, ResolvedSetPalette)]
+        full = [
+            s
+            for s in resolved.statements
+            if isinstance(s, ResolvedBuiltinCall)
+            and s.builtin
+            in (BuiltinId.SET_BACKGROUND_PALETTE, BuiltinId.SET_SPRITE_PALETTE)
+        ]
         individual = [
-            s for s in resolved.statements if isinstance(s, ResolvedSetPaletteColor)
+            s
+            for s in resolved.statements
+            if isinstance(s, ResolvedBuiltinCall)
+            and s.builtin
+            in (
+                BuiltinId.SET_BACKGROUND_PALETTE_COLOR,
+                BuiltinId.SET_SPRITE_PALETTE_COLOR,
+            )
         ]
         self.assertEqual([statement.queued for statement in full], [False, True])
         self.assertTrue(individual[0].queued)
@@ -110,9 +126,11 @@ end;
         palette_statements = [
             statement
             for statement in resolved.procedures[0].body
-            if isinstance(
-                statement,
-                (ResolvedSetBackgroundColor, ResolvedSetPaletteColor),
+            if isinstance(statement, ResolvedBuiltinCall)
+            and statement.builtin
+            in (
+                BuiltinId.SET_BACKGROUND_COLOR,
+                BuiltinId.SET_SPRITE_PALETTE_COLOR,
             )
         ]
         self.assertTrue(all(statement.queued for statement in palette_statements))
