@@ -1,5 +1,7 @@
 # Milestone 0.5.5: Compiler Architecture and Code Generation Audit
 
+English | [Português (Brasil)](..\pt-BR\compiler\optimization-audit-0.5.5.md)
+
 This document establishes the official architecture, code generation, and resource consumption baseline for the **NES Pascal** compiler as of milestone **0.5.5**.
 
 It evaluates the compiler's current state, measures generated 6502 code across an expanded 16-benchmark suite, analyzes technical debt and architectural risks, assesses optimization opportunities, reconciles the NMI/VBlank cycle budget with runtime specifications, and defines a prioritized sequence of follow-up milestones.

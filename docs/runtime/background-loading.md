@@ -1,5 +1,7 @@
 # Background loading
 
+English | [Português (Brasil)](..\pt-BR\runtime\background-loading.md)
+
 `nes.load_background()` uploads one complete static background during program
 initialization:
 

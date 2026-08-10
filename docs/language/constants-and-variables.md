@@ -1,5 +1,7 @@
 # Constants and variables
 
+English | [Português (Brasil)](..\pt-BR\language\constants-and-variables.md)
+
 ## Constants
 
 A constant declaration has this grammar:

@@ -1,5 +1,7 @@
 # Metasprites
 
+English | [Português (Brasil)](..\pt-BR\runtime\metasprites.md)
+
 A metasprite is one logical object composed of an arbitrary list of 8-by-8 NES
 hardware sprites. A `metasprite` value identifies the logical instance; it is
 not an OAM index, and component indexes are never exposed to source code.

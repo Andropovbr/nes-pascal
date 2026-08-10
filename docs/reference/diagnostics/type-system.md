@@ -1,5 +1,7 @@
 # Type-system diagnostics
 
+English | [Português (Brasil)](..\..\pt-BR\reference\diagnostics\type-system.md)
+
 Type-system diagnostics use the E4000-E4999 range.
 
 ## E4001 - Unknown type

@@ -1,5 +1,7 @@
 # Identifiers and literals
 
+English | [Português (Brasil)](..\pt-BR\language\identifiers-and-literals.md)
+
 ## Identifiers
 
 Identifiers:

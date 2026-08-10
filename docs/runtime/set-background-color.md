@@ -1,5 +1,7 @@
 # `nes.set_background_color`
 
+English | [Português (Brasil)](..\pt-BR\runtime\set-background-color.md)
+
 `nes.set_background_color` sets the universal NES background palette color.
 
 ## Syntax

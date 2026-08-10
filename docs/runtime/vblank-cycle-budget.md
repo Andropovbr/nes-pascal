@@ -1,5 +1,7 @@
 # VBlank cycle budget
 
+English | [Português (Brasil)](..\pt-BR\runtime\vblank-cycle-budget.md)
+
 NES Pascal targets NTSC NES. One VBlank is approximately 2,273 CPU cycles.
 That is the hardware window, not a safe promise that every one of those cycles
 is available: NMI begins after the current instruction completes, OAM DMA has

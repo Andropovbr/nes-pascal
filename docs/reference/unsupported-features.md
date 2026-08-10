@@ -1,5 +1,7 @@
 # Unsupported features
 
+English | [Português (Brasil)](..\pt-BR\reference\unsupported-features.md)
+
 This page lists important limits of the currently implemented language,
 runtime, and target. Planned work is tracked in the
 [project roadmap](../../roadmap/README.md); an unchecked roadmap item is not part of

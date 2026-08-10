@@ -1,5 +1,7 @@
 # Reference
 
+English | [Português (Brasil)](..\pt-BR\reference\index.md)
+
 The reference section covers compiler and platform behavior that spans the
 language guide and runtime API.
 

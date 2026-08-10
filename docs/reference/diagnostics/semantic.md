@@ -1,5 +1,7 @@
 # Semantic diagnostics
 
+English | [Português (Brasil)](..\..\pt-BR\reference\diagnostics\semantic.md)
+
 Semantic-analysis diagnostics use the E3000-E3999 range.
 
 ## E3001 - Missing `nes.run`

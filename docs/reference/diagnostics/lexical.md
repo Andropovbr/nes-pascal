@@ -1,5 +1,7 @@
 # Lexical diagnostics
 
+English | [Português (Brasil)](..\..\pt-BR\reference\diagnostics\lexical.md)
+
 Lexical diagnostics use the E1000-E1999 range.
 
 ## E1000 - Unexpected character

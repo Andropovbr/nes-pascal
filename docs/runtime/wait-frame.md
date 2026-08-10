@@ -1,5 +1,7 @@
 # `nes.wait_frame`
 
+English | [Português (Brasil)](..\pt-BR\runtime\wait-frame.md)
+
 `nes.wait_frame` blocks the main thread until the runtime-owned NMI frame
 counter changes:
 
