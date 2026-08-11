@@ -90,16 +90,24 @@ jobs:
           echo "MesenCE 2.2.1 binary ready at: $MESEN_PATH"
 
       - name: Run Mesen runtime emulation tests
+        id: mesen_tests
         run: |
-          python -m unittest tests.test_integration.MesenIntegrationTests -v 2>&1 | tee /tmp/test_output.log
-          test ${PIPESTATUS[0]} -eq 0
+          python -m unittest tests.test_integration.MesenIntegrationTests -v 2>&1 | tee mesen_tests.log
+
+      - name: Upload Mesen test log artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mesen-test-log
+          path: mesen_tests.log
+          if-no-files-found: ignore
 
       - name: Publish Test Summary
         if: always()
         run: |
           echo "### Mesen Runtime Test Results" >> "$GITHUB_STEP_SUMMARY"
           echo '```text' >> "$GITHUB_STEP_SUMMARY"
-          cat /tmp/test_output.log >> "$GITHUB_STEP_SUMMARY" || true
+          cat mesen_tests.log >> "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
   ci-gate:
