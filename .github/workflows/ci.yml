@@ -49,6 +49,7 @@ jobs:
     env:
       SDL_AUDIODRIVER: dummy
       SDL_VIDEODRIVER: dummy
+      ALSA_CONFIG_PATH: /dev/null
 
     steps:
       - name: Checkout repository
@@ -68,7 +69,7 @@ jobs:
       - name: Install cc65 and runtime dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cc65 libsdl2-dev libfontconfig1 curl unzip
+          sudo apt-get install -y cc65 libsdl2-dev libfontconfig1 libgl1 libgtk-3-0 curl unzip
 
       - name: Validate toolchain installation
         run: |
@@ -90,7 +91,16 @@ jobs:
 
       - name: Run Mesen runtime emulation tests
         run: |
-          python -m unittest tests.test_integration.MesenIntegrationTests -v
+          python -m unittest tests.test_integration.MesenIntegrationTests -v 2>&1 | tee /tmp/test_output.log
+          test ${PIPESTATUS[0]} -eq 0
+
+      - name: Publish Test Summary
+        if: always()
+        run: |
+          echo "### Mesen Runtime Test Results" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/test_output.log >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
   ci-gate:
     name: ci-gate
