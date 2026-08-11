@@ -1,6 +1,7 @@
-from pathlib import Path
+import shutil
 import tempfile
 import unittest
+from pathlib import Path
 
 from nes_pascal.ast import (
     BuiltinCall,
@@ -20,6 +21,10 @@ from nes_pascal.semantic import analyze
 
 
 ROOT = Path(__file__).resolve().parents[1]
+TOOLCHAIN_AVAILABLE = (
+    shutil.which("ca65") is not None
+    and shutil.which("ld65") is not None
+)
 
 
 SOURCE = """program BackgroundUpdates;
@@ -497,6 +502,10 @@ end.
         self.assertEqual(assembly.count("jsr runtime_get_tile"), 2)
 
 
+@unittest.skipUnless(
+    TOOLCHAIN_AVAILABLE,
+    "integration skipped: ca65 and/or ld65 are not installed",
+)
 class BackgroundUpdateIntegrationTests(unittest.TestCase):
     def test_focused_loaded_background_programs_compile(self) -> None:
         cases = {

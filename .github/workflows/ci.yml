@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compiler-toolchain:
+    name: compiler-toolchain
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies and project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Install cc65 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cc65
+
+      - name: Validate toolchain installation
+        run: |
+          ca65 --version
+          ld65 --version
+
+      - name: Run compiler and toolchain regression suite
+        run: |
+          python -m unittest discover -s tests -v
+
+  mesen-runtime:
+    name: mesen-runtime
+    needs: compiler-toolchain
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies and project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Install cc65 and runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cc65 libsdl2-2.0-0 curl unzip
+
+      - name: Validate toolchain installation
+        run: |
+          ca65 --version
+          ld65 --version
+
+      - name: Install MesenCE 2.2.1
+        run: |
+          mkdir -p "$HOME/.mesen"
+          curl -sSL "https://github.com/nesdev-org/MesenCE/releases/download/2.2.1/Mesen_2.2.1_Linux_x64.zip" -o "$HOME/.mesen/Mesen_2.2.1_Linux_x64.zip"
+          unzip -o "$HOME/.mesen/Mesen_2.2.1_Linux_x64.zip" -d "$HOME/.mesen"
+          chmod +x "$HOME/.mesen/Mesen"
+          echo "MESEN_PATH=$HOME/.mesen/Mesen" >> "$GITHUB_ENV"
+
+      - name: Validate Mesen installation
+        run: |
+          test -x "$MESEN_PATH"
+          echo "MesenCE 2.2.1 binary ready at: $MESEN_PATH"
+
+      - name: Run Mesen runtime emulation tests
+        run: |
+          python -m unittest tests.test_integration.MesenIntegrationTests -v
+
+  ci-gate:
+    name: ci-gate
+    needs:
+      - compiler-toolchain
+      - mesen-runtime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate pipeline status
+        run: |
+          echo "All required checks (compiler-toolchain and mesen-runtime) passed successfully."

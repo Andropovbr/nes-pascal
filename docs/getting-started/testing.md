@@ -83,3 +83,29 @@ python -m unittest discover -s tests -v
 
 The behavior test is skipped clearly when Mesen or the cc65 toolchain is
 unavailable.
+
+## Continuous Integration (CI)
+
+The repository uses GitHub Actions for automated regression testing on every
+push and manual trigger (`workflow_dispatch`). The pipeline consists of three
+jobs:
+
+1. **`compiler-toolchain`**: Installs Python and the `cc65` toolchain (`ca65`
+   and `ld65`), and executes the complete compiler regression test suite
+   (lexer, parser, semantic, memory layout, diagnostics, golden assembly, and
+   ROM build integration tests).
+2. **`mesen-runtime`**: Depends on `compiler-toolchain`, installs `ca65`/`ld65`
+   and MesenCE 2.2.1, configures `MESEN_PATH`, and executes the complete
+   suite of headless Mesen behavioral runtime tests.
+3. **`ci-gate`**: Acts as the single required gate verifying that both
+   `compiler-toolchain` and `mesen-runtime` passed successfully.
+
+To run the equivalent test stages locally:
+
+```text
+# Run the compiler and toolchain regression suite (requires ca65 and ld65 on PATH)
+python -m unittest discover -s tests -v
+
+# Run the Mesen runtime behavioral suite (requires ca65, ld65, and MESEN_PATH)
+python -m unittest tests.test_integration.MesenIntegrationTests -v
+```
