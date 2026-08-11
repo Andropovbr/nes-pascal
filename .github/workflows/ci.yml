@@ -86,7 +86,6 @@ jobs:
       - name: Validate Mesen installation
         run: |
           test -x "$MESEN_PATH"
-          "$MESEN_PATH" --help
           echo "MesenCE 2.2.1 binary ready at: $MESEN_PATH"
 
       - name: Run Mesen runtime emulation tests
