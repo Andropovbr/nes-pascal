@@ -7,3 +7,6 @@ name = "nes-pascal"
 version = "0.5.4"
 description = "Prototype Pascal compiler specialized for the NES"
 requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+include = ["nes_pascal*"]
