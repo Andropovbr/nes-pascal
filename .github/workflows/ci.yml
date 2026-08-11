@@ -63,7 +63,7 @@ jobs:
       - name: Install cc65 and runtime dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cc65 libsdl2-2.0-0 curl unzip
+          sudo apt-get install -y cc65 libsdl2-2.0-0 xvfb curl unzip
 
       - name: Validate toolchain installation
         run: |
@@ -85,7 +85,7 @@ jobs:
 
       - name: Run Mesen runtime emulation tests
         run: |
-          python -m unittest tests.test_integration.MesenIntegrationTests -v
+          xvfb-run -a python -m unittest tests.test_integration.MesenIntegrationTests -v
 
   ci-gate:
     name: ci-gate
