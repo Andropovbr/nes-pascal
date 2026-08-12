@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compiler-toolchain:
+    name: compiler-toolchain
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies and project
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -e .
+
+      - name: Install cc65 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cc65
+
+      - name: Validate toolchain installation
+        run: |
+          ca65 --version
+          ld65 --version
+
+      - name: Run compiler and toolchain regression suite
+        run: |
+          python -m unittest discover -s tests -v
+
+  mesen-runtime:
+    name: mesen-runtime
+    runs-on: ubuntu-latest
+    needs: compiler-toolchain
+    env:
+      SDL_AUDIODRIVER: dummy
+      ALSA_CONFIG_PATH: /dev/null
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies and project
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -e .
+
+      - name: Install cc65 and runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cc65 libsdl2-dev libfontconfig1 libgl1 libgtk-3-0 xvfb curl unzip
+
+      - name: Validate toolchain installation
+        run: |
+          ca65 --version
+          ld65 --version
+
+      - name: Install MesenCE 2.2.1
+        run: |
+          mkdir -p "$HOME/.mesen"
+          curl -sSL "https://github.com/nesdev-org/MesenCE/releases/download/2.2.1/Mesen_2.2.1_Linux_x64.zip" -o "$HOME/.mesen/Mesen_2.2.1_Linux_x64.zip"
+          unzip -o "$HOME/.mesen/Mesen_2.2.1_Linux_x64.zip" -d "$HOME/.mesen"
+          chmod +x "$HOME/.mesen/Mesen"
+          echo "MESEN_PATH=$HOME/.mesen/Mesen" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.config/MesenCE"
+          echo '{"Version": "2.2.1", "ConfigUpgrade": 5}' > "$HOME/.config/MesenCE/settings.json"
+
+      - name: Validate Mesen installation
+        run: |
+          test -x "$MESEN_PATH"
+          test -f "$HOME/.config/MesenCE/settings.json"
+          echo "MesenCE 2.2.1 binary ready at: $MESEN_PATH"
+
+      - name: Run Mesen runtime emulation tests
+        id: mesen_tests
+        run: |
+          set -o pipefail
+          xvfb-run -a -s "-screen 0 1024x768x24" python -m unittest tests.test_integration.MesenIntegrationTests -v 2>&1 | tee mesen_tests.log
+
+      - name: Upload Mesen test log artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mesen-test-log
+          path: mesen_tests.log
+          if-no-files-found: ignore
+
+      - name: Publish Test Summary
+        if: always()
+        run: |
+          echo "### Mesen Runtime Test Results" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          cat mesen_tests.log >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  ci-gate:
+    name: ci-gate
+    if: ${{ always() }}
+    needs:
+      - compiler-toolchain
+      - mesen-runtime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate pipeline status
+        env:
+          COMPILER_RESULT: ${{ needs.compiler-toolchain.result }}
+          MESEN_RESULT: ${{ needs.mesen-runtime.result }}
+        run: |
+          echo "compiler-toolchain: $COMPILER_RESULT"
+          echo "mesen-runtime: $MESEN_RESULT"
+
+          test "$COMPILER_RESULT" = "success"
+          test "$MESEN_RESULT" = "success"
+
+          echo "All required checks passed successfully."
