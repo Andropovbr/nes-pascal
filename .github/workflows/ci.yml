@@ -48,7 +48,6 @@ jobs:
     needs: compiler-toolchain
     env:
       SDL_AUDIODRIVER: dummy
-      SDL_VIDEODRIVER: dummy
       ALSA_CONFIG_PATH: /dev/null
 
     steps:
