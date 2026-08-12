@@ -1,0 +1,28 @@
+program ArrayCodegen;
+
+var
+    Values: array[$00..$07] of byte;
+    Flags: array[$00..$03] of boolean;
+    Index: byte;
+    Result: byte;
+    Enabled: boolean;
+
+begin
+    Index := $01;
+    Values[$00] := $10;
+    Values[Index] := $20;
+    Result := Values[$00];
+    Result := Values[Index];
+    Values[$02] := Values[Index] + $01;
+    Flags[$00] := true;
+    Flags[Index] := false;
+    Enabled := Flags[$00];
+    Enabled := Flags[Index];
+    Result := Values[$01] + Values[$02];
+    if Flags[Index] then
+        Result := Result + $01;
+    if Values[Index] = $20 then
+        Enabled := true;
+    nes.set_background_color($0F);
+    nes.run;
+end.

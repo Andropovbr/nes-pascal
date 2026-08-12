@@ -20,6 +20,8 @@ if str(ROOT) not in sys.path:
 
 from nes_pascal.assets import load_background_data, load_chr_rom
 from nes_pascal.ast import (
+    ResolvedArrayElement,
+    ResolvedArrayElementAssignment,
     BinaryExpression,
     BooleanBinaryExpression,
     BooleanNotExpression,
@@ -124,6 +126,11 @@ BENCHMARKS: tuple[BenchmarkSpec, ...] = (
         "examples/frame_callbacks.nsp",
     ),
     BenchmarkSpec(
+        "arrays",
+        "Fixed Arrays",
+        "examples/arrays.nsp",
+    ),
+    BenchmarkSpec(
         "gameplay_full_stack",
         "Full-Stack Gameplay (Combined RAM Pressure)",
         "examples/gameplay_full_stack.nsp",
@@ -171,13 +178,21 @@ def get_expression_metrics(val: ResolvedValue) -> tuple[int, int]:
                 1 + metrics[1][1],
             )
         return depth, temporaries
+    if isinstance(val, ResolvedArrayElement):
+        depth, temporaries = get_expression_metrics(val.index)
+        return 1 + depth, temporaries
     return 0, 0
 
 
 def collect_statement_metrics(stmts: tuple[ResolvedStatement, ...]) -> tuple[int, int]:
     max_d, max_t = 0, 0
     for s in stmts:
-        if isinstance(s, ResolvedAssignment):
+        if isinstance(s, ResolvedArrayElementAssignment):
+            index_depth, index_temporaries = get_expression_metrics(s.index)
+            value_depth, value_temporaries = get_expression_metrics(s.value)
+            max_d = max(max_d, index_depth, value_depth)
+            max_t = max(max_t, index_temporaries, value_temporaries)
+        elif isinstance(s, ResolvedAssignment):
             d, t = get_expression_metrics(s.value)
             max_d, max_t = max(max_d, d), max(max_t, t)
         elif isinstance(s, ResolvedBuiltinCall):
@@ -713,7 +728,7 @@ def run_all_benchmarks() -> list[BenchmarkMetrics]:
 
 def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
     lines: list[str] = [
-        "# NES Pascal Compiler Benchmark Results (0.5.5 Corpus)",
+        "# NES Pascal Compiler Benchmark Results (0.5.5 Corpus + 0.5.8 Arrays)",
         "",
         "## 1. CPU RAM Accounting",
         "",

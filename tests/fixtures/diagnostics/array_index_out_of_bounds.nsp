@@ -1,0 +1,8 @@
+program ArrayIndexOutOfBounds;
+var
+    Values: array[$00..$03] of byte;
+begin
+    Values[$04] := $10;
+    nes.set_background_color($0F);
+    nes.run;
+end.

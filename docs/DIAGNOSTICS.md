@@ -83,6 +83,11 @@ diagnostics section.
 | E4007 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4008 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4009 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4010 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4011 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4012 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4013 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4014 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E5001 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5002 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5003 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |

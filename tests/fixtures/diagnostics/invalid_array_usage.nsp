@@ -1,0 +1,8 @@
+program InvalidArrayUsage;
+var
+    Values: array[$00..$03] of byte;
+begin
+    Values := $10;
+    nes.set_background_color($0F);
+    nes.run;
+end.

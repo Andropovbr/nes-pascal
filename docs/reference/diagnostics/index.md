@@ -94,6 +94,11 @@ the range reserved for their category.
 | [E4007](type-system.md) | Type System | Invalid palette argument type |
 | [E4008](type-system.md) | Type System | Invalid `sprite` value |
 | [E4009](type-system.md) | Type System | Invalid `metasprite` value |
+| [E4010](type-system.md) | Type System | Invalid array element type |
+| [E4011](type-system.md) | Type System | Invalid array index type |
+| [E4012](type-system.md) | Type System | Array index out of bounds |
+| [E4013](type-system.md) | Type System | Invalid array usage |
+| [E4014](type-system.md) | Type System | Invalid array bounds |
 | [E5001](code-generation.md) | Code Generation | Missing toolchain |
 | [E5002](code-generation.md) | Code Generation | Toolchain failure |
 | [E5003](code-generation.md) | Code Generation | User RAM exhausted |

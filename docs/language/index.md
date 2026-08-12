@@ -10,6 +10,7 @@ compatible with Pascal or Free Pascal.
 - [Identifiers and literals](identifiers-and-literals.md)
 - [Built-in types](types.md)
 - [Constants and variables](constants-and-variables.md)
+- [Arrays](arrays.md)
 - [Assignments](assignments.md)
 - [Expressions](expressions.md)
 - [Conditional statements](conditionals.md)

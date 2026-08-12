@@ -37,14 +37,17 @@ var
     Enabled: boolean;
 ```
 
-Each declaration contains exactly one identifier and an explicit built-in
-type. Storage is deterministic. A global referenced by at least three source
+Each declaration contains exactly one identifier and an explicit scalar or
+fixed-array type. Storage is deterministic. A scalar global referenced by at least three source
 operations is eligible for automatic Zero Page promotion in declaration
 order. If optional promotion space is unavailable, it falls back to regular
 RAM without changing its symbol or behavior. Other globals and every procedure
 value parameter use regular RAM. The compiler reports an error before linking
 if mandatory temporaries or regular RAM are exhausted. See the
 [CPU memory reference](../runtime/cpu-memory.md).
+
+Fixed arrays are always contiguous regular-RAM allocations. See
+[Arrays](arrays.md) for their syntax, element types, and exact memory cost.
 
 ## Names and duplicate declarations
 

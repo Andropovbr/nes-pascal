@@ -165,3 +165,48 @@ Diagnósticos do sistema de tipos utilizam o intervalo E4000-E4999.
 - **Saída esperada do compilador:** `E4009` rejeita o literal sem convertê-lo para uma
   identidade de instância.
 - **Correção sugerida:** Atribua o resultado de `nes.metasprite_create(imported.frame)` à variável.
+
+## E4010 - Tipo de elemento de array inválido
+
+- **Categoria:** Type System
+- **Explicação:** Arrays fixos suportam atualmente apenas elementos `byte` e
+  `boolean`.
+- **Gatilho:** Declarar `array[$00..$03] of nes_color`.
+- **Correção sugerida:** Use `byte` ou `boolean` como tipo do elemento.
+
+## E4011 - Tipo de índice de array inválido
+
+- **Categoria:** Type System
+- **Explicação:** Um índice de array deve ser uma expressão estrita de tipo
+  `byte`.
+- **Gatilho:** Indexar um array com um valor `boolean`.
+- **Correção sugerida:** Use uma variável, literal, constante ou expressão
+  aritmética de tipo `byte`.
+
+## E4012 - Índice de array fora dos limites
+
+- **Categoria:** Type System
+- **Explicação:** Um índice conhecido em tempo de compilação está fora do
+  intervalo inclusivo declarado para o array.
+- **Gatilho:** Ler ou escrever `Values[$08]` quando `Values` foi declarado como
+  `array[$00..$07] of byte`.
+- **Correção sugerida:** Use um índice constante dentro dos limites declarados.
+  Índices variáveis continuam sendo responsabilidade do programa em runtime.
+
+## E4013 - Uso inválido de array
+
+- **Categoria:** Type System
+- **Explicação:** Uma variável escalar foi indexada, ou um array foi usado ou
+  atribuído como um valor escalar inteiro.
+- **Gatilho:** Compilar `Counter[$00] := $01` ou `Counter := Values`.
+- **Correção sugerida:** Indexe um array declarado e leia ou escreva um único
+  elemento.
+
+## E4014 - Limites de array inválidos
+
+- **Categoria:** Type System
+- **Explicação:** Arrays usam um intervalo de byte iniciado em zero, com limite
+  inferior `$00` e superior não maior que `$FF`.
+- **Gatilho:** Declarar `array[$01..$04] of byte`.
+- **Correção sugerida:** Declare um intervalo como
+  `array[$00..$03] of byte`.

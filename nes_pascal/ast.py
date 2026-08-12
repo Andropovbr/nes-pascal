@@ -26,6 +26,33 @@ class BuiltInType(Enum):
     METASPRITE_ANIMATION = "metasprite_animation"
 
 
+@dataclass(frozen=True, slots=True)
+class ArrayType:
+    """A fixed-size, zero-based global array type."""
+
+    element_type: BuiltInType
+    lower_bound: int
+    upper_bound: int
+    position: SourcePosition | None = field(default=None, compare=False)
+    lower_bound_position: SourcePosition | None = field(default=None, compare=False)
+    upper_bound_position: SourcePosition | None = field(default=None, compare=False)
+    element_type_position: SourcePosition | None = field(default=None, compare=False)
+
+    @property
+    def element_count(self) -> int:
+        return self.upper_bound - self.lower_bound + 1
+
+    @property
+    def value(self) -> str:
+        return (
+            f"array[${self.lower_bound:02X}..${self.upper_bound:02X}] "
+            f"of {self.element_type.value}"
+        )
+
+
+VariableType = BuiltInType | ArrayType
+
+
 class UnaryOperator(Enum):
     PLUS = "+"
     NEGATE = "-"
@@ -83,7 +110,7 @@ class ConstantDeclaration:
 @dataclass(frozen=True, slots=True)
 class VariableDeclaration:
     name: str
-    type: BuiltInType
+    type: VariableType
     position: SourcePosition
 
 
@@ -104,6 +131,13 @@ class ConstantReference:
 @dataclass(frozen=True, slots=True)
 class VariableReference:
     name: str
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class ArrayIndexExpression:
+    array_name: str
+    index: ValueExpression
     position: SourcePosition
 
 
@@ -156,6 +190,7 @@ ValueExpression = (
     | BooleanLiteral
     | ConstantReference
     | VariableReference
+    | ArrayIndexExpression
     | UnaryExpression
     | BinaryExpression
     | ComparisonExpression
@@ -169,6 +204,14 @@ ValueExpression = (
 class Assignment:
     target: str
     target_position: SourcePosition
+    value: ValueExpression
+
+
+@dataclass(frozen=True, slots=True)
+class ArrayElementAssignment:
+    target: str
+    target_position: SourcePosition
+    index: ValueExpression
     value: ValueExpression
 
 
@@ -270,6 +313,7 @@ class ProcedureCall:
 
 Statement = (
     Assignment
+    | ArrayElementAssignment
     | BuiltinCall
     | LoadBackground
     | Run
@@ -308,7 +352,7 @@ class Program:
 @dataclass(frozen=True, slots=True)
 class ResolvedVariable:
     name: str
-    type: BuiltInType
+    type: VariableType
     label: str
     position: SourcePosition | None = field(default=None, compare=False)
 
@@ -322,6 +366,12 @@ class ImmediateValue:
 @dataclass(frozen=True, slots=True)
 class VariableValue:
     variable: ResolvedVariable
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedArrayElement:
+    array: ResolvedVariable
+    index: ResolvedValue
 
 
 @dataclass(frozen=True, slots=True)
@@ -366,6 +416,7 @@ class ResolvedBuiltinCall:
 ResolvedValue = (
     ImmediateValue
     | VariableValue
+    | ResolvedArrayElement
     | ResolvedUnaryExpression
     | ResolvedBinaryExpression
     | ResolvedComparisonExpression
@@ -378,6 +429,13 @@ ResolvedValue = (
 @dataclass(frozen=True, slots=True)
 class ResolvedAssignment:
     target: ResolvedVariable
+    value: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedArrayElementAssignment:
+    target: ResolvedVariable
+    index: ResolvedValue
     value: ResolvedValue
 
 
@@ -536,6 +594,7 @@ class OamReservation:
 
 ResolvedStatement = (
     ResolvedAssignment
+    | ResolvedArrayElementAssignment
     | ResolvedBuiltinCall
     | ResolvedLoadBackground
     | Run

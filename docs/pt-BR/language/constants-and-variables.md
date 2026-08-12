@@ -36,14 +36,17 @@ var
     Enabled: boolean;
 ```
 
-Cada declaração contém exatamente um identificador e um tipo embutido explícito.
-O armazenamento é determinístico. Uma variável global referenciada por pelo menos
+Cada declaração contém exatamente um identificador e um tipo escalar ou de array
+fixo explícito. O armazenamento é determinístico. Uma variável global escalar referenciada por pelo menos
 três operações do código-fonte é elegível para promoção automática para a Zero Page
 na ordem de declaração. Se o espaço de promoção opcional não estiver disponível, ela
 recorre à RAM comum (fallback) sem alterar seu símbolo ou comportamento. Outras variáveis
 globais e todos os parâmetros de valor de procedimentos utilizam RAM comum. O compilador
 reporta um erro antes do link se os temporários obrigatórios ou a RAM comum forem
 esgotados. Consulte a [Referência de memória da CPU](../runtime/cpu-memory.md).
+
+Arrays fixos são sempre alocações contíguas na RAM comum. Consulte
+[Arrays](arrays.md) para a sintaxe, os tipos de elemento e o custo exato de memória.
 
 ## Nomes e declarações duplicadas
 

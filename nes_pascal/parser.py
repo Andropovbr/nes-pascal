@@ -1,6 +1,9 @@
 """Hand-written recursive-descent parser for the current milestone."""
 
 from .ast import (
+    ArrayElementAssignment,
+    ArrayIndexExpression,
+    ArrayType,
     Assignment,
     BinaryExpression,
     BinaryOperator,
@@ -144,7 +147,7 @@ class Parser:
         while self._check(TokenKind.IDENTIFIER):
             name = self._expect(TokenKind.IDENTIFIER, "Expected a variable name.")
             self._expect(TokenKind.COLON, "Expected ':' after the variable name.")
-            declared_type = self._parse_type()
+            declared_type = self._parse_variable_type()
             self._expect(
                 TokenKind.SEMICOLON, "Expected ';' after the variable declaration."
             )
@@ -156,6 +159,37 @@ class Parser:
                 )
             )
         return declarations
+
+    def _parse_variable_type(self) -> BuiltInType | ArrayType:
+        if not self._match(TokenKind.ARRAY):
+            return self._parse_type()
+
+        array_token = self._previous()
+        self._expect(TokenKind.LEFT_BRACKET, "Expected '[' after 'array'.")
+        lower = self._expect(
+            TokenKind.HEX_LITERAL,
+            "Expected a hexadecimal lower bound after '['.",
+        )
+        self._expect(TokenKind.DOT, "Expected '..' between array bounds.")
+        self._expect(TokenKind.DOT, "Expected '..' between array bounds.")
+        upper = self._expect(
+            TokenKind.HEX_LITERAL,
+            "Expected a hexadecimal upper bound after '..'.",
+        )
+        self._expect(TokenKind.RIGHT_BRACKET, "Expected ']' after array bounds.")
+        self._expect(TokenKind.OF, "Expected 'of' after array bounds.")
+        element_token = self._current()
+        element_type = self._parse_type()
+        assert lower.value is not None and upper.value is not None
+        return ArrayType(
+            element_type,
+            lower.value,
+            upper.value,
+            SourcePosition(array_token.line, array_token.column),
+            SourcePosition(lower.line, lower.column),
+            SourcePosition(upper.line, upper.column),
+            SourcePosition(element_token.line, element_token.column),
+        )
 
     def _parse_type(self) -> BuiltInType:
         token = self._expect(TokenKind.IDENTIFIER, "Expected a type after ':'.")
@@ -315,7 +349,10 @@ class Parser:
                 TokenKind.CONTINUE,
                 consume_terminator,
             )
-        if self._check(TokenKind.IDENTIFIER) and self._peek_kind() is TokenKind.ASSIGN:
+        if self._check(TokenKind.IDENTIFIER) and self._peek_kind() in (
+            TokenKind.ASSIGN,
+            TokenKind.LEFT_BRACKET,
+        ):
             return self._parse_assignment(consume_terminator)
         if self._check(TokenKind.IDENTIFIER) and self._peek_kind() in (
             TokenKind.LEFT_PAREN,
@@ -394,15 +431,32 @@ class Parser:
         self._unknown_command(command, qualified_name)
         raise AssertionError("unreachable")
 
-    def _parse_assignment(self, consume_terminator: bool) -> Assignment:
+    def _parse_assignment(
+        self, consume_terminator: bool
+    ) -> Assignment | ArrayElementAssignment:
         target = self._expect(TokenKind.IDENTIFIER, "Expected an assignment target.")
+        target_position = SourcePosition(target.line, target.column)
+        index = None
+        if self._match(TokenKind.LEFT_BRACKET):
+            index = self._parse_expression()
+            self._expect(
+                TokenKind.RIGHT_BRACKET,
+                "Expected ']' after the array index.",
+            )
         self._expect(TokenKind.ASSIGN, "Expected ':=' after the assignment target.")
         value = self._parse_expression()
         if consume_terminator:
             self._expect(TokenKind.SEMICOLON, "Expected ';' after the assignment.")
+        if index is not None:
+            return ArrayElementAssignment(
+                target.text,
+                target_position,
+                index,
+                value,
+            )
         return Assignment(
             target.text,
-            SourcePosition(target.line, target.column),
+            target_position,
             value,
         )
 
@@ -781,6 +835,13 @@ class Parser:
             return self._parse_literal("value")
         if self._match(TokenKind.IDENTIFIER):
             position = SourcePosition(token.line, token.column)
+            if self._match(TokenKind.LEFT_BRACKET):
+                index = self._parse_expression()
+                self._expect(
+                    TokenKind.RIGHT_BRACKET,
+                    "Expected ']' after the array index.",
+                )
+                return ArrayIndexExpression(token.text, index, position)
             if self._match(TokenKind.DOT):
                 member = self._expect(
                     TokenKind.IDENTIFIER,

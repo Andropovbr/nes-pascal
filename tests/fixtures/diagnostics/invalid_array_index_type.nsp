@@ -1,0 +1,11 @@
+program InvalidArrayIndexType;
+var
+    Values: array[$00..$03] of byte;
+    Enabled: boolean;
+begin
+    Enabled := true;
+    Values[$00] := $10;
+    Values[Enabled] := $20;
+    nes.set_background_color($0F);
+    nes.run;
+end.

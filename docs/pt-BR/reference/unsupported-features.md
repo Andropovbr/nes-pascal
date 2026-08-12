@@ -20,8 +20,9 @@ parte da linguagem suportada.
 - Igualdade e desigualdade exigem tipos correspondentes; comparações ordenadas são
   limitadas a `byte`.
 - Expressões booleanas suportam apenas `not`, `and` e `or`.
-- `case`, arrays, records, funções gerais, strings em tempo de execução e Assembly inline
-  não são suportados. Um pequeno conjunto fixo de expressões de consulta embutidas e os
+- `case`, records, funções gerais, strings em tempo de execução e Assembly inline
+  não são suportados. Arrays são limitados a arrays globais unidimensionais de
+  tamanho fixo com elementos `byte` ou `boolean`. Um pequeno conjunto fixo de expressões de consulta embutidas e os
   intrínsecos estaticamente resolvidos `nes.sprite_create()` e `nes.metasprite_create(frame)`
   são suportados.
 - Parâmetros de procedimentos são limitados a valores `byte` e `boolean`. Não há parâmetros

@@ -177,3 +177,45 @@ Type-system diagnostics use the E4000-E4999 range.
   it to an instance identity.
 - **Suggested fix:** Assign the result of
   `nes.metasprite_create(imported.frame)` to the variable.
+
+## E4010 - Invalid array element type
+
+- **Category:** Type System
+- **Explanation:** Fixed arrays currently support only `byte` and `boolean`
+  elements.
+- **Trigger:** Declare `array[$00..$03] of nes_color`.
+- **Suggested fix:** Use `byte` or `boolean` as the element type.
+
+## E4011 - Invalid array index type
+
+- **Category:** Type System
+- **Explanation:** An array index must be a strict `byte` expression.
+- **Trigger:** Index an array with a `boolean` value.
+- **Suggested fix:** Use an assigned `byte` variable, literal, constant, or
+  arithmetic expression.
+
+## E4012 - Array index out of bounds
+
+- **Category:** Type System
+- **Explanation:** A compile-time-known index is outside the array's inclusive
+  declared range.
+- **Trigger:** Read or write `Values[$08]` when `Values` is declared as
+  `array[$00..$07] of byte`.
+- **Suggested fix:** Use a constant index inside the declared bounds. Variable
+  indexes remain the program's runtime responsibility.
+
+## E4013 - Invalid array usage
+
+- **Category:** Type System
+- **Explanation:** A scalar was indexed, or an array was used or assigned as a
+  whole scalar value.
+- **Trigger:** Compile `Counter[$00] := $01` or `Counter := Values`.
+- **Suggested fix:** Index a declared array and read or write one element.
+
+## E4014 - Invalid array bounds
+
+- **Category:** Type System
+- **Explanation:** Arrays use a zero-based byte range with lower bound `$00`
+  and upper bound no greater than `$FF`.
+- **Trigger:** Declare `array[$01..$04] of byte`.
+- **Suggested fix:** Declare a range such as `array[$00..$03] of byte`.
