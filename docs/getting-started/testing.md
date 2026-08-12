@@ -111,13 +111,27 @@ While local integration tests gracefully skip when external dependencies (`ca65`
 `ld65`, or Mesen) are absent, authoritative CI jobs must install all required
 dependencies and execute all assertions without skipping.
 
-To run the equivalent stages locally:
+### Canonical Developer Workflow Commands
+
+The repository provides canonical `Makefile` targets that wrap standard Python entry points:
+
+| Target | Command | Requirements | Description |
+| :--- | :--- | :--- | :--- |
+| `make test` | `python -m unittest discover -s tests -v` | Python | Standard local regression test suite. Skips Mesen tests when `MESEN_PATH` is unset. |
+| `make test-all` | `make test` | Python | Explicit alias for `make test` running the complete discovery suite. |
+| `make test-mesen` | `python -m unittest tests.test_integration.MesenIntegrationTests -v` | `ca65`, `ld65`, `MESEN_PATH` | Runs the headless Mesen behavioral emulation test suite. |
+| `make benchmark` | `python tools/measure_benchmarks.py` | `ca65`, `ld65` | Runs the compiler resource and pattern measurement tool. |
+| `make rom` | `python -m nes_pascal.cli examples/minimal.nsp -o build/minimal.nes` | `ca65`, `ld65` | Compiles the canonical representative minimal ROM. |
+| `make clean` | Removes `build/`, `*.log`, `benchmark-report.md` | Python | Safely cleans transient build outputs without deleting tracked assets. |
+| `make validate` | Runs `test-all`, `benchmark`, `rom` | `ca65`, `ld65` | Comprehensive local pre-push validation. Does not replace the authoritative CI gate. |
+
+To run equivalent commands directly without Make:
 
 ```text
 # Run focused unit tests during development (e.g. arrays)
 python -m unittest tests.test_arrays -v
 
-# Run the complete compiler and toolchain regression suite (requires ca65 and ld65 on PATH)
+# Run the standard compiler regression suite
 python -m unittest discover -s tests -v
 
 # Run the Mesen runtime behavioral suite (requires ca65, ld65, and MESEN_PATH)
@@ -125,4 +139,8 @@ python -m unittest tests.test_integration.MesenIntegrationTests -v
 
 # Generate the benchmark metrics report locally (requires ca65 and ld65 on PATH)
 python tools/measure_benchmarks.py
+
+# Build the representative minimal ROM
+python -m nes_pascal.cli examples/minimal.nsp -o build/minimal.nes
 ```
+

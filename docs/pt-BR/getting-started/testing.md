@@ -110,13 +110,27 @@ externas (`ca65`, `ld65` ou Mesen) com skips informativos, os jobs autoritativos
 devem obrigatoriamente instalar todas as dependências requeridas e executar todas as
 asserções sem pular validações.
 
-Para executar localmente os níveis equivalentes de teste:
+### Comandos Canônicos do Fluxo de Desenvolvimento
+
+O repositório fornece alvos canônicos no `Makefile` que encapsulam os pontos de entrada padrão do Python:
+
+| Alvo | Comando | Requisitos | Descrição |
+| :--- | :--- | :--- | :--- |
+| `make test` | `python -m unittest discover -s tests -v` | Python | Suíte padrão de testes de regressão local. Pula testes do Mesen quando `MESEN_PATH` não está definido. |
+| `make test-all` | `make test` | Python | Alias explícito de `make test` executando a suíte completa de descoberta. |
+| `make test-mesen` | `python -m unittest tests.test_integration.MesenIntegrationTests -v` | `ca65`, `ld65`, `MESEN_PATH` | Executa a suíte de testes de emulação de comportamento no Mesen headless. |
+| `make benchmark` | `python tools/measure_benchmarks.py` | `ca65`, `ld65` | Executa a ferramenta de medição de recursos e padrões do compilador. |
+| `make rom` | `python -m nes_pascal.cli examples/minimal.nsp -o build/minimal.nes` | `ca65`, `ld65` | Compila a ROM mínima representativa canônica. |
+| `make clean` | Remove `build/`, `*.log`, `benchmark-report.md` | Python | Limpa com segurança saídas temporárias de build sem remover assets versionados. |
+| `make validate` | Executa `test-all`, `benchmark`, `rom` | `ca65`, `ld65` | Validação local abrangente pré-push. Não substitui o gate autoritativo do CI. |
+
+Para executar comandos equivalentes diretamente sem o Make:
 
 ```text
 # Executar testes unitários focados durante o desenvolvimento (ex.: arrays)
 python -m unittest tests.test_arrays -v
 
-# Executar a suíte completa de regressão do compilador e toolchain (requer ca65 e ld65 no PATH)
+# Executar a suíte padrão de regressão do compilador
 python -m unittest discover -s tests -v
 
 # Executar a suíte de testes de runtime no Mesen (requer ca65, ld65 e MESEN_PATH)
@@ -124,4 +138,8 @@ python -m unittest tests.test_integration.MesenIntegrationTests -v
 
 # Gerar o relatório de métricas de benchmark localmente (requer ca65 e ld65 no PATH)
 python tools/measure_benchmarks.py
+
+# Compilar a ROM mínima representativa
+python -m nes_pascal.cli examples/minimal.nsp -o build/minimal.nes
 ```
+
