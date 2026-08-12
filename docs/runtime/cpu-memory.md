@@ -1,6 +1,6 @@
 # CPU memory
 
-English | [Português (Brasil)](..\pt-BR\runtime\cpu-memory.md)
+English | [Português (Brasil)](../pt-BR/runtime/cpu-memory.md)
 
 NES Pascal models exactly 2,048 bytes of physical internal CPU RAM:
 `$0000-$07FF`. Addresses `$0800-$1FFF` are hardware mirrors of that same RAM

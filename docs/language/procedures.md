@@ -1,6 +1,6 @@
 # Procedures
 
-English | [Português (Brasil)](..\pt-BR\language\procedures.md)
+English | [Português (Brasil)](../pt-BR/language/procedures.md)
 
 Procedure declarations appear after global variables and before the main
 program block. A parameterless procedure omits parentheses:

@@ -1,6 +1,6 @@
 # Runtime background updates
 
-English | [Português (Brasil)](..\pt-BR\runtime\background-updates.md)
+English | [Português (Brasil)](../pt-BR/runtime/background-updates.md)
 
 Milestone 0.4.4 provides bounded updates to nametable 0 after rendering starts.
 All coordinates and values are `byte` expressions:

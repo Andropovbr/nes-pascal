@@ -1,6 +1,6 @@
 # Target platform
 
-English | [Português (Brasil)](..\pt-BR\runtime\target-platform.md)
+English | [Português (Brasil)](../pt-BR/runtime/target-platform.md)
 
 NES Pascal generates ca65-compatible Assembly for the Ricoh 2A03 CPU and uses
 only 6502 instructions. It does not generate intermediate C or use 65C02-only

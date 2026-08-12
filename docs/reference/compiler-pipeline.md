@@ -1,6 +1,6 @@
 # Compiler pipeline
 
-English | [Português (Brasil)](..\pt-BR\reference\compiler-pipeline.md)
+English | [Português (Brasil)](../pt-BR/reference/compiler-pipeline.md)
 
 The compiler pipeline is deliberately separated:
 

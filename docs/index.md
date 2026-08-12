@@ -9,7 +9,7 @@ systems.
 
 This documentation describes only behavior implemented by the compiler.
 Planned work is tracked separately in the
-[project roadmap](https://github.com/Andropovbr/nes-pascal/blob/main/roadmap/README.md).
+[project roadmap](../roadmap/README.md).
 
 ## Getting Started
 

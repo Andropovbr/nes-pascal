@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 
+from . import __version__
 from .assets import load_background_data, load_chr_rom
 from .ast import ResolvedLoadBackground
 from .backend_ca65 import generate
@@ -21,6 +22,7 @@ from .memory_layout import (
 from .metasprite_assets import load_metasprite_assets
 from .parser import parse
 from .semantic import analyze
+
 
 
 class ToolchainError(Exception):
@@ -163,6 +165,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nes-pascal",
         description="Compile the current NES Pascal subset to an NROM image.",
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     parser.add_argument("source", type=Path, help=".nsp source file")
     parser.add_argument("-o", "--output", required=True, type=Path, help=".nes ROM")

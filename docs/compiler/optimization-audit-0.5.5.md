@@ -1,6 +1,6 @@
 # Milestone 0.5.5: Compiler Architecture and Code Generation Audit
 
-English | [Português (Brasil)](..\pt-BR\compiler\optimization-audit-0.5.5.md)
+English | [Português (Brasil)](../pt-BR/compiler/optimization-audit-0.5.5.md)
 
 This document establishes the official architecture, code generation, and resource consumption baseline for the **NES Pascal** compiler as of milestone **0.5.5**.
 
@@ -72,28 +72,28 @@ The audit evaluated 16 deterministic programs representing specific compiler sub
 
 | Benchmark | Source File | Primary Characteristics |
 | :--- | :--- | :--- |
-| `minimal` | [`examples/minimal.nsp`](file:///g:/github/nes-pascal/examples/minimal.nsp) | Minimal runtime baseline, PPU color, `nes.run` |
-| `arithmetic` | [`examples/arithmetic.nsp`](file:///g:/github/nes-pascal/examples/arithmetic.nsp) | Unary negation, binary addition/subtraction, 8-bit wraparound |
-| `boolean_expressions` | [`examples/boolean_expressions.nsp`](file:///g:/github/nes-pascal/examples/boolean_expressions.nsp) | Equality, relational comparisons, `not`, `and`, `or` |
-| `conditionals` | [`examples/conditionals.nsp`](file:///g:/github/nes-pascal/examples/conditionals.nsp) | `if`/`else` branches, nested conditionals |
-| `loops` | [`examples/loops.nsp`](file:///g:/github/nes-pascal/examples/loops.nsp) | `while`, `repeat`/`until`, `break`, `continue` |
-| `counting` | [`examples/counting.nsp`](file:///g:/github/nes-pascal/examples/counting.nsp) | `inc`, `dec`, ascending/descending `for` loops |
-| `procedures` | [`examples/procedures.nsp`](file:///g:/github/nes-pascal/examples/procedures.nsp) | Parameterless procedures, acyclic calls |
-| `procedure_parameters` | [`examples/procedure_parameters.nsp`](file:///g:/github/nes-pascal/examples/procedure_parameters.nsp) | `byte` and `boolean` value parameters in procedure RAM slots |
-| `controller_input` | [`examples/controller_input.nsp`](file:///g:/github/nes-pascal/examples/controller_input.nsp) | Dual controller polling, `down`/`pressed`/`released` state, sprite 0 |
-| `sprite_support` | [`examples/sprite_support.nsp`](file:///g:/github/nes-pascal/examples/sprite_support.nsp) | 64-entry OAM shadow, positioning, palettes, flipping, visibility |
-| `metasprite_player` | [`examples/metasprite_player.nsp`](file:///g:/github/nes-pascal/examples/metasprite_player.nsp) | Multi-component metasprite positioning, flipping, manual frames |
-| `sprite_animation` | [`examples/sprite_animation.nsp`](file:///g:/github/nes-pascal/examples/sprite_animation.nsp) | Animated player: timer, looping/one-shot, frame advancement, facing |
-| `palette_support` | [`examples/palette_support.nsp`](file:///g:/github/nes-pascal/examples/palette_support.nsp) | Full 32-byte palette updates, VBlank palette queue |
-| `background_updates` | [`examples/background_updates.nsp`](file:///g:/github/nes-pascal/examples/background_updates.nsp) | VBlank tile/attribute update queue, 960-byte tile shadow |
-| `frame_callbacks` | [`examples/frame_callbacks.nsp`](file:///g:/github/nes-pascal/examples/frame_callbacks.nsp) | Deterministic main-thread update loop and NMI synchronization |
-| `gameplay_full_stack` | [`examples/gameplay_full_stack.nsp`](file:///g:/github/nes-pascal/examples/gameplay_full_stack.nsp) | **Combined full-stack benchmark**: animated metasprite, controller input, OAM DMA, background updates, tile shadow read, user state |
+| `minimal` | [`examples/minimal.nsp`](../../examples/minimal.nsp) | Minimal runtime baseline, PPU color, `nes.run` |
+| `arithmetic` | [`examples/arithmetic.nsp`](../../examples/arithmetic.nsp) | Unary negation, binary addition/subtraction, 8-bit wraparound |
+| `boolean_expressions` | [`examples/boolean_expressions.nsp`](../../examples/boolean_expressions.nsp) | Equality, relational comparisons, `not`, `and`, `or` |
+| `conditionals` | [`examples/conditionals.nsp`](../../examples/conditionals.nsp) | `if`/`else` branches, nested conditionals |
+| `loops` | [`examples/loops.nsp`](../../examples/loops.nsp) | `while`, `repeat`/`until`, `break`, `continue` |
+| `counting` | [`examples/counting.nsp`](../../examples/counting.nsp) | `inc`, `dec`, ascending/descending `for` loops |
+| `procedures` | [`examples/procedures.nsp`](../../examples/procedures.nsp) | Parameterless procedures, acyclic calls |
+| `procedure_parameters` | [`examples/procedure_parameters.nsp`](../../examples/procedure_parameters.nsp) | `byte` and `boolean` value parameters in procedure RAM slots |
+| `controller_input` | [`examples/controller_input.nsp`](../../examples/controller_input.nsp) | Dual controller polling, `down`/`pressed`/`released` state, sprite 0 |
+| `sprite_support` | [`examples/sprite_support.nsp`](../../examples/sprite_support.nsp) | 64-entry OAM shadow, positioning, palettes, flipping, visibility |
+| `metasprite_player` | [`examples/metasprite_player.nsp`](../../examples/metasprite_player.nsp) | Multi-component metasprite positioning, flipping, manual frames |
+| `sprite_animation` | [`examples/sprite_animation.nsp`](../../examples/sprite_animation.nsp) | Animated player: timer, looping/one-shot, frame advancement, facing |
+| `palette_support` | [`examples/palette_support.nsp`](../../examples/palette_support.nsp) | Full 32-byte palette updates, VBlank palette queue |
+| `background_updates` | [`examples/background_updates.nsp`](../../examples/background_updates.nsp) | VBlank tile/attribute update queue, 960-byte tile shadow |
+| `frame_callbacks` | [`examples/frame_callbacks.nsp`](../../examples/frame_callbacks.nsp) | Deterministic main-thread update loop and NMI synchronization |
+| `gameplay_full_stack` | [`examples/gameplay_full_stack.nsp`](../../examples/gameplay_full_stack.nsp) | **Combined full-stack benchmark**: animated metasprite, controller input, OAM DMA, background updates, tile shadow read, user state |
 
 ---
 
 ## 4. Measurement Methodology
 
-Measurements are collected deterministically using [`tools/measure_benchmarks.py`](file:///g:/github/nes-pascal/tools/measure_benchmarks.py):
+Measurements are collected deterministically using [`tools/measure_benchmarks.py`](../../tools/measure_benchmarks.py):
 1. **PRG-ROM Occupied Bytes:** Extracted directly from `ld65` link map segment tables (`CODE` + `VECTORS`), distinguishing actual byte footprint from the 32 KiB padded NROM image.
 2. **CPU RAM Accounting:** Extracted from the compiler's deterministic `ProgramMemoryLayout` and `.map` symbol tables. Measurements separately report compiler/runtime/user allocation, compiler-policy reservation, hardware stack reservation, and allocator-visible free Zero Page and regular RAM. An arithmetic invariant verifies that committed/reserved and allocator-visible bytes reconcile to the NES's 2,048-byte physical RAM.
 3. **Expression Tree Depth:** Calculated as the maximum height of operator subtrees (0 for leaf literals/variables).
@@ -198,7 +198,7 @@ bytes contain live stack data.
   adc #$01
   ```
 * **Impact:** Adds 2 instructions (5 bytes, 5 cycles) per simple binary operation.
-* **Fix Location:** Backend expression lowering ([`backend_ca65.py`](file:///g:/github/nes-pascal/nes_pascal/backend_ca65.py)).
+* **Fix Location:** Backend expression lowering ([`backend_ca65.py`](../../nes_pascal/backend_ca65.py)).
 
 #### 2. Boolean Materialization Before Branching
 * **Source:** `if Counter <= Limit then`
@@ -230,7 +230,7 @@ bytes contain live stack data.
   ```
 * **Critical Distinction:** When a Boolean is consumed strictly as control flow (`if`, `while`, `repeat`), branching directly on CPU flags is optimal. When a Boolean is stored as a first-class value (`Flag := A < B;`), materializing canonical `$00` / `$01` bytes remains strictly necessary.
 * **Impact:** Eliminates ~7 instructions (~14 bytes, ~16 cycles) per conditional branch.
-* **Fix Location:** Backend condition lowering ([`backend_ca65.py`](file:///g:/github/nes-pascal/nes_pascal/backend_ca65.py)).
+* **Fix Location:** Backend condition lowering ([`backend_ca65.py`](../../nes_pascal/backend_ca65.py)).
 
 #### 3. Redundant `CMP #$00`
 * **Source:** Variable loads or boolean operations followed by zero tests.
@@ -246,7 +246,7 @@ bytes contain live stack data.
 - `Max Expression Tree Depth` reflects AST height.
 - `Max Live Expression Temporaries` reflects the actual peak memory requirement of simultaneously live temporaries during lowering.
 - **Measured Result:** Across all 16 benchmarks, the peak simultaneous temporary requirement is **at most 2** (`temp_0` and `temp_1`).
-- **Static Reservation:** [`memory_layout.py`](file:///g:/github/nes-pascal/nes_pascal/memory_layout.py#L112) unconditionally allocates 16 Zero Page bytes (`$0010`–`$001F`) for every program, wasting 14 to 16 bytes of scarce Zero Page space in simple programs.
+- **Static Reservation:** [`memory_layout.py`](../../nes_pascal/memory_layout.py#L112) unconditionally allocates 16 Zero Page bytes (`$0010`–`$001F`) for every program, wasting 14 to 16 bytes of scarce Zero Page space in simple programs.
 
 ### Correctness Risk: Nested Function Calls
 Consider the future expression:
@@ -329,7 +329,7 @@ reserved for compiler temporaries.
 ## 9. Reconciled NMI / VBlank Cycle Budget
 
 ### Hardware Limits & Timing Components
-NTSC NES provides **2,273 CPU cycles** per VBlank window. Standard Ricoh 2A03 component costs from [`docs/runtime/vblank-cycle-budget.md`](file:///g:/github/nes-pascal/docs/runtime/vblank-cycle-budget.md):
+NTSC NES provides **2,273 CPU cycles** per VBlank window. Standard Ricoh 2A03 component costs from [`docs/runtime/vblank-cycle-budget.md`](../runtime/vblank-cycle-budget.md):
 
 | NMI Component | Cost (CPU Cycles) | Condition / State |
 | :--- | :---: | :--- |
@@ -368,11 +368,11 @@ All game logic, controller polling (~241 cycles), and metasprite rendering (~550
 
 ### Current Architecture
 Currently, 21 distinct runtime operations are modeled with dedicated AST node pairs across 5 compiler modules:
-- AST classes in [`nes_pascal/ast.py`](file:///g:/github/nes-pascal/nes_pascal/ast.py) (~40 classes).
-- Parser statement/expression dispatch in [`nes_pascal/parser.py`](file:///g:/github/nes-pascal/nes_pascal/parser.py).
-- Semantic verification in [`nes_pascal/semantic.py`](file:///g:/github/nes-pascal/nes_pascal/semantic.py).
-- Resource detection in [`nes_pascal/memory_layout.py`](file:///g:/github/nes-pascal/nes_pascal/memory_layout.py).
-- Code generation dispatch in [`nes_pascal/backend_ca65.py`](file:///g:/github/nes-pascal/nes_pascal/backend_ca65.py).
+- AST classes in [`nes_pascal/ast.py`](../../nes_pascal/ast.py) (~40 classes).
+- Parser statement/expression dispatch in [`nes_pascal/parser.py`](../../nes_pascal/parser.py).
+- Semantic verification in [`nes_pascal/semantic.py`](../../nes_pascal/semantic.py).
+- Resource detection in [`nes_pascal/memory_layout.py`](../../nes_pascal/memory_layout.py).
+- Code generation dispatch in [`nes_pascal/backend_ca65.py`](../../nes_pascal/backend_ca65.py).
 
 ### Upcoming Roadmap Expansion
 Releases 0.6 and 0.7 plan 25+ new runtime operations (APU tones, SFX, music, collisions, HUD, timers, math). Continuing dedicated AST node modeling represents linear per-builtin growth replicated across multiple compiler phases.
@@ -450,5 +450,5 @@ Based on empirical measurements, the recommended progression is:
 
 - **Automated Unit & Integration Test Suite:** 408 passed (0 failures, 0 errors in 28.2s).
 - **Mesen Emulator Behavioral Suite:** All 21 emulator integration tests passed.
-- **Full-Stack Benchmark Verification:** [`examples/gameplay_full_stack.nsp`](file:///g:/github/nes-pascal/examples/gameplay_full_stack.nsp) verified for compilation, RAM layout, and valid NROM header generation.
+- **Full-Stack Benchmark Verification:** [`examples/gameplay_full_stack.nsp`](../../examples/gameplay_full_stack.nsp) verified for compilation, RAM layout, and valid NROM header generation.
 - **ROM Stability:** No regressions in any existing example or ROM binary output.
