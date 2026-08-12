@@ -1,6 +1,6 @@
 # Runtime-validation diagnostics
 
-English | [Português (Brasil)](..\..\pt-BR\reference\diagnostics\runtime-validation.md)
+English | [Português (Brasil)](../../pt-BR/reference/diagnostics/runtime-validation.md)
 
 Runtime-validation diagnostics use the E6000-E6999 range.
 

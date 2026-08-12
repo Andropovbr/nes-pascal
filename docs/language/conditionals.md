@@ -1,6 +1,6 @@
 # Conditional statements
 
-English | [Português (Brasil)](..\pt-BR\language\conditionals.md)
+English | [Português (Brasil)](../pt-BR/language/conditionals.md)
 
 An `if` condition must have type `boolean`. A conditional may contain one
 statement:

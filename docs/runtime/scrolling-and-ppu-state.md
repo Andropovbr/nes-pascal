@@ -1,6 +1,6 @@
 # Scrolling and PPU state
 
-English | [Português (Brasil)](..\pt-BR\runtime\scrolling-and-ppu-state.md)
+English | [Português (Brasil)](../pt-BR/runtime/scrolling-and-ppu-state.md)
 
 `nes.set_scroll(x, y)` stages one horizontal and vertical scroll pair:
 

@@ -9,7 +9,7 @@ Esta pasta contém a tradução completa da documentação do **NES Pascal** par
 - **Fonte canônica:** A documentação em inglês (`docs/`) é a fonte oficial e autoritativa do projeto.
 - **Espelhamento de estrutura:** A estrutura de diretórios e os nomes de arquivos em `docs/pt-BR/` espelham exatamente a documentação em inglês para permitir comparações automatizadas e navegação consistente.
 - **Nomes de arquivos inalterados:** Caminhos e nomes de arquivos não são traduzidos.
-- **Sincronização:** Todas as 47 páginas de documentação voltadas ao usuário estão 100% traduzidas e sincronizadas.
+- **Sincronização:** Todas as 50 páginas de documentação voltadas ao usuário estão 100% traduzidas e sincronizadas.
 
 ## Status da Tradução
 

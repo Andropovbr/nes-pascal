@@ -1,6 +1,6 @@
 # Increment and decrement
 
-English | [Português (Brasil)](..\pt-BR\language\increment-and-decrement.md)
+English | [Português (Brasil)](../pt-BR/language/increment-and-decrement.md)
 
 `inc` and `dec` update an initialized `byte` variable. The one-argument forms
 add or subtract one:

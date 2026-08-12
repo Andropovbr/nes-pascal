@@ -9,7 +9,7 @@ NES NTSC.
 
 Esta documentação descreve apenas o comportamento implementado pelo compilador.
 O trabalho planejado é acompanhado separadamente no
-[roadmap do projeto](https://github.com/Andropovbr/nes-pascal/blob/main/roadmap/README.md).
+[roadmap do projeto](../../roadmap/README.md).
 
 ## Primeiros Passos
 

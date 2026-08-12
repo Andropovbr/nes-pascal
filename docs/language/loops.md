@@ -1,6 +1,6 @@
 # Loops
 
-English | [Português (Brasil)](..\pt-BR\language\loops.md)
+English | [Português (Brasil)](../pt-BR/language/loops.md)
 
 NES Pascal supports `while`, `repeat`/`until`, and ascending or descending
 `for` loops. Loops may be nested.

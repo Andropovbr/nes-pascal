@@ -1,6 +1,6 @@
 # Controller input
 
-English | [Português (Brasil)](..\pt-BR\runtime\controller-input.md)
+English | [Português (Brasil)](../pt-BR/runtime/controller-input.md)
 
 NES Pascal reads the standard controllers connected to ports 1 and 2. Input
 is sampled by the main runtime outside NMI exactly once for each processed

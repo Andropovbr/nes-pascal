@@ -200,7 +200,7 @@ class ParserTests(unittest.TestCase):
         assert isinstance(color_command, BuiltinCall)
         self.assertIsInstance(color_command.arguments[0], VariableReference)
 
-    def test_parses_all_milestone_three_variable_types(self) -> None:
+    def test_parses_scalar_and_color_variable_types(self) -> None:
         program = parse(
             program_with(
                 "Color := $21;\n"

@@ -1,6 +1,6 @@
 # Palette API
 
-English | [Português (Brasil)](..\pt-BR\runtime\palettes.md)
+English | [Português (Brasil)](../pt-BR/runtime/palettes.md)
 
 NES Pascal exposes four background palettes and four sprite palettes. Palette
 and color indexes are compile-time `byte` values in `$00..$03`; each color is

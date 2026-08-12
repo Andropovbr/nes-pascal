@@ -1,6 +1,6 @@
 # Constants and variables
 
-English | [Português (Brasil)](..\pt-BR\language\constants-and-variables.md)
+English | [Português (Brasil)](../pt-BR/language/constants-and-variables.md)
 
 ## Constants
 
