@@ -228,6 +228,43 @@ Changes affecting shared memory layout have a broad regression surface and requi
 
 ---
 
+## Code Generation Quality and Benchmark Policy
+
+Backend and code-generation improvements must preserve both semantic correctness and established code-quality invariants.
+
+When modifying backend lowering or introducing optimizations:
+
+* accompany code-generation changes with focused backend tests and golden Assembly assertions;
+* investigate any unexpected changes in generated Assembly output before accepting them;
+* run relevant benchmark measurements whenever lowering or expression evaluation rules change;
+* monitor for unexpected regressions across:
+  * PRG-ROM size;
+  * instruction count;
+  * estimated static cycles;
+  * RAM usage;
+  * Zero Page usage;
+  * expression temporary pressure;
+* ensure any measurable regression in size, memory, or cycles is intentional, necessary, and documented;
+* optimization must never break:
+  * language semantics;
+  * expression and argument evaluation order;
+  * short-circuit evaluation for boolean operators;
+  * canonical Boolean materialization (`$00`/`$01`) when a boolean value is stored, passed, returned, or required as data;
+  * long-branch safety and boundary handling;
+  * runtime correctness and hardware invariants;
+* prefer small, local, directly provable code-generation transformations unless the roadmap explicitly introduces a broader optimization architecture.
+
+### Benchmark Corpus Policy
+
+The benchmark corpus serves as a stable historical baseline for evaluating code generation and resource usage.
+
+* Once a benchmark program is established as a baseline, avoid repurposing or modifying its source code.
+* Prefer adding new representative benchmark programs to measure new language capabilities rather than rewriting existing ones.
+* Preserve historical comparability across releases whenever practical.
+
+
+---
+
 ## Diagnostics
 
 Compiler diagnostics are part of the public interface.

@@ -286,6 +286,121 @@ class ArrayMemoryAndBackendTests(unittest.TestCase):
         self.assertNotIn("array_index_temp", assembly)
         self.assertNotIn("expression_temporary_", assembly)
 
+    def test_minimum_array_boundary_allocation_addressing_and_semantics(self) -> None:
+        source = program_with(
+            "    Values[$00] := $42;",
+            "    Values: array[$00..$00] of byte;",
+        )
+        resolved = resolve(source)
+        layout = build_memory_layout(resolved, source=source, filename="min_array.nsp")
+        values = layout.user_symbols[0]
+
+        self.assertEqual(values.size, 1)
+        self.assertEqual(resolved.variables[0].type, ArrayType(BuiltInType.BYTE, 0, 0))
+        memory_map = generate_memory_map(layout)
+        self.assertIn(f"${values.address:04X}", memory_map)
+        self.assertIn("array[$00..$00] of byte", memory_map)
+
+        assembly = generate(resolved, layout)
+        self.assertIn("sta variable_Values", assembly)
+        self.assertNotIn("variable_Values + 0", assembly)
+        self.assertNotIn("array_index_temp", assembly)
+        self.assertNotIn("expression_temporary_", assembly)
+
+        # Verify out-of-bounds constant is rejected
+        invalid_source = program_with(
+            "    Values[$01] := $42;",
+            "    Values: array[$00..$00] of byte;",
+        )
+        with self.assertRaises(CompilerError) as context:
+            resolve(invalid_source)
+        self.assertEqual(context.exception.code, "E4012")
+
+    def test_maximum_array_boundary_allocation_and_indexing(self) -> None:
+        source = program_with(
+            """    Values[$00] := $10;
+    Values[$FF] := $20;""",
+            "    Values: array[$00..$FF] of byte;",
+        )
+        resolved = resolve(source)
+        layout = build_memory_layout(resolved, source=source, filename="max_array.nsp")
+        values = layout.user_symbols[0]
+
+        self.assertEqual(values.size, 256)
+        self.assertEqual(resolved.variables[0].type, ArrayType(BuiltInType.BYTE, 0, 255))
+        memory_map = generate_memory_map(layout)
+        self.assertIn(f"${values.address:04X}-${values.address + 255:04X}", memory_map)
+        self.assertIn("array[$00..$FF] of byte", memory_map)
+
+        assembly = generate(resolved, layout)
+        self.assertIn("sta variable_Values", assembly)
+        self.assertIn("sta variable_Values + 255", assembly)
+        self.assertIn("variable_Values: .res 256", assembly)
+
+        # Verify upper-bound boundary out-of-bounds is rejected when end < $FF
+        invalid_upper = program_with(
+            "    Values[$FE + $01] := $30;",
+            "    Values: array[$00..$FE] of byte;",
+        )
+        with self.assertRaises(CompilerError) as context:
+            resolve(invalid_upper)
+        self.assertEqual(context.exception.code, "E4012")
+
+        # Verify invalid array bounds where start != $00 triggers E4014
+        invalid_start = program_with(
+            "    Values[$01] := $30;",
+            "    Values: array[$01..$FF] of byte;",
+        )
+        with self.assertRaises(CompilerError) as context:
+            resolve(invalid_start)
+        self.assertEqual(context.exception.code, "E4014")
+
+    def test_variable_index_at_upper_boundary_preserves_native_range(self) -> None:
+        source = program_with(
+            """    Index := $FF;
+    Values[Index] := $55;
+    Result := Values[Index];""",
+            """    Values: array[$00..$FF] of byte;
+    Index: byte;
+    Result: byte;""",
+        )
+        resolved = resolve(source)
+        assembly = generate(resolved)
+
+        self.assertIn("; Source: Values[index] := value", assembly)
+        self.assertIn("tax                     ; native array index", assembly)
+        self.assertIn("sta variable_Values,x", assembly)
+        self.assertIn("lda variable_Values,x", assembly)
+        self.assertIn("sta variable_Result", assembly)
+        self.assertNotIn("and #$7F", assembly)
+        self.assertNotIn("and #$0F", assembly)
+
+    def test_indexed_assignment_with_expression_preserves_order_and_temporaries(self) -> None:
+        source = program_with(
+            """    Values[$00] := $10;
+    Values[$01] := $20;
+    Index := $02;
+    Values[Index] := Values[$00] + (Values[$01] + $03);""",
+            """    Values: array[$00..$07] of byte;
+    Index: byte;""",
+        )
+        resolved = resolve(source)
+        layout = build_memory_layout(resolved)
+        assembly = generate(resolved, layout)
+
+        block = assembly.split("; Source: Values[index] := value", 1)[1].split(
+            "; Source: nes.set_background_color(value)", 1
+        )[0]
+        pha_idx = block.index("pha")
+        pla_idx = block.index("pla")
+        self.assertLess(pha_idx, pla_idx)
+        self.assertIn("tay                     ; preserve assigned value", block)
+        self.assertIn("sta variable_Values,x", block)
+        self.assertEqual(block.count("pha"), 1)
+        self.assertEqual(block.count("pla"), 1)
+        self.assertEqual(layout.temporary_storage.size, 16)
+        self.assertNotIn("array_index_temp", assembly)
+
     @unittest.skipUnless(
         shutil.which("ca65") is not None and shutil.which("ld65") is not None,
         "array benchmark measurement requires ca65 and ld65",
