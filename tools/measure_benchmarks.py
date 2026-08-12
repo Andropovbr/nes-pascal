@@ -126,6 +126,11 @@ BENCHMARKS: tuple[BenchmarkSpec, ...] = (
         "examples/frame_callbacks.nsp",
     ),
     BenchmarkSpec(
+        "scrolling_ppu_state",
+        "Scrolling and PPU State",
+        "examples/scrolling_ppu_state.nsp",
+    ),
+    BenchmarkSpec(
         "arrays",
         "Fixed Arrays",
         "examples/arrays.nsp",
