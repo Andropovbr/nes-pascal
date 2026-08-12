@@ -342,12 +342,15 @@ A bug should not be considered permanently fixed if nothing prevents the same re
 
 GitHub Actions is the authoritative full-regression environment.
 
+The repository provides canonical `Makefile` targets (`make test`, `make test-all`, `make test-mesen`, `make benchmark`, `make rom`, `make clean`, `make validate`) wrapping the standard entry points.
+
 During normal implementation work:
 
 1. run focused tests for the subsystem being changed;
-2. run representative build or compilation smoke tests;
-3. run relevant runtime/emulator tests when practical;
-4. iterate using the smallest test set that gives useful feedback.
+2. run representative build or compilation smoke tests (`make rom`);
+3. run relevant runtime/emulator tests when practical (`make test-mesen`);
+4. run local pre-push validation (`make validate`) before completing broad changes;
+5. iterate using the smallest test set that gives useful feedback.
 
 Do not repeatedly run the entire regression suite locally after every small edit.
 
