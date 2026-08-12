@@ -491,7 +491,7 @@ end;
         source = callback_program(
             """procedure Update;
 begin
-    UpdateFrames := UpdateFrames + $01;
+    UpdateFrames := $01 + (UpdateFrames + $01);
 end;
 procedure VBlank;
 begin

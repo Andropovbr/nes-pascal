@@ -6,6 +6,7 @@ from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import StrEnum
 
 from .ast import (
+    ImmediateValue,
     OamOwnerKind,
     ResolvedAssignment,
     ResolvedBinaryExpression,
@@ -29,6 +30,7 @@ from .ast import (
     VariableValue,
 )
 from .builtins import BuiltinId, RuntimeFeature, builtin_by_id
+from .codegen_analysis import expression_temporary_symbol_count
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
 
 
@@ -1660,7 +1662,7 @@ def _temporary_symbol_names(program: ResolvedProgram) -> tuple[str, ...]:
         ),
     )
     expression_count = max(
-        (_statement_expression_depth(statement) for statement in all_statements),
+        (_statement_temporary_symbol_count(statement) for statement in all_statements),
         default=0,
     )
     for_count = sum(_count_for_statements(statement) for statement in all_statements)
@@ -1670,54 +1672,49 @@ def _temporary_symbol_names(program: ResolvedProgram) -> tuple[str, ...]:
     )
 
 
-def _expression_depth(value: ResolvedValue) -> int:
-    if isinstance(value, ResolvedBuiltinCall):
-        return max((_expression_depth(item) for item in value.arguments), default=0)
-    if isinstance(value, (ResolvedBinaryExpression, ResolvedComparisonExpression)):
-        return 1 + max(_expression_depth(value.left), _expression_depth(value.right))
-    if isinstance(value, (ResolvedUnaryExpression, ResolvedBooleanNotExpression)):
-        return _expression_depth(value.operand)
-    if isinstance(value, ResolvedBooleanBinaryExpression):
-        return max(_expression_depth(value.left), _expression_depth(value.right))
-    return 0
-
-
-def _statement_expression_depth(statement: ResolvedStatement) -> int:
+def _statement_temporary_symbol_count(statement: ResolvedStatement) -> int:
     if isinstance(statement, ResolvedAssignment):
-        return _expression_depth(statement.value)
+        return expression_temporary_symbol_count(statement.value)
     if isinstance(statement, ResolvedBuiltinCall):
         return max(
-            (_expression_depth(value) for value in statement.arguments),
+            (expression_temporary_symbol_count(value) for value in statement.arguments),
             default=0,
         )
     if isinstance(statement, ResolvedIncrementStatement):
-        return _expression_depth(statement.amount) if statement.amount else 0
+        return expression_temporary_symbol_count(statement.amount) if statement.amount else 0
     if isinstance(statement, ResolvedDecrementStatement):
-        return max(1, _expression_depth(statement.amount)) if statement.amount else 0
+        if statement.amount is None:
+            return 0
+        if isinstance(statement.amount, (ImmediateValue, VariableValue)):
+            return 0
+        return max(1, expression_temporary_symbol_count(statement.amount))
     if isinstance(statement, ResolvedIfStatement):
         branches = [
-            _statement_expression_depth(item) for item in statement.then_branch
+            _statement_temporary_symbol_count(item) for item in statement.then_branch
         ]
         if statement.else_branch is not None:
             branches.extend(
-                _statement_expression_depth(item) for item in statement.else_branch
+                _statement_temporary_symbol_count(item) for item in statement.else_branch
             )
-        return max([_expression_depth(statement.condition), *branches])
+        return max([expression_temporary_symbol_count(statement.condition), *branches])
     if isinstance(statement, (ResolvedWhileStatement, ResolvedRepeatStatement)):
-        body = [_statement_expression_depth(item) for item in statement.body]
-        return max([_expression_depth(statement.condition), *body])
+        body = [_statement_temporary_symbol_count(item) for item in statement.body]
+        return max([expression_temporary_symbol_count(statement.condition), *body])
     if isinstance(statement, ResolvedForStatement):
-        body = [_statement_expression_depth(item) for item in statement.body]
+        body = [_statement_temporary_symbol_count(item) for item in statement.body]
         return max(
             [
-                _expression_depth(statement.initial),
-                _expression_depth(statement.final),
+                expression_temporary_symbol_count(statement.initial),
+                expression_temporary_symbol_count(statement.final),
                 *body,
             ]
         )
     if isinstance(statement, ResolvedProcedureCall):
         return max(
-            (_expression_depth(argument.value) for argument in statement.arguments),
+            (
+                expression_temporary_symbol_count(argument.value)
+                for argument in statement.arguments
+            ),
             default=0,
         )
     return 0

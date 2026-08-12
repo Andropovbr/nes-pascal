@@ -23,7 +23,7 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
-expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
+    ; no compiler temporaries required
 
 .segment "ZERO_PAGE_VARIABLES": zeropage
 ; Source: optional global-variable promotion with regular-RAM fallback
@@ -134,17 +134,13 @@ RESET:
     ; argument 1: Matches
     ; boolean and: evaluate left operand
     lda variable_Enabled
-    cmp #$00
     bne @boolean_evaluate_right_0
     jmp @boolean_false_2       ; short-circuit false
 @boolean_evaluate_right_0:
     ; evaluate right operand
-    ; comparison =: evaluate right operand
-    lda #$06
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison =: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
+    cmp #$06
     beq @comparison_true_4
 @comparison_false_5:
     lda #$00              ; false
@@ -152,7 +148,6 @@ RESET:
 @comparison_true_4:
     lda #$01              ; true
 @comparison_end_6:
-    cmp #$00
     bne @boolean_true_1
 @boolean_false_2:
     lda #$00              ; false
@@ -249,13 +244,10 @@ procedure_Initialize:
     sta variable_Enabled
 
 ; Source: Step := value
-    ; binary +: evaluate right operand
-    lda #$01
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; binary +: direct right operand
     lda parameter_Initialize_Step
     clc
-    adc expression_temporary_0
+    adc #$01
     sta parameter_Initialize_Step
 
 ; Source: ApplyStep
@@ -273,7 +265,6 @@ procedure_ApplyStep:
 
 ; Source: if condition then
     lda parameter_ApplyStep_ShouldApply
-    cmp #$00
     bne @if_then_8
     jmp @if_end_9       ; long-branch-safe false path
 @if_then_8:
@@ -291,7 +282,6 @@ procedure_SelectColor:
 
 ; Source: if condition then
     lda parameter_SelectColor_Matches
-    cmp #$00
     bne @if_then_10
     jmp @if_else_12       ; long-branch-safe false path
 @if_then_10:

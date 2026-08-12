@@ -41,6 +41,7 @@ from .builtins import (
     PaletteKind,
     builtin_by_id,
 )
+from .codegen_analysis import can_use_direct_rhs_operand
 from .memory_layout import (
     BackgroundRuntimeFeatures,
     ProgramMemoryLayout,
@@ -644,10 +645,14 @@ def _generate_statements(
                 [
                     "",
                     "; Source: if condition then",
-                    *_load_value(statement.condition, label_counter),
-                    "    cmp #$00",
-                    f"    bne {then_label}",
-                    f"    jmp {else_label}       ; long-branch-safe false path",
+                    *_emit_boolean_branch(
+                        statement.condition,
+                        then_label,
+                        else_label,
+                        0,
+                        label_counter,
+                        "long-branch-safe false path",
+                    ),
                     f"{then_label}:",
                     *_generate_statements(
                         statement.then_branch,
@@ -690,10 +695,14 @@ def _generate_statements(
                     "",
                     "; Source: while condition do",
                     f"{condition_label}:",
-                    *_load_value(statement.condition, label_counter),
-                    "    cmp #$00",
-                    f"    bne {body_label}",
-                    f"    jmp {end_label}       ; long-branch-safe loop exit",
+                    *_emit_boolean_branch(
+                        statement.condition,
+                        body_label,
+                        end_label,
+                        0,
+                        label_counter,
+                        "long-branch-safe loop exit",
+                    ),
                     f"{body_label}:",
                     *_generate_statements(
                         statement.body,
@@ -731,10 +740,14 @@ def _generate_statements(
                         default_sprite_palette_enabled,
                     ),
                     f"{condition_label}:",
-                    *_load_value(statement.condition, label_counter),
-                    "    cmp #$00",
-                    f"    bne {end_label}",
-                    f"    jmp {body_label}       ; long-branch-safe repeat",
+                    *_emit_boolean_branch(
+                        statement.condition,
+                        end_label,
+                        body_label,
+                        0,
+                        label_counter,
+                        "long-branch-safe repeat",
+                    ),
                     f"{end_label}:",
                 ]
             )
@@ -2673,6 +2686,19 @@ def _generate_decrement(
             f"; Source: dec({statement.target.name})",
             f"    dec {statement.target.label}",
         ]
+    direct_operand = _direct_rhs_operand(
+        VariableValue(statement.target),
+        statement.amount,
+    )
+    if direct_operand is not None:
+        return [
+            "",
+            f"; Source: dec({statement.target.name}, amount)",
+            f"    lda {statement.target.label}",
+            "    sec",
+            f"    sbc {direct_operand}",
+            f"    sta {statement.target.label}",
+        ]
     return [
         "",
         f"; Source: dec({statement.target.name}, amount)",
@@ -2879,6 +2905,16 @@ def _load_binary_expression(
     depth: int,
     label_counter: list[int],
 ) -> list[str]:
+    direct_operand = _direct_rhs_operand(expression.left, expression.right)
+    if direct_operand is not None:
+        lines = [
+            f"    ; binary {expression.operator.value}: direct right operand",
+            *_load_value_at_depth(expression.left, depth, label_counter),
+        ]
+        if expression.operator is BinaryOperator.ADD:
+            return [*lines, "    clc", f"    adc {direct_operand}"]
+        return [*lines, "    sec", f"    sbc {direct_operand}"]
+
     temporary = f"expression_temporary_{depth}"
     lines = [
         f"    ; binary {expression.operator.value}: evaluate right operand",
@@ -2920,16 +2956,33 @@ def _load_value_at_depth(
     return _load_value(value, label_counter)
 
 
-def _load_comparison_expression(
+def _direct_rhs_operand(
+    left: ResolvedValue,
+    right: ResolvedValue,
+) -> str | None:
+    if not can_use_direct_rhs_operand(left, right):
+        return None
+    if isinstance(right, ImmediateValue):
+        return f"#${right.value:02X}"
+    assert isinstance(right, VariableValue)
+    return right.variable.label
+
+
+def _comparison_setup(
     expression: ResolvedComparisonExpression,
     depth: int,
     label_counter: list[int],
 ) -> list[str]:
+    direct_operand = _direct_rhs_operand(expression.left, expression.right)
+    if direct_operand is not None:
+        return [
+            f"    ; comparison {expression.operator.value}: direct right operand",
+            *_load_value_at_depth(expression.left, depth, label_counter),
+            f"    cmp {direct_operand}",
+        ]
+
     temporary = f"expression_temporary_{depth}"
-    true_label = _new_label(label_counter, "comparison_true")
-    false_label = _new_label(label_counter, "comparison_false")
-    end_label = _new_label(label_counter, "comparison_end")
-    lines = [
+    return [
         f"    ; comparison {expression.operator.value}: evaluate right operand",
         *_load_value_at_depth(expression.right, depth + 1, label_counter),
         f"    sta {temporary}",
@@ -2937,6 +2990,17 @@ def _load_comparison_expression(
         *_load_value_at_depth(expression.left, depth + 1, label_counter),
         f"    cmp {temporary}",
     ]
+
+
+def _load_comparison_expression(
+    expression: ResolvedComparisonExpression,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
+    true_label = _new_label(label_counter, "comparison_true")
+    false_label = _new_label(label_counter, "comparison_false")
+    end_label = _new_label(label_counter, "comparison_end")
+    lines = _comparison_setup(expression, depth, label_counter)
     branches = {
         ComparisonOperator.EQUAL: [f"    beq {true_label}"],
         ComparisonOperator.NOT_EQUAL: [f"    bne {true_label}"],
@@ -2973,7 +3037,7 @@ def _load_boolean_not_expression(
     return [
         "    ; boolean not",
         *_load_value_at_depth(expression.operand, depth, label_counter),
-        "    cmp #$00",
+        *([] if _zero_flag_is_valid(expression.operand) else ["    cmp #$00"]),
         f"    beq {true_label}",
         "    lda #$00              ; false",
         f"    jmp {end_label}",
@@ -2995,7 +3059,7 @@ def _load_boolean_binary_expression(
     lines = [
         f"    ; boolean {expression.operator.value}: evaluate left operand",
         *_load_value_at_depth(expression.left, depth, label_counter),
-        "    cmp #$00",
+        *([] if _zero_flag_is_valid(expression.left) else ["    cmp #$00"]),
     ]
     if expression.operator is BooleanOperator.AND:
         lines.extend(
@@ -3016,7 +3080,7 @@ def _load_boolean_binary_expression(
         f"{evaluate_right_label}:",
         "    ; evaluate right operand",
         *_load_value_at_depth(expression.right, depth, label_counter),
-        "    cmp #$00",
+        *([] if _zero_flag_is_valid(expression.right) else ["    cmp #$00"]),
         f"    bne {true_label}",
         f"{false_label}:",
         "    lda #$00              ; false",
@@ -3024,6 +3088,255 @@ def _load_boolean_binary_expression(
         f"{true_label}:",
         "    lda #$01              ; true",
         f"{end_label}:",
+    ]
+
+
+_BOOLEAN_LOADS_WITH_VALID_ZERO_FLAG = {
+    BuiltinId.BACKGROUND_UPDATES_OVERFLOWED,
+    BuiltinId.CONTROLLER_DOWN,
+    BuiltinId.CONTROLLER_PRESSED,
+    BuiltinId.CONTROLLER_RELEASED,
+}
+
+
+def _zero_flag_is_valid(value: ResolvedValue) -> bool:
+    """Recognize only loads whose final instruction provably defines Z."""
+
+    if isinstance(value, (ImmediateValue, VariableValue)):
+        return True
+    if isinstance(
+        value,
+        (
+            ResolvedComparisonExpression,
+            ResolvedBooleanNotExpression,
+            ResolvedBooleanBinaryExpression,
+        ),
+    ):
+        return True
+    return (
+        isinstance(value, ResolvedBuiltinCall)
+        and value.builtin in _BOOLEAN_LOADS_WITH_VALID_ZERO_FLAG
+    )
+
+
+def _emit_comparison_branch(
+    expression: ResolvedComparisonExpression,
+    true_label: str,
+    false_label: str,
+    depth: int,
+    label_counter: list[int],
+    false_path_comment: str | None,
+) -> list[str]:
+    lines = _comparison_setup(expression, depth, label_counter)
+    if expression.operator is ComparisonOperator.EQUAL:
+        return [
+            *lines,
+            f"    beq {true_label}",
+            _absolute_jump(false_label, false_path_comment),
+        ]
+    if expression.operator is ComparisonOperator.NOT_EQUAL:
+        return [
+            *lines,
+            f"    bne {true_label}",
+            _absolute_jump(false_label, false_path_comment),
+        ]
+    if expression.operator is ComparisonOperator.LESS:
+        return [
+            *lines,
+            f"    bcc {true_label}",
+            _absolute_jump(false_label, false_path_comment),
+        ]
+    if expression.operator is ComparisonOperator.GREATER_EQUAL:
+        return [
+            *lines,
+            f"    bcs {true_label}",
+            _absolute_jump(false_label, false_path_comment),
+        ]
+    if expression.operator is ComparisonOperator.LESS_EQUAL:
+        return [
+            *lines,
+            f"    bcc {true_label}",
+            f"    beq {true_label}",
+            _absolute_jump(false_label, false_path_comment),
+        ]
+
+    false_trampoline = _new_label(label_counter, "comparison_branch_false")
+    return [
+        *lines,
+        f"    beq {false_trampoline}",
+        f"    bcs {true_label}",
+        f"{false_trampoline}:",
+        _absolute_jump(false_label, false_path_comment),
+    ]
+
+
+def _emit_controller_branch(
+    query: ResolvedBuiltinCall,
+    true_label: str,
+    false_label: str,
+    label_counter: list[int],
+    false_path_comment: str | None,
+) -> list[str]:
+    controller, button = query.arguments
+    assert isinstance(controller, ImmediateValue)
+    assert isinstance(button, ImmediateValue)
+    current = f"runtime_controller_{controller.value}_current"
+    previous = f"runtime_controller_{controller.value}_previous"
+    prefix = [
+        f"    ; {builtin_by_id(query.builtin).public_name}"
+        f"(${controller.value:02X}, {_CONTROLLER_BUTTON_NAMES[button.value]}): branch result",
+    ]
+    if query.builtin is BuiltinId.CONTROLLER_DOWN:
+        return [
+            *prefix,
+            f"    lda {current}",
+            f"    and #${button.value:02X}",
+            f"    bne {true_label}",
+            _absolute_jump(false_label, false_path_comment),
+        ]
+
+    false_trampoline = _new_label(label_counter, "controller_branch_false")
+    if query.builtin is BuiltinId.CONTROLLER_PRESSED:
+        return [
+            *prefix,
+            f"    lda {current}",
+            f"    and #${button.value:02X}",
+            f"    beq {false_trampoline}",
+            f"    lda {previous}",
+            f"    and #${button.value:02X}",
+            f"    beq {true_label}",
+            f"{false_trampoline}:",
+            _absolute_jump(false_label, false_path_comment),
+        ]
+    return [
+        *prefix,
+        f"    lda {current}",
+        f"    and #${button.value:02X}",
+        f"    bne {false_trampoline}",
+        f"    lda {previous}",
+        f"    and #${button.value:02X}",
+        f"    bne {true_label}",
+        f"{false_trampoline}:",
+        _absolute_jump(false_label, false_path_comment),
+    ]
+
+
+def _absolute_jump(label: str, comment: str | None = None) -> str:
+    suffix = f"       ; {comment}" if comment else ""
+    return f"    jmp {label}{suffix}"
+
+
+def _emit_boolean_branch(
+    value: ResolvedValue,
+    true_label: str,
+    false_label: str,
+    depth: int,
+    label_counter: list[int],
+    false_path_comment: str | None = None,
+) -> list[str]:
+    """Branch without materializing a Boolean value.
+
+    The caller places ``true_label`` immediately after the returned block. All
+    potentially distant false paths use absolute JMP instructions, preserving
+    the backend's long-branch guarantee.
+    """
+
+    if isinstance(value, ResolvedComparisonExpression):
+        return _emit_comparison_branch(
+            value,
+            true_label,
+            false_label,
+            depth,
+            label_counter,
+            false_path_comment,
+        )
+    if isinstance(value, ResolvedBooleanNotExpression):
+        operand_true = _new_label(label_counter, "not_branch_operand_true")
+        return [
+            "    ; boolean not: branch result",
+            *_emit_boolean_branch(
+                value.operand,
+                operand_true,
+                true_label,
+                depth,
+                label_counter,
+                None,
+            ),
+            f"{operand_true}:",
+            _absolute_jump(false_label, false_path_comment),
+        ]
+    if isinstance(value, ResolvedBooleanBinaryExpression):
+        evaluate_right = _new_label(label_counter, "boolean_branch_right")
+        if value.operator is BooleanOperator.AND:
+            return [
+                "    ; boolean and: branch left operand",
+                *_emit_boolean_branch(
+                    value.left,
+                    evaluate_right,
+                    false_label,
+                    depth,
+                    label_counter,
+                    false_path_comment,
+                ),
+                f"{evaluate_right}:",
+                "    ; boolean and: branch right operand",
+                *_emit_boolean_branch(
+                    value.right,
+                    true_label,
+                    false_label,
+                    depth,
+                    label_counter,
+                    false_path_comment,
+                ),
+            ]
+
+        short_circuit_true = _new_label(label_counter, "boolean_branch_true")
+        return [
+            "    ; boolean or: branch left operand",
+            *_emit_boolean_branch(
+                value.left,
+                short_circuit_true,
+                evaluate_right,
+                depth,
+                label_counter,
+                None,
+            ),
+            f"{short_circuit_true}:",
+            f"    jmp {true_label}       ; short-circuit true",
+            f"{evaluate_right}:",
+            "    ; boolean or: branch right operand",
+            *_emit_boolean_branch(
+                value.right,
+                true_label,
+                false_label,
+                depth,
+                label_counter,
+                false_path_comment,
+            ),
+        ]
+    if (
+        isinstance(value, ResolvedBuiltinCall)
+        and value.builtin
+        in {
+            BuiltinId.CONTROLLER_DOWN,
+            BuiltinId.CONTROLLER_PRESSED,
+            BuiltinId.CONTROLLER_RELEASED,
+        }
+    ):
+        return _emit_controller_branch(
+            value,
+            true_label,
+            false_label,
+            label_counter,
+            false_path_comment,
+        )
+
+    zero_test = [] if _zero_flag_is_valid(value) else ["    cmp #$00"]
+    return [
+        *_load_value_at_depth(value, depth, label_counter),
+        *zero_test,
+        f"    bne {true_label}",
+        _absolute_jump(false_label, false_path_comment),
     ]
 
 

@@ -23,7 +23,7 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
-expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
+    ; no compiler temporaries required
 
 .segment "ZERO_PAGE_VARIABLES": zeropage
 ; Source: optional global-variable promotion with regular-RAM fallback
@@ -298,17 +298,9 @@ procedure_Update:
     sta variable_MovementSpeed
 
 ; Source: if condition then
-    ; nes.controller_down($01, nes.button_a)
+    ; nes.controller_down($01, nes.button_a): branch result
     lda runtime_controller_1_current
     and #$01
-    bne @controller_true_3
-@controller_false_4:
-    lda #$00              ; false
-    jmp @controller_end_5
-@controller_true_3:
-    lda #$01              ; true
-@controller_end_5:
-    cmp #$00
     bne @if_then_1
     jmp @if_end_2       ; long-branch-safe false path
 @if_then_1:
@@ -319,373 +311,252 @@ procedure_Update:
 @if_end_2:
 
 ; Source: if condition then
-    ; nes.controller_pressed($01, nes.button_select)
+    ; nes.controller_pressed($01, nes.button_select): branch result
     lda runtime_controller_1_current
     and #$04
-    beq @controller_false_9
+    beq @controller_branch_false_5
     lda runtime_controller_1_previous
     and #$04
-    beq @controller_true_8
-@controller_false_9:
-    lda #$00              ; false
-    jmp @controller_end_10
-@controller_true_8:
-    lda #$01              ; true
-@controller_end_10:
-    cmp #$00
-    bne @if_then_6
-    jmp @if_end_7       ; long-branch-safe false path
-@if_then_6:
+    beq @if_then_3
+@controller_branch_false_5:
+    jmp @if_end_4       ; long-branch-safe false path
+@if_then_3:
 
 ; Source: WrapAtEdges := value
     ; boolean not
     lda variable_WrapAtEdges
-    cmp #$00
-    beq @not_true_11
+    beq @not_true_6
     lda #$00              ; false
-    jmp @not_end_12
-@not_true_11:
+    jmp @not_end_7
+@not_true_6:
     lda #$01              ; true
-@not_end_12:
+@not_end_7:
     sta variable_WrapAtEdges
-@if_end_7:
+@if_end_4:
 
 ; Source: if condition then
-    ; nes.controller_down($01, nes.button_left)
+    ; nes.controller_down($01, nes.button_left): branch result
     lda runtime_controller_1_current
     and #$40
-    bne @controller_true_15
-@controller_false_16:
-    lda #$00              ; false
-    jmp @controller_end_17
-@controller_true_15:
-    lda #$01              ; true
-@controller_end_17:
-    cmp #$00
-    bne @if_then_13
-    jmp @if_end_14       ; long-branch-safe false path
-@if_then_13:
+    bne @if_then_8
+    jmp @if_end_9       ; long-branch-safe false path
+@if_then_8:
 
 ; Source: if condition then
-    ; comparison <=: evaluate right operand
-    lda #$0A
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison <=: direct right operand
     lda variable_PlayerX
-    cmp expression_temporary_0
-    bcc @comparison_true_21
-    beq @comparison_true_21
-@comparison_false_22:
-    lda #$00              ; false
-    jmp @comparison_end_23
-@comparison_true_21:
-    lda #$01              ; true
-@comparison_end_23:
-    cmp #$00
-    bne @if_then_18
+    cmp #$0A
+    bcc @if_then_10
+    beq @if_then_10
+    jmp @if_else_12       ; long-branch-safe false path
+@if_then_10:
+
+; Source: if condition then
+    lda variable_WrapAtEdges
+    bne @if_then_13
+    jmp @if_else_15       ; long-branch-safe false path
+@if_then_13:
+
+; Source: PlayerX := value
+    lda #$F7
+    sta variable_PlayerX
+    jmp @if_end_14
+@if_else_15:
+
+; Source: PlayerX := value
+    lda #$08
+    sta variable_PlayerX
+@if_end_14:
+    jmp @if_end_11
+@if_else_12:
+
+; Source: PlayerX := value
+    ; binary -: direct right operand
+    lda variable_PlayerX
+    sec
+    sbc variable_MovementSpeed
+    sta variable_PlayerX
+@if_end_11:
+@if_end_9:
+
+; Source: if condition then
+    ; nes.controller_down($01, nes.button_right): branch result
+    lda runtime_controller_1_current
+    and #$80
+    bne @if_then_16
+    jmp @if_end_17       ; long-branch-safe false path
+@if_then_16:
+
+; Source: if condition then
+    ; comparison >=: direct right operand
+    lda variable_PlayerX
+    cmp #$F5
+    bcs @if_then_18
     jmp @if_else_20       ; long-branch-safe false path
 @if_then_18:
 
 ; Source: if condition then
     lda variable_WrapAtEdges
-    cmp #$00
-    bne @if_then_24
-    jmp @if_else_26       ; long-branch-safe false path
-@if_then_24:
-
-; Source: PlayerX := value
-    lda #$F7
-    sta variable_PlayerX
-    jmp @if_end_25
-@if_else_26:
+    bne @if_then_21
+    jmp @if_else_23       ; long-branch-safe false path
+@if_then_21:
 
 ; Source: PlayerX := value
     lda #$08
     sta variable_PlayerX
-@if_end_25:
+    jmp @if_end_22
+@if_else_23:
+
+; Source: PlayerX := value
+    lda #$F7
+    sta variable_PlayerX
+@if_end_22:
     jmp @if_end_19
 @if_else_20:
 
 ; Source: PlayerX := value
-    ; binary -: evaluate right operand
-    lda variable_MovementSpeed
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; binary +: direct right operand
     lda variable_PlayerX
-    sec
-    sbc expression_temporary_0
+    clc
+    adc variable_MovementSpeed
     sta variable_PlayerX
 @if_end_19:
-@if_end_14:
+@if_end_17:
 
 ; Source: if condition then
-    ; nes.controller_down($01, nes.button_right)
+    ; nes.controller_down($01, nes.button_up): branch result
     lda runtime_controller_1_current
-    and #$80
-    bne @controller_true_29
-@controller_false_30:
-    lda #$00              ; false
-    jmp @controller_end_31
-@controller_true_29:
-    lda #$01              ; true
-@controller_end_31:
-    cmp #$00
-    bne @if_then_27
-    jmp @if_end_28       ; long-branch-safe false path
-@if_then_27:
+    and #$10
+    bne @if_then_24
+    jmp @if_end_25       ; long-branch-safe false path
+@if_then_24:
 
 ; Source: if condition then
-    ; comparison >=: evaluate right operand
-    lda #$F5
-    sta expression_temporary_0
-    ; evaluate left operand
-    lda variable_PlayerX
-    cmp expression_temporary_0
-    bcs @comparison_true_35
-@comparison_false_36:
-    lda #$00              ; false
-    jmp @comparison_end_37
-@comparison_true_35:
-    lda #$01              ; true
-@comparison_end_37:
-    cmp #$00
+    ; comparison <=: direct right operand
+    lda variable_PlayerY
+    cmp #$12
+    bcc @if_then_26
+    beq @if_then_26
+    jmp @if_else_28       ; long-branch-safe false path
+@if_then_26:
+
+; Source: if condition then
+    lda variable_WrapAtEdges
+    bne @if_then_29
+    jmp @if_else_31       ; long-branch-safe false path
+@if_then_29:
+
+; Source: PlayerY := value
+    lda #$DF
+    sta variable_PlayerY
+    jmp @if_end_30
+@if_else_31:
+
+; Source: PlayerY := value
+    lda #$10
+    sta variable_PlayerY
+@if_end_30:
+    jmp @if_end_27
+@if_else_28:
+
+; Source: PlayerY := value
+    ; binary -: direct right operand
+    lda variable_PlayerY
+    sec
+    sbc variable_MovementSpeed
+    sta variable_PlayerY
+@if_end_27:
+@if_end_25:
+
+; Source: if condition then
+    ; nes.controller_down($01, nes.button_down): branch result
+    lda runtime_controller_1_current
+    and #$20
     bne @if_then_32
-    jmp @if_else_34       ; long-branch-safe false path
+    jmp @if_end_33       ; long-branch-safe false path
 @if_then_32:
 
 ; Source: if condition then
+    ; comparison >=: direct right operand
+    lda variable_PlayerY
+    cmp #$DD
+    bcs @if_then_34
+    jmp @if_else_36       ; long-branch-safe false path
+@if_then_34:
+
+; Source: if condition then
     lda variable_WrapAtEdges
-    cmp #$00
-    bne @if_then_38
-    jmp @if_else_40       ; long-branch-safe false path
-@if_then_38:
+    bne @if_then_37
+    jmp @if_else_39       ; long-branch-safe false path
+@if_then_37:
 
-; Source: PlayerX := value
-    lda #$08
-    sta variable_PlayerX
-    jmp @if_end_39
-@if_else_40:
+; Source: PlayerY := value
+    lda #$10
+    sta variable_PlayerY
+    jmp @if_end_38
+@if_else_39:
 
-; Source: PlayerX := value
-    lda #$F7
-    sta variable_PlayerX
-@if_end_39:
-    jmp @if_end_33
-@if_else_34:
+; Source: PlayerY := value
+    lda #$DF
+    sta variable_PlayerY
+@if_end_38:
+    jmp @if_end_35
+@if_else_36:
 
-; Source: PlayerX := value
-    ; binary +: evaluate right operand
-    lda variable_MovementSpeed
-    sta expression_temporary_0
-    ; evaluate left operand
-    lda variable_PlayerX
+; Source: PlayerY := value
+    ; binary +: direct right operand
+    lda variable_PlayerY
     clc
-    adc expression_temporary_0
-    sta variable_PlayerX
+    adc variable_MovementSpeed
+    sta variable_PlayerY
+@if_end_35:
 @if_end_33:
-@if_end_28:
 
 ; Source: if condition then
-    ; nes.controller_down($01, nes.button_up)
-    lda runtime_controller_1_current
-    and #$10
-    bne @controller_true_43
-@controller_false_44:
-    lda #$00              ; false
-    jmp @controller_end_45
-@controller_true_43:
-    lda #$01              ; true
-@controller_end_45:
-    cmp #$00
-    bne @if_then_41
-    jmp @if_end_42       ; long-branch-safe false path
-@if_then_41:
-
-; Source: if condition then
-    ; comparison <=: evaluate right operand
-    lda #$12
-    sta expression_temporary_0
-    ; evaluate left operand
-    lda variable_PlayerY
-    cmp expression_temporary_0
-    bcc @comparison_true_49
-    beq @comparison_true_49
-@comparison_false_50:
-    lda #$00              ; false
-    jmp @comparison_end_51
-@comparison_true_49:
-    lda #$01              ; true
-@comparison_end_51:
-    cmp #$00
-    bne @if_then_46
-    jmp @if_else_48       ; long-branch-safe false path
-@if_then_46:
-
-; Source: if condition then
-    lda variable_WrapAtEdges
-    cmp #$00
-    bne @if_then_52
-    jmp @if_else_54       ; long-branch-safe false path
-@if_then_52:
-
-; Source: PlayerY := value
-    lda #$DF
-    sta variable_PlayerY
-    jmp @if_end_53
-@if_else_54:
-
-; Source: PlayerY := value
-    lda #$10
-    sta variable_PlayerY
-@if_end_53:
-    jmp @if_end_47
-@if_else_48:
-
-; Source: PlayerY := value
-    ; binary -: evaluate right operand
-    lda variable_MovementSpeed
-    sta expression_temporary_0
-    ; evaluate left operand
-    lda variable_PlayerY
-    sec
-    sbc expression_temporary_0
-    sta variable_PlayerY
-@if_end_47:
-@if_end_42:
-
-; Source: if condition then
-    ; nes.controller_down($01, nes.button_down)
-    lda runtime_controller_1_current
-    and #$20
-    bne @controller_true_57
-@controller_false_58:
-    lda #$00              ; false
-    jmp @controller_end_59
-@controller_true_57:
-    lda #$01              ; true
-@controller_end_59:
-    cmp #$00
-    bne @if_then_55
-    jmp @if_end_56       ; long-branch-safe false path
-@if_then_55:
-
-; Source: if condition then
-    ; comparison >=: evaluate right operand
-    lda #$DD
-    sta expression_temporary_0
-    ; evaluate left operand
-    lda variable_PlayerY
-    cmp expression_temporary_0
-    bcs @comparison_true_63
-@comparison_false_64:
-    lda #$00              ; false
-    jmp @comparison_end_65
-@comparison_true_63:
-    lda #$01              ; true
-@comparison_end_65:
-    cmp #$00
-    bne @if_then_60
-    jmp @if_else_62       ; long-branch-safe false path
-@if_then_60:
-
-; Source: if condition then
-    lda variable_WrapAtEdges
-    cmp #$00
-    bne @if_then_66
-    jmp @if_else_68       ; long-branch-safe false path
-@if_then_66:
-
-; Source: PlayerY := value
-    lda #$10
-    sta variable_PlayerY
-    jmp @if_end_67
-@if_else_68:
-
-; Source: PlayerY := value
-    lda #$DF
-    sta variable_PlayerY
-@if_end_67:
-    jmp @if_end_61
-@if_else_62:
-
-; Source: PlayerY := value
-    ; binary +: evaluate right operand
-    lda variable_MovementSpeed
-    sta expression_temporary_0
-    ; evaluate left operand
-    lda variable_PlayerY
-    clc
-    adc expression_temporary_0
-    sta variable_PlayerY
-@if_end_61:
-@if_end_56:
-
-; Source: if condition then
-    ; nes.controller_pressed($01, nes.button_b)
+    ; nes.controller_pressed($01, nes.button_b): branch result
     lda runtime_controller_1_current
     and #$02
-    beq @controller_false_72
+    beq @controller_branch_false_42
     lda runtime_controller_1_previous
     and #$02
-    beq @controller_true_71
-@controller_false_72:
-    lda #$00              ; false
-    jmp @controller_end_73
-@controller_true_71:
-    lda #$01              ; true
-@controller_end_73:
-    cmp #$00
-    bne @if_then_69
-    jmp @if_end_70       ; long-branch-safe false path
-@if_then_69:
+    beq @if_then_40
+@controller_branch_false_42:
+    jmp @if_end_41       ; long-branch-safe false path
+@if_then_40:
 
 ; Source: PlayerTile := value
     lda #$02
     sta variable_PlayerTile
-@if_end_70:
+@if_end_41:
 
 ; Source: if condition then
-    ; nes.controller_released($01, nes.button_b)
+    ; nes.controller_released($01, nes.button_b): branch result
     lda runtime_controller_1_current
     and #$02
-    bne @controller_false_77
+    bne @controller_branch_false_45
     lda runtime_controller_1_previous
     and #$02
-    bne @controller_true_76
-@controller_false_77:
-    lda #$00              ; false
-    jmp @controller_end_78
-@controller_true_76:
-    lda #$01              ; true
-@controller_end_78:
-    cmp #$00
-    bne @if_then_74
-    jmp @if_end_75       ; long-branch-safe false path
-@if_then_74:
+    bne @if_then_43
+@controller_branch_false_45:
+    jmp @if_end_44       ; long-branch-safe false path
+@if_then_43:
 
 ; Source: PlayerTile := value
     lda #$01
     sta variable_PlayerTile
-@if_end_75:
+@if_end_44:
 
 ; Source: if condition then
-    ; nes.controller_pressed($01, nes.button_start)
+    ; nes.controller_pressed($01, nes.button_start): branch result
     lda runtime_controller_1_current
     and #$08
-    beq @controller_false_82
+    beq @controller_branch_false_48
     lda runtime_controller_1_previous
     and #$08
-    beq @controller_true_81
-@controller_false_82:
-    lda #$00              ; false
-    jmp @controller_end_83
-@controller_true_81:
-    lda #$01              ; true
-@controller_end_83:
-    cmp #$00
-    bne @if_then_79
-    jmp @if_end_80       ; long-branch-safe false path
-@if_then_79:
+    beq @if_then_46
+@controller_branch_false_48:
+    jmp @if_end_47       ; long-branch-safe false path
+@if_then_46:
 
 ; Source: PlayerX := value
     lda #$78
@@ -694,7 +565,7 @@ procedure_Update:
 ; Source: PlayerY := value
     lda #$70
     sta variable_PlayerY
-@if_end_80:
+@if_end_47:
 
 ; Source: nes.set_sprite_zero(x, y, tile, attributes)
 ; Runtime: invalidate, stage all bytes, then publish atomically

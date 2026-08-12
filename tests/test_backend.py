@@ -76,10 +76,9 @@ class BackendGoldenTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertEqual(actual, expected)
-        self.assertIn("expression_temporary_0: .res 1", actual)
-        self.assertIn("expression_temporary_1: .res 1", actual)
-        self.assertIn("adc expression_temporary_1", actual)
-        self.assertIn("sbc expression_temporary_0", actual)
+        self.assertNotIn("expression_temporary_", actual)
+        self.assertIn("adc #$02", actual)
+        self.assertIn("sbc #$01", actual)
         self.assertIn("eor #$FF", actual)
 
     def test_boolean_expression_program_matches_golden_assembly(self) -> None:
@@ -91,7 +90,8 @@ class BackendGoldenTests(unittest.TestCase):
             ROOT / "tests" / "golden" / "boolean_expressions.asm"
         ).read_text(encoding="utf-8")
         self.assertEqual(actual, expected)
-        self.assertIn("cmp expression_temporary_0", actual)
+        self.assertNotIn("expression_temporary_", actual)
+        self.assertIn("cmp #$10", actual)
         self.assertIn("; short-circuit false", actual)
         self.assertIn("; short-circuit true", actual)
         self.assertIn("lda #$00              ; false", actual)
@@ -232,7 +232,7 @@ end.
         )
         self.assertEqual(actual, expected)
         self.assertNotIn("runtime_oam_shadow", actual)
-        self.assertIn("; $0010: reusable expression evaluation byte", actual)
+        self.assertIn("for_limit_0: .res 1 ; $0010", actual)
         self.assertIn("; $0080: BackgroundColor: nes_color", actual)
 
     def test_zero_page_program_matches_golden_assembly(self) -> None:

@@ -166,8 +166,7 @@ class MemoryLayoutTests(unittest.TestCase):
         second = build_memory_layout(program)
 
         expected = [
-            ("expression_temporary_0", 0x0010),
-            ("for_limit_0", 0x0011),
+            ("for_limit_0", 0x0010),
         ]
         self.assertEqual(
             [

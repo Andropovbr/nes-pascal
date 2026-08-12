@@ -23,7 +23,7 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
-expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
+    ; no compiler temporaries required
 
 .segment "ZERO_PAGE_VARIABLES": zeropage
 ; Source: optional global-variable promotion with regular-RAM fallback
@@ -239,48 +239,18 @@ procedure_InitializeState:
 procedure_ChooseColor:
 
 ; Source: if condition then
-    ; boolean and: evaluate left operand
-    ; comparison =: evaluate right operand
-    lda #$03
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; boolean and: branch left operand
+    ; comparison =: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
-    beq @comparison_true_8
-@comparison_false_9:
-    lda #$00              ; false
-    jmp @comparison_end_10
-@comparison_true_8:
-    lda #$01              ; true
-@comparison_end_10:
-    cmp #$00
-    bne @boolean_evaluate_right_4
-    jmp @boolean_false_6       ; short-circuit false
-@boolean_evaluate_right_4:
-    ; evaluate right operand
-    ; comparison =: evaluate right operand
-    lda #$01
-    sta expression_temporary_0
-    ; evaluate left operand
+    cmp #$03
+    beq @boolean_branch_right_4
+    jmp @if_else_3       ; long-branch-safe false path
+@boolean_branch_right_4:
+    ; boolean and: branch right operand
+    ; comparison =: direct right operand
     lda variable_CallCount
-    cmp expression_temporary_0
-    beq @comparison_true_11
-@comparison_false_12:
-    lda #$00              ; false
-    jmp @comparison_end_13
-@comparison_true_11:
-    lda #$01              ; true
-@comparison_end_13:
-    cmp #$00
-    bne @boolean_true_5
-@boolean_false_6:
-    lda #$00              ; false
-    jmp @boolean_end_7
-@boolean_true_5:
-    lda #$01              ; true
-@boolean_end_7:
-    cmp #$00
-    bne @if_then_1
+    cmp #$01
+    beq @if_then_1
     jmp @if_else_3       ; long-branch-safe false path
 @if_then_1:
 

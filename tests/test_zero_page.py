@@ -94,9 +94,9 @@ class ZeroPageAllocationTests(unittest.TestCase):
         self.assertEqual(layout.free_ram.start, 0x0206)
 
     def test_mandatory_temporaries_do_not_borrow_optional_space(self) -> None:
-        path = ROOT / "examples" / "memory_layout.nsp"
+        path = ROOT / "examples" / "counting.nsp"
         source = path.read_text(encoding="utf-8")
-        settings = MemoryLayoutSettings(temporary_storage_size=1)
+        settings = MemoryLayoutSettings(temporary_storage_size=5)
 
         with self.assertRaises(CompilerError) as context:
             build_memory_layout(

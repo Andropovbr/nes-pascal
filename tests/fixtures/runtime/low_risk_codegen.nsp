@@ -1,0 +1,40 @@
+program LowRiskCodegenRuntime;
+
+var
+    Left: byte;
+    Right: byte;
+    BranchScore: byte;
+    LoopCount: byte;
+    RepeatCount: byte;
+    StoredTrue: boolean;
+    StoredFalse: boolean;
+
+begin
+    Left := $01;
+    Right := $03;
+    BranchScore := $00;
+    LoopCount := $00;
+    RepeatCount := $00;
+    StoredTrue := Left < Right;
+    StoredFalse := Left > Right;
+
+    if (Left < Right) and not StoredFalse then
+        inc(BranchScore);
+    if StoredFalse or (Right > Left) then
+        inc(BranchScore);
+    if StoredTrue then
+        inc(BranchScore);
+
+    while (Left < Right) and (LoopCount < $02) do
+    begin
+        Left := Left + $01;
+        LoopCount := LoopCount + $01;
+    end;
+
+    repeat
+        RepeatCount := RepeatCount + $01;
+    until (RepeatCount >= $02) or StoredFalse;
+
+    nes.set_background_color($21);
+    nes.run;
+end.
