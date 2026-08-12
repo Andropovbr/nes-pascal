@@ -32,11 +32,11 @@ A matriz adota os seguintes níveis de verificação semântica:
 | 14 | **NMI e sincronização de quadros** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | `nes.wait_frame`, contador de quadros |
 | 15 | **Callbacks de quadro** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | `nes.on_update`, `nes.on_vblank` |
 | 16 | **Entrada de controles** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Leitura de portas duplas, botões |
-| 17 | **Carregamento de CHR-ROM** | N/A | Forte | Forte | Forte | Forte | Ausente | Forte | Ausente | Ausente | Validação de `--chr` (8 KiB exatos) |
+| 17 | **Carregamento de CHR-ROM** | N/A | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Ausente | Validação de `--chr` (8 KiB exatos) |
 | 18 | **Carregamento de nametable** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Ausente | Transferência de 1 KiB raw na inicialização |
 | 19 | **Atualizações de fundo em runtime** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Fila de VBlank com 4 escritas, shadow de tiles |
 | 20 | **Gerenciamento de paletas** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Shadow de 32 bytes, uploader em VBlank |
-| 21 | **Rolagem e estado da PPU** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Ausente | Preparação de scroll, restauração de latch |
+| 21 | **Rolagem e estado da PPU** | Forte | Forte | **Forte** | Forte | Forte | Ausente | Forte | Forte | Ausente | Preparação de scroll, restauração de latch; fixtures de tipo para ambas as posições de argumento |
 | 22 | **Sprites de hardware básicos** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Shadow de 64 entradas de OAM, DMA em NMI |
 | 23 | **Gerenciamento de sprites** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Reserva estática de pool de 64 slots |
 | 24 | **Metasprites** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Geometria de âncora, flip, recorte de borda |
@@ -50,15 +50,15 @@ A matriz adota os seguintes níveis de verificação semântica:
 ## 2. Respostas às Perguntas Canônicas de Auditoria
 
 ### 1. Quais subsistemas implementados não possuem cobertura em runtime no Mesen?
-* **Carregamento de asset CHR-ROM (`--chr`):** Verificado estaticamente por comparação binária e inspeção de segmentos do `ld65` em `test_assets.py`, mas sem script de emulador que verifique a saída visual de padrões CHR.
+* **Carregamento de asset CHR-ROM (`--chr`) — ✅ Resolvido (P1):** `verify_chr_asset.lua` agora lê todos os 8 192 bytes da tabela de padrões da PPU (`$0000–$1FFF`) via `emu.read(..., emu.memType.nesPpuDebug)` e valida o padrão determinístico completo de `chr_asset.chr`, incluindo o marcador terminal único (`$0A`) no offset `$1FFF`.
 * *Nota sobre primitivas puras em tempo de compilação:* Os arquivos `arithmetic.nsp`, `boolean_expressions.nsp` e `conditionals.nsp` isolados não possuem scripts `.lua` individuais dedicados; entretanto, seu comportamento em runtime é completamente validado de forma transitiva em `verify_low_risk_codegen.lua`, `verify_arrays.lua` e `verify_counting.lua`.
 
 ### 2. Quais recursos voltados ao hardware dependem exclusivamente de testes estáticos/goldens?
-* **Embarque de CHR-ROM:** Validado por tamanho de arquivo, geração de configuração de linker e verificação binária da ROM, porém sem asserções em runtime sobre tabelas de padrões da PPU no Mesen.
+* **Embarque de CHR-ROM — ✅ Resolvido (P1):** Além da validação binária da ROM, `verify_chr_asset.lua` agora verifica o padrão CHR correto na tabela de padrões da PPU emulada em runtime.
 * Todos os demais recursos voltados ao hardware (Paletas, Nametables, Atualizações no VBlank, Rolagem/Scroll, Sprites de Hardware, Metasprites, Animação, Controles, Callbacks de NMI, Sincronização de Quadros) contam com testes comportamentais dedicados no Mesen headless via Lua.
 
 ### 3. Quais recursos têm cobertura no Mesen mas possuem cobertura semântica/diagnóstica fraca?
-* **Rolagem e Estado da PPU:** Possui verificação completa em runtime (`verify_scrolling_ppu_state.lua`), mas apenas um fixture negativo de diagnóstico (`invalid_set_scroll_argument_count.nsp`). A checagem de tipos adicionais é tratada pela validação genérica de builtins.
+* **Rolagem e Estado da PPU — ✅ Resolvido (P1):** Dois fixtures negativos dedicados (`invalid_set_scroll_x_type.nsp`, `invalid_set_scroll_y_type.nsp`) agora verificam explicitamente que passar `boolean` no argumento `x` ou `y` de `nes.set_scroll` gera `E4004` (incompatibilidade de tipo), confirmando que `E3046` (contagem de argumentos) não toma precedência.
 
 ### 4. Quais recursos do compilador não possuem representação dedicada no benchmark?
 * `chr_asset` (embarque isolado de CHR)
@@ -93,19 +93,18 @@ A matriz adota os seguintes níveis de verificação semântica:
 
 ## 3. Análise de Lacunas (Gaps)
 
-### Alta Prioridade (P1)
-1. **P1 — Adicionar teste dedicado de runtime no Mesen para validação de padrões de CHR-ROM**:
+### Alta Prioridade (P1) — Todos Resolvidos
+1. **✅ P1 — Validação em runtime no Mesen da tabela de padrões CHR-ROM** *(resolvido)*:
    * *Subsistema:* Carregamento de Asset CHR-ROM (`--chr`)
-   * *Camada Ausente:* Emulação de Runtime no Mesen
-   * *Relevância:* A integridade dos dados CHR é verificada no nível binário da ROM, mas a verificação em runtime da visibilidade na tabela de padrões da PPU (`$0000-$1FFF`) garante compatibilidade com o emulador.
-   * *Teste Sugerido:* Script Lua no Mesen lendo a memória da tabela de padrões da PPU após o reset.
-   * *Escopo:* Pequeno (1 script de verificação Lua + método de teste de integração).
+   * *Adicionado:* `tests/mesen/verify_chr_asset.lua` — lê todos os 8 192 bytes da tabela de padrões da PPU (`$0000–$1FFF`) via `emu.memType.nesPpuDebug` e verifica o padrão determinístico de `examples/assets/chr_asset.chr`, incluindo o byte terminal único `$0A` em `$1FFF`.
+   * *Integrado:* `MesenIntegrationTests.test_chr_asset_is_visible_in_ppu_pattern_tables` em `tests/test_integration.py`.
+   * *Atualização na matriz:* Subsistema 17 — camada Runtime no Mesen: **Ausente → Forte**.
 
-2. **P1 — Expandir fixtures negativos de diagnóstico para tipos de argumentos de `nes.set_scroll`**:
+2. **✅ P1 — Fixtures negativos de diagnóstico focados para tipos de argumentos de `nes.set_scroll`** *(resolvido)*:
    * *Subsistema:* Rolagem e Estado da PPU
-   * *Camada Ausente:* Fixtures de diagnóstico
-   * *Relevância:* A rejeição de tipos inválidos (ex.: `boolean` passado para `nes.set_scroll`) deve ser coberta por um fixture negativo focado em `tests/fixtures/diagnostics/`.
-   * *Escopo:* Pequeno (1 fixture negativo `.nsp` + asserção em teste de diagnóstico).
+   * *Adicionados:* `tests/fixtures/diagnostics/invalid_set_scroll_x_type.nsp` e `invalid_set_scroll_y_type.nsp`.
+   * *Testes adicionados:* `test_boolean_x_argument_fixture_emits_type_diagnostic_not_argument_count` e `test_boolean_y_argument_fixture_emits_type_diagnostic_not_argument_count` em `tests/test_scrolling_ppu_state.py`, cada um verificando `E4004` e confirmando que `E3046` não toma precedência.
+   * *Atualização na matriz:* Subsistema 21 — camada Diagnósticos: anotação atualizada para indicar que ambas as posições de argumento estão cobertas.
 
 ### Média Prioridade (P2)
 1. **P2 — Adicionar fixtures focados de Golden Assembly para subsistemas de hardware**:
@@ -137,8 +136,8 @@ A matriz adota os seguintes níveis de verificação semântica:
 
 ## 4. Backlog Priorizado de Seguimento
 
-* `[P1]` Adicionar teste de validação de padrões da PPU no Mesen para carregamento de CHR-ROM (`verify_chr_asset.lua`).
-* `[P1]` Adicionar fixture negativo de diagnóstico focado para tipos inválidos de argumentos em `nes.set_scroll`.
+* `[P1 ✅]` ~~Adicionar teste de validação de padrões da PPU no Mesen para carregamento de CHR-ROM (`verify_chr_asset.lua`).~~ **Resolvido** — `tests/mesen/verify_chr_asset.lua` valida todos os 8 192 bytes da tabela de padrões da PPU em runtime.
+* `[P1 ✅]` ~~Adicionar fixture negativo de diagnóstico focado para tipos inválidos de argumentos em `nes.set_scroll`.~~ **Resolvido** — Fixtures `invalid_set_scroll_x_type.nsp` e `invalid_set_scroll_y_type.nsp` com asserções de `E4004` para ambas as posições de argumento.
 * `[P2]` Adicionar fixtures de golden assembly focados para rotinas de runtime de hardware (paletas, fila de fundo, renderizador de metasprites).
 * `[P2]` Adicionar especificação de benchmark de `scrolling_ppu_state` em `tools/measure_benchmarks.py`.
 * `[P2]` Separar `tests/test_integration.py` em `test_toolchain.py`, `test_goldens.py` e `test_mesen.py`.

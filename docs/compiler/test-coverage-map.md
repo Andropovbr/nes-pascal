@@ -32,11 +32,11 @@ The matrix uses semantic verification tiers:
 | 14 | **NMI & frame sync** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | `nes.wait_frame`, frame counter |
 | 15 | **Frame callbacks** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | `nes.on_update`, `nes.on_vblank` |
 | 16 | **Controller input** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Dual-port polling, button queries |
-| 17 | **CHR-ROM asset loading** | N/A | Strong | Strong | Strong | Strong | Missing | Strong | Missing | Missing | `--chr` validation (8 KiB exact) |
+| 17 | **CHR-ROM asset loading** | N/A | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Missing | `--chr` validation (8 KiB exact) |
 | 18 | **Nametable loading** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Missing | Full raw 1 KiB upload |
 | 19 | **Runtime BG updates** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | 4-write VBlank queue, tile shadow |
 | 20 | **Palette management** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | 32-byte shadow, VBlank uploader |
-| 21 | **Scrolling & PPU state** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Missing | Scroll staging, latch restore |
+| 21 | **Scrolling & PPU state** | Strong | Strong | **Strong** | Strong | Strong | Missing | Strong | Strong | Missing | Scroll staging, latch restore; type fixtures for both arg positions |
 | 22 | **Basic hardware sprites** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | 64-entry OAM shadow, NMI DMA |
 | 23 | **Sprite management** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | Static 64-slot pool reservation |
 | 24 | **Metasprites** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | Anchor geometry, flipping, clipping |
@@ -50,15 +50,15 @@ The matrix uses semantic verification tiers:
 ## 2. Answers to Canonical Audit Questions
 
 ### 1. Which implemented subsystems have no Mesen runtime coverage?
-* **CHR-ROM Asset Loading (`--chr`):** Verified statically through binary comparison and ld65 segment inspection in `test_assets.py`, but has no active emulator script checking visual CHR pattern tile output.
+* **CHR-ROM Asset Loading (`--chr`) — ✅ Resolved (P1):** `verify_chr_asset.lua` now reads all 8 192 PPU pattern-table bytes (`$0000–$1FFF`) via `emu.read(..., emu.memType.nesPpuDebug)` and asserts the complete deterministic pattern from `chr_asset.chr`, including the unique terminal marker (`$0A`) at offset `$1FFF`.
 * *Note on pure compile-time primitives:* Standalone `arithmetic.nsp`, `boolean_expressions.nsp`, and `conditionals.nsp` do not have dedicated individual `.lua` scripts; however, their runtime behavior is thoroughly asserted transitively by `verify_low_risk_codegen.lua`, `verify_arrays.lua`, and `verify_counting.lua`.
 
 ### 2. Which hardware-facing features rely only on static/golden tests?
-* **CHR-ROM embedding:** Checked by file size validation, linker configuration generation, and raw binary ROM slicing, but without runtime PPU tile pattern assertions in Mesen.
+* **CHR-ROM embedding — ✅ Resolved (P1):** In addition to binary ROM validation, `verify_chr_asset.lua` now asserts the correct CHR pattern in the emulated PPU pattern table at runtime.
 * All other hardware-facing features (Palettes, Nametables, VBlank Updates, Scrolling, Hardware Sprites, Metasprites, Animation, Controllers, NMI Callbacks, Frame Synchronization) possess dedicated, headless Mesen Lua behavioral tests.
 
 ### 3. Which features have Mesen coverage but weak semantic/diagnostic coverage?
-* **Scrolling and PPU State:** Possesses complete runtime verification (`verify_scrolling_ppu_state.lua`), but only a single negative diagnostic fixture (`invalid_set_scroll_argument_count.nsp`). Additional argument type checks are handled by general builtin validation.
+* **Scrolling and PPU State — ✅ Resolved (P1):** Two dedicated negative fixtures (`invalid_set_scroll_x_type.nsp`, `invalid_set_scroll_y_type.nsp`) now explicitly assert that passing a `boolean` to the `x` or `y` argument of `nes.set_scroll` raises `E4004` (type mismatch) and that `E3046` (argument count) does not take precedence.
 
 ### 4. Which compiler features have no dedicated benchmark representation?
 * `chr_asset` (standalone CHR embedding)
@@ -93,19 +93,18 @@ The matrix uses semantic verification tiers:
 
 ## 3. Gap Analysis
 
-### High Priority (P1)
-1. **P1 — Add dedicated Mesen runtime test for standalone CHR-ROM pattern validation**:
+### High Priority (P1) — All Resolved
+1. **✅ P1 — CHR-ROM Mesen runtime pattern table validation** *(resolved)*:
    * *Subsystem:* CHR-ROM Asset Loading (`--chr`)
-   * *Missing Layer:* Mesen Runtime Emulation
-   * *Why it matters:* CHR data integrity is verified at ROM binary level, but runtime verification of PPU pattern table visibility (`$0000-$1FFF`) ensures emulator compatibility.
-   * *Suggested Test:* Mesen Lua script reading PPU pattern table memory after reset.
-   * *Scope:* Small (1 Lua verification script + integration test method).
+   * *Added:* `tests/mesen/verify_chr_asset.lua` — reads all 8 192 PPU pattern-table bytes (`$0000–$1FFF`) via `emu.memType.nesPpuDebug` and verifies the deterministic pattern from `examples/assets/chr_asset.chr`, including the unique terminal byte `$0A` at `$1FFF`.
+   * *Integrated:* `MesenIntegrationTests.test_chr_asset_is_visible_in_ppu_pattern_tables` in `tests/test_integration.py`.
+   * *Matrix update:* Subsystem 17 — Mesen Runtime tier: **Missing → Strong**.
 
-2. **P1 — Expand negative diagnostic fixtures for `nes.set_scroll` argument types**:
+2. **✅ P1 — Focused negative diagnostic fixtures for `nes.set_scroll` argument types** *(resolved)*:
    * *Subsystem:* Scrolling & PPU State
-   * *Missing Layer:* Diagnostic fixtures
-   * *Why it matters:* Rejection of invalid types (e.g. `boolean` passed to `nes.set_scroll`) should be covered by a focused negative fixture in `tests/fixtures/diagnostics/`.
-   * *Scope:* Small (1 negative `.nsp` fixture + diagnostic test assertion).
+   * *Added:* `tests/fixtures/diagnostics/invalid_set_scroll_x_type.nsp` and `invalid_set_scroll_y_type.nsp`.
+   * *Added tests:* `test_boolean_x_argument_fixture_emits_type_diagnostic_not_argument_count` and `test_boolean_y_argument_fixture_emits_type_diagnostic_not_argument_count` in `tests/test_scrolling_ppu_state.py`, each asserting `E4004` and confirming `E3046` does not take precedence.
+   * *Matrix update:* Subsystem 21 — Diagnostics tier: annotation updated to note both argument positions are now covered.
 
 ### Medium Priority (P2)
 1. **P2 — Add focused Golden Assembly fixtures for hardware subsystems**:
@@ -137,8 +136,8 @@ The matrix uses semantic verification tiers:
 
 ## 4. Prioritized Follow-up Backlog
 
-* `[P1]` Add Mesen PPU pattern validation test for CHR-ROM loading (`verify_chr_asset.lua`).
-* `[P1]` Add focused negative diagnostic fixture for invalid `nes.set_scroll` argument types.
+* `[P1 ✅]` ~~Add Mesen PPU pattern validation test for CHR-ROM loading (`verify_chr_asset.lua`).~~ **Resolved** — `tests/mesen/verify_chr_asset.lua` validates all 8 192 PPU pattern-table bytes at runtime.
+* `[P1 ✅]` ~~Add focused negative diagnostic fixture for invalid `nes.set_scroll` argument types.~~ **Resolved** — `invalid_set_scroll_x_type.nsp` and `invalid_set_scroll_y_type.nsp` fixtures with test assertions for `E4004` in both argument positions.
 * `[P2]` Add focused golden assembly fixtures for hardware runtime routines (palettes, background queue, metasprite renderer).
 * `[P2]` Add `scrolling_ppu_state` benchmark spec to `tools/measure_benchmarks.py`.
 * `[P2]` Separate `tests/test_integration.py` into `test_toolchain.py`, `test_goldens.py`, and `test_mesen.py`.
