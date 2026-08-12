@@ -52,5 +52,6 @@ O trabalho planejado é acompanhado separadamente no
 - [Infraestrutura de builtins / intrínsecos (0.5.6)](compiler/builtin-infrastructure.md)
 - [Melhorias de baixo risco na geração de código (0.5.7)](compiler/low-risk-codegen-0.5.7.md)
 - [Implementação e medições de arrays (0.5.8)](compiler/arrays-0.5.8.md)
+- [Mapa de cobertura de testes semânticos](compiler/test-coverage-map.md)
 - [Recursos não suportados](reference/unsupported-features.md)
 - [Diagnósticos do compilador](reference/diagnostics/index.md)
