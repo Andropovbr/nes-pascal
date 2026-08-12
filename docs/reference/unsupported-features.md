@@ -21,8 +21,9 @@ the supported language.
 - Equality and inequality require matching types; ordered comparisons are
   limited to `byte`.
 - Boolean expressions support only `not`, `and`, and `or`.
-- `case`, arrays, records, general functions, runtime strings, and inline
-  Assembly are not supported. A small fixed set of built-in query expressions
+- `case`, records, general functions, runtime strings, and inline Assembly are
+  not supported. Arrays are limited to fixed-size, one-dimensional global
+  arrays of `byte` or `boolean`. A small fixed set of built-in query expressions
   and the statically resolved `nes.sprite_create()` and
   `nes.metasprite_create(frame)` intrinsics are supported.
 - Procedure parameters are limited to `byte` and `boolean` values. There are

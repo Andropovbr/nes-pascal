@@ -32,12 +32,16 @@ class TokenKind(Enum):
     NOT = auto()
     AND = auto()
     OR = auto()
+    ARRAY = auto()
+    OF = auto()
     IDENTIFIER = auto()
     HEX_LITERAL = auto()
     SEMICOLON = auto()
     DOT = auto()
     LEFT_PAREN = auto()
     RIGHT_PAREN = auto()
+    LEFT_BRACKET = auto()
+    RIGHT_BRACKET = auto()
     COMMA = auto()
     COLON = auto()
     EQUAL = auto()
@@ -78,6 +82,8 @@ KEYWORDS = {
     "not": TokenKind.NOT,
     "and": TokenKind.AND,
     "or": TokenKind.OR,
+    "array": TokenKind.ARRAY,
+    "of": TokenKind.OF,
 }
 
 PUNCTUATION = {
@@ -85,6 +91,8 @@ PUNCTUATION = {
     ".": TokenKind.DOT,
     "(": TokenKind.LEFT_PAREN,
     ")": TokenKind.RIGHT_PAREN,
+    "[": TokenKind.LEFT_BRACKET,
+    "]": TokenKind.RIGHT_BRACKET,
     ",": TokenKind.COMMA,
     ":": TokenKind.COLON,
     "=": TokenKind.EQUAL,

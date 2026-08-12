@@ -1,0 +1,7 @@
+program InvalidArrayBounds;
+var
+    Values: array[$01..$04] of byte;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+end.

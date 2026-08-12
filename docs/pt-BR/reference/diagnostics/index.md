@@ -94,6 +94,11 @@ devem utilizar o intervalo reservado para a sua categoria.
 | [E4007](type-system.md) | Type System | Tipo de argumento de paleta inválido |
 | [E4008](type-system.md) | Type System | Valor inválido para `sprite` |
 | [E4009](type-system.md) | Type System | Valor inválido para `metasprite` |
+| [E4010](type-system.md) | Type System | Tipo de elemento de array inválido |
+| [E4011](type-system.md) | Type System | Tipo de índice de array inválido |
+| [E4012](type-system.md) | Type System | Índice de array fora dos limites |
+| [E4013](type-system.md) | Type System | Uso inválido de array |
+| [E4014](type-system.md) | Type System | Limites de array inválidos |
 | [E5001](code-generation.md) | Code Generation | Toolchain ausente |
 | [E5002](code-generation.md) | Code Generation | Falha no toolchain |
 | [E5003](code-generation.md) | Code Generation | RAM do usuário esgotada |

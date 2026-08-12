@@ -90,6 +90,9 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_counting_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("counting")
 
+    def test_arrays_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("arrays")
+
     def test_procedure_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("procedures")
 
@@ -641,6 +644,9 @@ class MesenIntegrationTests(unittest.TestCase):
                 ROOT / "tests" / "fixtures" / "runtime" / "low_risk_codegen.nsp"
             ),
         )
+
+    def test_arrays_preserve_indexed_storage_and_boolean_branching(self) -> None:
+        self._run_mesen_test("arrays", "verify_arrays.lua")
 
     def test_counting_example_reaches_expected_runtime_state(self) -> None:
         self._run_mesen_test(

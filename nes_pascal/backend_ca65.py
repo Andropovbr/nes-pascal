@@ -8,6 +8,8 @@ from .ast import (
     ComparisonOperator,
     ForDirection,
     ImmediateValue,
+    ResolvedArrayElement,
+    ResolvedArrayElementAssignment,
     ResolvedLoadBackground,
     ResolvedImportMetasprite,
     ResolvedAssignment,
@@ -546,7 +548,35 @@ def _generate_statements(
 ) -> list[str]:
     statement_lines: list[str] = []
     for statement in statements:
-        if isinstance(statement, ResolvedAssignment):
+        if isinstance(statement, ResolvedArrayElementAssignment):
+            if isinstance(statement.index, ImmediateValue):
+                offset = statement.index.value
+                operand = _array_element_operand(statement.target.label, offset)
+                statement_lines.extend(
+                    [
+                        "",
+                        f"; Source: {statement.target.name}[constant] := value",
+                        *_load_value(statement.value, label_counter),
+                        f"    sta {operand}",
+                    ]
+                )
+            else:
+                statement_lines.extend(
+                    [
+                        "",
+                        f"; Source: {statement.target.name}[index] := value",
+                        "; evaluate index before value; preserve it on hardware stack",
+                        *_load_value(statement.index, label_counter),
+                        "    pha",
+                        *_load_value(statement.value, label_counter),
+                        "    tay                     ; preserve assigned value",
+                        "    pla",
+                        "    tax                     ; native array index",
+                        "    tya",
+                        f"    sta {statement.target.label},x",
+                    ]
+                )
+        elif isinstance(statement, ResolvedAssignment):
             statement_lines.extend(
                 [
                     "",
@@ -2721,6 +2751,8 @@ def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
         return [f"    lda #${value.value:02X}"]
     if isinstance(value, VariableValue):
         return [f"    lda {value.variable.label}"]
+    if isinstance(value, ResolvedArrayElement):
+        return _load_array_element(value, 0, label_counter)
     if isinstance(value, ResolvedUnaryExpression):
         lines = _load_value(value.operand, label_counter)
         if value.operator is UnaryOperator.PLUS:
@@ -2935,6 +2967,8 @@ def _load_value_at_depth(
 ) -> list[str]:
     if isinstance(value, ResolvedBuiltinCall):
         return _load_builtin_value(value, depth, label_counter)
+    if isinstance(value, ResolvedArrayElement):
+        return _load_array_element(value, depth, label_counter)
     if isinstance(value, ResolvedBinaryExpression):
         return _load_binary_expression(value, depth, label_counter)
     if isinstance(value, ResolvedComparisonExpression):
@@ -2956,6 +2990,23 @@ def _load_value_at_depth(
     return _load_value(value, label_counter)
 
 
+def _load_array_element(
+    value: ResolvedArrayElement,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
+    if isinstance(value.index, ImmediateValue):
+        return [
+            f"    lda {_array_element_operand(value.array.label, value.index.value)}"
+        ]
+    return [
+        "    ; array element: native variable index",
+        *_load_value_at_depth(value.index, depth, label_counter),
+        "    tax",
+        f"    lda {value.array.label},x",
+    ]
+
+
 def _direct_rhs_operand(
     left: ResolvedValue,
     right: ResolvedValue,
@@ -2964,8 +3015,15 @@ def _direct_rhs_operand(
         return None
     if isinstance(right, ImmediateValue):
         return f"#${right.value:02X}"
-    assert isinstance(right, VariableValue)
-    return right.variable.label
+    if isinstance(right, VariableValue):
+        return right.variable.label
+    assert isinstance(right, ResolvedArrayElement)
+    assert isinstance(right.index, ImmediateValue)
+    return _array_element_operand(right.array.label, right.index.value)
+
+
+def _array_element_operand(label: str, offset: int) -> str:
+    return label if offset == 0 else f"{label} + {offset}"
 
 
 def _comparison_setup(
@@ -3102,7 +3160,7 @@ _BOOLEAN_LOADS_WITH_VALID_ZERO_FLAG = {
 def _zero_flag_is_valid(value: ResolvedValue) -> bool:
     """Recognize only loads whose final instruction provably defines Z."""
 
-    if isinstance(value, (ImmediateValue, VariableValue)):
+    if isinstance(value, (ImmediateValue, VariableValue, ResolvedArrayElement)):
         return True
     if isinstance(
         value,

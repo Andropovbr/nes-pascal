@@ -4,6 +4,9 @@ from dataclasses import dataclass, fields, is_dataclass
 from typing import Iterator
 
 from .ast import (
+    ArrayElementAssignment,
+    ArrayIndexExpression,
+    ArrayType,
     Assignment,
     BinaryExpression,
     BooleanBinaryExpression,
@@ -38,6 +41,8 @@ from .ast import (
     ProcedureDeclaration,
     RepeatStatement,
     ResolvedArgument,
+    ResolvedArrayElement,
+    ResolvedArrayElementAssignment,
     ResolvedAssignment,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
@@ -237,6 +242,38 @@ class SemanticAnalyzer:
                 declaration.position,
                 declared_names,
             )
+            if isinstance(declaration.type, ArrayType):
+                array_type = declaration.type
+                if array_type.element_type not in (
+                    BuiltInType.BYTE,
+                    BuiltInType.BOOLEAN,
+                ):
+                    self._error(
+                        array_type.element_type_position or declaration.position,
+                        DiagnosticCode.INVALID_ARRAY_ELEMENT_TYPE,
+                        f"Arrays of {array_type.element_type.value} are not supported.",
+                        "Use byte or boolean as the array element type.",
+                        len(array_type.element_type.value),
+                    )
+                if array_type.lower_bound != 0:
+                    self._error(
+                        array_type.lower_bound_position or declaration.position,
+                        DiagnosticCode.INVALID_ARRAY_BOUNDS,
+                        "Array lower bounds must be $00.",
+                        "Declare a zero-based range such as array[$00..$07].",
+                        3,
+                    )
+                if (
+                    array_type.upper_bound < array_type.lower_bound
+                    or array_type.upper_bound > 0xFF
+                ):
+                    self._error(
+                        array_type.upper_bound_position or declaration.position,
+                        DiagnosticCode.INVALID_ARRAY_BOUNDS,
+                        f"Array upper bound ${array_type.upper_bound:X} is invalid.",
+                        "Use an upper bound from $00 through $FF.",
+                        max(3, len(f"${array_type.upper_bound:X}")),
+                    )
             variable = ResolvedVariable(
                 declaration.name,
                 declaration.type,
@@ -772,7 +809,21 @@ class SemanticAnalyzer:
         current_assignments = set(assigned_variables)
         resolved_statements: list[ResolvedStatement] = []
         for statement in statements:
-            if isinstance(statement, Assignment):
+            if isinstance(statement, ArrayElementAssignment):
+                self._reject_control_variable_modification(
+                    statement.target,
+                    statement.target_position,
+                    protected_control_variables,
+                )
+                resolved = self._resolve_array_assignment(
+                    statement,
+                    constants,
+                    variables,
+                    current_assignments,
+                )
+                resolved_statements.append(resolved)
+                current_assignments.add(statement.target.lower())
+            elif isinstance(statement, Assignment):
                 self._reject_control_variable_modification(
                     statement.target,
                     statement.target_position,
@@ -1314,6 +1365,12 @@ class SemanticAnalyzer:
                 validate_statement(statement, symbol.declaration.name)
 
         def validate_statement(statement: Statement, owner: str) -> None:
+            if isinstance(statement, ArrayElementAssignment):
+                if not self._vblank_expression_is_safe(statement.index):
+                    self._vblank_unsafe_expression(statement.index, owner)
+                if not self._vblank_expression_is_safe(statement.value):
+                    self._vblank_unsafe_expression(statement.value, owner)
+                return
             if isinstance(statement, Assignment):
                 if not self._vblank_expression_is_safe(statement.value):
                     self._vblank_unsafe_expression(statement.value, owner)
@@ -1445,6 +1502,8 @@ class SemanticAnalyzer:
             return False
         if isinstance(value, (UnaryExpression, BooleanNotExpression)):
             return self._vblank_expression_is_safe(value.operand)
+        if isinstance(value, ArrayIndexExpression):
+            return self._vblank_expression_is_safe(value.index)
         if isinstance(value, BooleanBinaryExpression):
             return self._vblank_expression_is_safe(
                 value.left
@@ -1497,6 +1556,8 @@ class SemanticAnalyzer:
             return value
         if isinstance(value, (UnaryExpression, BooleanNotExpression)):
             return self._first_controller_query(value.operand)
+        if isinstance(value, ArrayIndexExpression):
+            return self._first_controller_query(value.index)
         if isinstance(
             value,
             (BinaryExpression, BooleanBinaryExpression, ComparisonExpression),
@@ -1519,6 +1580,8 @@ class SemanticAnalyzer:
             return value
         if isinstance(value, (UnaryExpression, BooleanNotExpression)):
             return self._first_get_tile(value.operand)
+        if isinstance(value, ArrayIndexExpression):
+            return self._first_get_tile(value.index)
         if isinstance(
             value,
             (BinaryExpression, BooleanBinaryExpression, ComparisonExpression),
@@ -1532,7 +1595,7 @@ class SemanticAnalyzer:
         return None
 
     def _statement_position_for_callback(self, statement: Statement) -> SourcePosition:
-        if isinstance(statement, Assignment):
+        if isinstance(statement, (Assignment, ArrayElementAssignment)):
             return statement.target_position
         position = getattr(statement, "position", None)
         assert position is not None
@@ -2120,6 +2183,14 @@ class SemanticAnalyzer:
                 f"Unknown variable: {assignment.target}.",
                 "Declare the variable in the var section before assigning it.",
             )
+        if isinstance(target.type, ArrayType):
+            self._error(
+                assignment.target_position,
+                DiagnosticCode.INVALID_ARRAY_USAGE,
+                f"Array {target.name} cannot be assigned as a whole value.",
+                f"Assign one element, for example {target.name}[$00] := value.",
+                len(target.name),
+            )
         value = self._resolve_value(
             assignment.value,
             target.type,
@@ -2130,6 +2201,58 @@ class SemanticAnalyzer:
         )
         return ResolvedAssignment(target, value)
 
+    def _resolve_array_assignment(
+        self,
+        assignment: ArrayElementAssignment,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+    ) -> ResolvedArrayElementAssignment:
+        normalized_target = assignment.target.lower()
+        target = variables.get(normalized_target)
+        if target is None:
+            if normalized_target in constants:
+                self._error(
+                    assignment.target_position,
+                    DiagnosticCode.ASSIGNMENT_TO_CONSTANT,
+                    f"Cannot index and assign to constant {assignment.target}.",
+                    "Use a declared array variable as the assignment target.",
+                    len(assignment.target),
+                )
+            self._error(
+                assignment.target_position,
+                DiagnosticCode.UNKNOWN_ASSIGNMENT_TARGET,
+                f"Unknown array variable: {assignment.target}.",
+                "Declare the array in the var section before assigning it.",
+                len(assignment.target),
+            )
+        if not isinstance(target.type, ArrayType):
+            self._error(
+                assignment.target_position,
+                DiagnosticCode.INVALID_ARRAY_USAGE,
+                f"Variable {target.name} has type {target.type.value} and cannot be indexed.",
+                "Index only a variable declared with an array type.",
+                len(target.name),
+            )
+
+        # Index first, then value. The backend preserves this order for variable
+        # indexes without reserving permanent Zero Page state.
+        index = self._resolve_array_index(
+            assignment.index,
+            target,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        value = self._resolve_value(
+            assignment.value,
+            target.type.element_type,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        return ResolvedArrayElementAssignment(target, index, value)
+
     def _resolve_value(
         self,
         expression: ValueExpression,
@@ -2139,6 +2262,15 @@ class SemanticAnalyzer:
         assigned_variables: set[str],
         assignment_target: ResolvedVariable | None = None,
     ) -> ResolvedValue:
+        if isinstance(expression, ArrayIndexExpression):
+            return self._resolve_array_element(
+                expression,
+                expected_type,
+                constants,
+                variables,
+                assigned_variables,
+                assignment_target,
+            )
         if isinstance(expression, BuiltinCall):
             descriptor = builtin_by_name(expression.name)
             assert descriptor is not None
@@ -2220,6 +2352,14 @@ class SemanticAnalyzer:
                 f"Unknown identifier: {expression.name}.",
                 "Declare the constant or variable before using it.",
             )
+        if isinstance(variable.type, ArrayType):
+            self._error(
+                expression.position,
+                DiagnosticCode.INVALID_ARRAY_USAGE,
+                f"Array {variable.name} cannot be used as a scalar value.",
+                f"Read one element, for example {variable.name}[$00].",
+                len(expression.name),
+            )
         self._require_matching_type(
             expression.name,
             expression.position,
@@ -2240,6 +2380,129 @@ class SemanticAnalyzer:
                     len(expression.name),
                 )
         return VariableValue(variable)
+
+    def _resolve_array_element(
+        self,
+        expression: ArrayIndexExpression,
+        expected_type: BuiltInType,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+        assignment_target: ResolvedVariable | None,
+    ) -> ResolvedArrayElement:
+        normalized_name = expression.array_name.lower()
+        array = variables.get(normalized_name)
+        if array is None:
+            self._error(
+                expression.position,
+                DiagnosticCode.UNKNOWN_IDENTIFIER,
+                f"Unknown array identifier: {expression.array_name}.",
+                "Declare the array in the var section before using it.",
+                len(expression.array_name),
+            )
+        if not isinstance(array.type, ArrayType):
+            self._error(
+                expression.position,
+                DiagnosticCode.INVALID_ARRAY_USAGE,
+                f"Variable {array.name} has type {array.type.value} and cannot be indexed.",
+                "Index only a variable declared with an array type.",
+                len(array.name),
+            )
+        self._require_expression_result_type(
+            expression.position,
+            array.type.element_type,
+            expected_type,
+            f"Array element {array.name}[...]",
+            assignment_target,
+        )
+        index = self._resolve_array_index(
+            expression.index,
+            array,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        if normalized_name not in assigned_variables:
+            if self.required_variables is not None:
+                self.required_variables.add(normalized_name)
+                assigned_variables.add(normalized_name)
+            else:
+                self._error(
+                    expression.position,
+                    DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT,
+                    f"Array {array.name} is read before an element is assigned.",
+                    f"Assign {array.name}[index] before reading the array.",
+                    len(array.name),
+                )
+        return ResolvedArrayElement(array, index)
+
+    def _resolve_array_index(
+        self,
+        expression: ValueExpression,
+        array: ResolvedVariable,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+    ) -> ResolvedValue:
+        assert isinstance(array.type, ArrayType)
+        type_hint = self._expression_type_hint(expression, constants, variables)
+        if type_hint is not None and type_hint is not BuiltInType.BYTE:
+            self._error(
+                expression.position,
+                DiagnosticCode.INVALID_ARRAY_INDEX_TYPE,
+                f"Array index for {array.name} must have type byte, but "
+                f"the expression has type {type_hint.value}.",
+                "Use a byte expression as the array index.",
+            )
+        resolved = self._resolve_value(
+            expression,
+            BuiltInType.BYTE,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        constant_index = self._constant_byte_value(expression, constants)
+        if constant_index is None:
+            return resolved
+        if not array.type.lower_bound <= constant_index <= array.type.upper_bound:
+            self._error(
+                expression.position,
+                DiagnosticCode.ARRAY_INDEX_OUT_OF_BOUNDS,
+                f"Index ${constant_index:02X} is outside {array.name}'s range "
+                f"${array.type.lower_bound:02X}..${array.type.upper_bound:02X}.",
+                "Use an index within the declared array bounds.",
+            )
+        return ImmediateValue(
+            constant_index - array.type.lower_bound,
+            BuiltInType.BYTE,
+        )
+
+    def _constant_byte_value(
+        self,
+        expression: ValueExpression,
+        constants: dict[str, TypedConstant],
+    ) -> int | None:
+        if isinstance(expression, HexLiteral):
+            return expression.value if expression.value <= 0xFF else None
+        if isinstance(expression, ConstantReference):
+            constant = constants.get(expression.name.lower())
+            if constant is not None and constant.type is BuiltInType.BYTE:
+                return constant.value
+            return None
+        if isinstance(expression, UnaryExpression):
+            operand = self._constant_byte_value(expression.operand, constants)
+            if operand is None:
+                return None
+            return operand if expression.operator.value == "+" else (-operand) & 0xFF
+        if isinstance(expression, BinaryExpression):
+            left = self._constant_byte_value(expression.left, constants)
+            right = self._constant_byte_value(expression.right, constants)
+            if left is None or right is None:
+                return None
+            if expression.operator.value == "+":
+                return (left + right) & 0xFF
+            return (left - right) & 0xFF
+        return None
 
     def _resolve_controller_index(
         self,
@@ -2720,6 +2983,11 @@ class SemanticAnalyzer:
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
     ) -> BuiltInType | None:
+        if isinstance(expression, ArrayIndexExpression):
+            variable = variables.get(expression.array_name.lower())
+            if variable is not None and isinstance(variable.type, ArrayType):
+                return variable.type.element_type
+            return None
         if isinstance(expression, BuiltinCall):
             descriptor = builtin_by_name(expression.name)
             assert descriptor is not None
@@ -2743,7 +3011,11 @@ class SemanticAnalyzer:
         if constant is not None:
             return constant.type
         variable = variables.get(expression.name.lower())
-        return variable.type if variable is not None else None
+        return (
+            variable.type
+            if variable is not None and isinstance(variable.type, BuiltInType)
+            else None
+        )
 
     def _require_expression_result_type(
         self,
@@ -2990,7 +3262,7 @@ class SemanticAnalyzer:
         statement: Statement,
         program: Program,
     ) -> SourcePosition:
-        if isinstance(statement, Assignment):
+        if isinstance(statement, (Assignment, ArrayElementAssignment)):
             return statement.target_position
         if isinstance(statement, IfStatement):
             return statement.position

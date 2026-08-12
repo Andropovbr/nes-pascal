@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .ast import (
     ImmediateValue,
+    ResolvedArrayElement,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
     ResolvedBooleanNotExpression,
@@ -20,6 +21,8 @@ def is_side_effect_free_value(value: ResolvedValue) -> bool:
 
     if isinstance(value, (ImmediateValue, VariableValue)):
         return True
+    if isinstance(value, ResolvedArrayElement):
+        return is_side_effect_free_value(value.index)
     if isinstance(value, (ResolvedUnaryExpression, ResolvedBooleanNotExpression)):
         return is_side_effect_free_value(value.operand)
     if isinstance(
@@ -48,7 +51,11 @@ def can_use_direct_rhs_operand(left: ResolvedValue, right: ResolvedValue) -> boo
 
     if isinstance(right, ImmediateValue):
         return True
-    return isinstance(right, VariableValue) and is_side_effect_free_value(left)
+    direct_memory = isinstance(right, VariableValue) or (
+        isinstance(right, ResolvedArrayElement)
+        and isinstance(right.index, ImmediateValue)
+    )
+    return direct_memory and is_side_effect_free_value(left)
 
 
 def expression_temporary_symbol_count(
@@ -80,4 +87,6 @@ def expression_temporary_symbol_count(
             ),
             default=depth,
         )
+    if isinstance(value, ResolvedArrayElement):
+        return expression_temporary_symbol_count(value.index, depth)
     return depth

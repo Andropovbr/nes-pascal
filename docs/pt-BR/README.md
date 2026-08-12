@@ -31,6 +31,7 @@ Esta pasta contém a tradução completa da documentação do **NES Pascal** par
 - [x] `docs/language/identifiers-and-literals.md` -> `docs/pt-BR/language/identifiers-and-literals.md`
 - [x] `docs/language/types.md` -> `docs/pt-BR/language/types.md`
 - [x] `docs/language/constants-and-variables.md` -> `docs/pt-BR/language/constants-and-variables.md`
+- [x] `docs/language/arrays.md` -> `docs/pt-BR/language/arrays.md`
 - [x] `docs/language/assignments.md` -> `docs/pt-BR/language/assignments.md`
 - [x] `docs/language/expressions.md` -> `docs/pt-BR/language/expressions.md`
 - [x] `docs/language/conditionals.md` -> `docs/pt-BR/language/conditionals.md`
@@ -71,4 +72,5 @@ Esta pasta contém a tradução completa da documentação do **NES Pascal** par
 ### Compiler Internals (Internos do Compilador)
 - [x] `docs/compiler/builtin-infrastructure.md` -> `docs/pt-BR/compiler/builtin-infrastructure.md`
 - [x] `docs/compiler/low-risk-codegen-0.5.7.md` -> `docs/pt-BR/compiler/low-risk-codegen-0.5.7.md`
+- [x] `docs/compiler/arrays-0.5.8.md` -> `docs/pt-BR/compiler/arrays-0.5.8.md`
 - [x] `docs/compiler/optimization-audit-0.5.5.md` -> `docs/pt-BR/compiler/optimization-audit-0.5.5.md`

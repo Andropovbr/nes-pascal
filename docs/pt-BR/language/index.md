@@ -10,6 +10,7 @@ com Pascal ou Free Pascal.
 - [Identificadores e literais](identifiers-and-literals.md)
 - [Tipos embutidos](types.md)
 - [Constantes e variáveis](constants-and-variables.md)
+- [Arrays](arrays.md)
 - [Atribuições](assignments.md)
 - [Expressões](expressions.md)
 - [Estruturas condicionais](conditionals.md)

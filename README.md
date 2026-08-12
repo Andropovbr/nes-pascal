@@ -9,7 +9,9 @@ The compiler currently supports explicitly typed constants and global
 variables, exact-type assignments, one-byte arithmetic, comparisons,
 short-circuit Boolean expressions, structured conditionals and loops,
 increment and decrement operations, and acyclic procedures with `byte` and
-`boolean` value parameters. The one-byte `sprite` type strongly selects one of
+`boolean` value parameters. Fixed global arrays provide contiguous static
+storage for `byte` and `boolean` elements with direct or native indexed
+addressing. The one-byte `sprite` type strongly selects one of
 64 hardware OAM entries, while the opaque `metasprite` type identifies a
 static multi-component object compiled from PNG2CHR Studio metadata. The
 deterministic memory layout places mandatory

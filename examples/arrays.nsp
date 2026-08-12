@@ -1,0 +1,33 @@
+program Arrays;
+
+var
+    Values: array[$00..$07] of byte;
+    Active: array[$00..$07] of boolean;
+    Index: byte;
+    Sum: byte;
+    ActiveCount: byte;
+
+begin
+    Values[$00] := $10;
+    Values[$07] := $17;
+    Active[$00] := true;
+    Active[$07] := false;
+
+    for Index := $00 to $07 do
+    begin
+        Values[Index] := Index + $10;
+        Active[Index] := Index < $04;
+    end;
+
+    Sum := $00;
+    ActiveCount := $00;
+    for Index := $00 to $07 do
+    begin
+        Sum := Sum + Values[Index];
+        if Active[Index] then
+            ActiveCount := ActiveCount + $01;
+    end;
+
+    nes.set_background_color($0F);
+    nes.run;
+end.

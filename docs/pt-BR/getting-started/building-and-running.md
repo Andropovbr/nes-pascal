@@ -18,6 +18,7 @@ python -m nes_pascal.cli examples/boolean_expressions.nsp -o build/boolean_expre
 python -m nes_pascal.cli examples/conditionals.nsp -o build/conditionals.nes
 python -m nes_pascal.cli examples/loops.nsp -o build/loops.nes
 python -m nes_pascal.cli examples/counting.nsp -o build/counting.nes
+python -m nes_pascal.cli examples/arrays.nsp -o build/arrays.nes
 python -m nes_pascal.cli examples/procedures.nsp -o build/procedures.nes
 python -m nes_pascal.cli examples/procedure_parameters.nsp -o build/procedure_parameters.nes
 python -m nes_pascal.cli examples/memory_layout.nsp -o build/memory_layout.nes
@@ -45,6 +46,9 @@ Os exemplos demonstram:
 - `loops.nsp`: contagem, fluxo de controle aninhado, `break` e `continue`;
 - `counting.nsp`: `inc` e `dec` com estouro circular (wrapping), laços `for`
   ascendentes e descendentes, limites exatos `$00` e `$FF` e laços aninhados;
+- `arrays.nsp`: arrays fixos de bytes e booleanos, índices constantes e
+  variáveis, preenchimento em laço, acumulação indexada e branches sobre
+  elementos booleanos;
 - `procedures.nsp`: resolução antecipada (forward) de procedimentos, chamadas
   aninhadas, estado global compartilhado, `JSR`/`RTS` e uma condicional dentro
   de um procedimento;

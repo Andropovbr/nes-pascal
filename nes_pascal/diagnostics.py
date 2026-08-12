@@ -85,6 +85,11 @@ class DiagnosticCode(StrEnum):
     INVALID_PALETTE_ARGUMENT_TYPE = "E4007"
     INVALID_SPRITE_VALUE = "E4008"
     INVALID_METASPRITE_VALUE = "E4009"
+    INVALID_ARRAY_ELEMENT_TYPE = "E4010"
+    INVALID_ARRAY_INDEX_TYPE = "E4011"
+    ARRAY_INDEX_OUT_OF_BOUNDS = "E4012"
+    INVALID_ARRAY_USAGE = "E4013"
+    INVALID_ARRAY_BOUNDS = "E4014"
     MISSING_TOOLCHAIN = "E5001"
     TOOLCHAIN_FAILURE = "E5002"
     USER_RAM_EXHAUSTED = "E5003"
@@ -336,6 +341,21 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INVALID_METASPRITE_VALUE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Invalid metasprite value"
+    ),
+    DiagnosticCode.INVALID_ARRAY_ELEMENT_TYPE: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Invalid array element type"
+    ),
+    DiagnosticCode.INVALID_ARRAY_INDEX_TYPE: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Invalid array index type"
+    ),
+    DiagnosticCode.ARRAY_INDEX_OUT_OF_BOUNDS: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Array index out of bounds"
+    ),
+    DiagnosticCode.INVALID_ARRAY_USAGE: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Invalid array usage"
+    ),
+    DiagnosticCode.INVALID_ARRAY_BOUNDS: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Invalid array bounds"
     ),
     DiagnosticCode.MISSING_TOOLCHAIN: DiagnosticDefinition(
         DiagnosticCategory.CODE_GENERATION, "Missing toolchain"

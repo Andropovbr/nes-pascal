@@ -1,0 +1,7 @@
+program InvalidArrayElementType;
+var
+    Colors: array[$00..$03] of nes_color;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+end.

@@ -6,8 +6,11 @@ from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import StrEnum
 
 from .ast import (
+    ArrayType,
     ImmediateValue,
     OamOwnerKind,
+    ResolvedArrayElement,
+    ResolvedArrayElementAssignment,
     ResolvedAssignment,
     ResolvedBinaryExpression,
     ResolvedBooleanBinaryExpression,
@@ -910,6 +913,7 @@ def build_memory_layout(
     promoted_labels = {
         variable.label
         for variable in program.variables
+        if not isinstance(variable.type, ArrayType)
         if reference_counts.get(variable.label, 0)
         >= settings.automatic_promotion_min_references
     }
@@ -918,8 +922,10 @@ def build_memory_layout(
     next_zero_page_address = zero_page_automatic.start
     next_user_address = user_capacity.start
     for source_name, variable, purpose, promotion_allowed in _user_variables(program):
+        size = variable.type.element_count if isinstance(variable.type, ArrayType) else 1
         promote = (
             promotion_allowed
+            and size == 1
             and variable.label in promoted_labels
             and next_zero_page_address
             < zero_page_automatic.start + zero_page_automatic.size
@@ -929,7 +935,7 @@ def build_memory_layout(
                 MemorySymbol(
                     variable.label,
                     next_zero_page_address,
-                    1,
+                    size,
                     SymbolKind.USER,
                     zero_page_automatic.name,
                     f"{purpose}; automatically promoted after "
@@ -939,14 +945,15 @@ def build_memory_layout(
                     variable.position,
                 )
             )
-            next_zero_page_address += 1
+            next_zero_page_address += size
             continue
 
         available = user_capacity.start + user_capacity.size - next_user_address
-        if available < 1:
+        if available < size:
             _raise_error(
                 DiagnosticCode.USER_RAM_EXHAUSTED,
-                f"User RAM cannot allocate {source_name}: requested 1 byte, "
+                f"User RAM cannot allocate {source_name}: requested {size} "
+                f"{'byte' if size == 1 else 'bytes'}, "
                 f"but {available} bytes remain in {user_capacity.name}.",
                 filename,
                 source,
@@ -959,7 +966,7 @@ def build_memory_layout(
             MemorySymbol(
                 variable.label,
                 next_user_address,
-                1,
+                size,
                 SymbolKind.USER,
                 user_capacity.name,
                 purpose,
@@ -968,7 +975,7 @@ def build_memory_layout(
                 variable.position,
             )
         )
-        next_user_address += 1
+        next_user_address += size
 
     layout = ProgramMemoryLayout(
         settings,
@@ -1179,7 +1186,7 @@ def generate_memory_map(layout: ProgramMemoryLayout) -> str:
             "User Symbols",
             "------------",
             "",
-            "Address  Size  Storage     Type       "
+            "Address range  Size  Storage     Type       "
             "Source name                 Assembly symbol",
         ]
     )
@@ -1190,8 +1197,13 @@ def generate_memory_map(layout: ProgramMemoryLayout) -> str:
                 if symbol.region_name == layout.zero_page_automatic.name
                 else "Regular RAM"
             )
+            address_range = (
+                f"${symbol.address:04X}"
+                if symbol.size == 1
+                else f"${symbol.address:04X}-${symbol.address + symbol.size - 1:04X}"
+            )
             lines.append(
-                f"${symbol.address:04X}    {symbol.size:4}  "
+                f"{address_range:13}  {symbol.size:4}  "
                 f"{storage:11} "
                 f"{(symbol.type_name or '-'):10} "
                 f"{(symbol.source_name or '-'):27} {symbol.assembly_symbol}"
@@ -1589,7 +1601,11 @@ def _count_statement_variable_references(
     statement: ResolvedStatement,
     counts: dict[str, int],
 ) -> None:
-    if isinstance(statement, ResolvedAssignment):
+    if isinstance(statement, ResolvedArrayElementAssignment):
+        _count_variable(statement.target, counts)
+        _count_value_variable_references(statement.index, counts)
+        _count_value_variable_references(statement.value, counts)
+    elif isinstance(statement, ResolvedAssignment):
         _count_variable(statement.target, counts)
         _count_value_variable_references(statement.value, counts)
     elif isinstance(statement, ResolvedBuiltinCall):
@@ -1628,7 +1644,10 @@ def _count_value_variable_references(
     value: ResolvedValue,
     counts: dict[str, int],
 ) -> None:
-    if isinstance(value, VariableValue):
+    if isinstance(value, ResolvedArrayElement):
+        _count_variable(value.array, counts)
+        _count_value_variable_references(value.index, counts)
+    elif isinstance(value, VariableValue):
         _count_variable(value.variable, counts)
     elif isinstance(value, (ResolvedUnaryExpression, ResolvedBooleanNotExpression)):
         _count_value_variable_references(value.operand, counts)
@@ -1673,6 +1692,11 @@ def _temporary_symbol_names(program: ResolvedProgram) -> tuple[str, ...]:
 
 
 def _statement_temporary_symbol_count(statement: ResolvedStatement) -> int:
+    if isinstance(statement, ResolvedArrayElementAssignment):
+        return max(
+            expression_temporary_symbol_count(statement.index),
+            expression_temporary_symbol_count(statement.value),
+        )
     if isinstance(statement, ResolvedAssignment):
         return expression_temporary_symbol_count(statement.value)
     if isinstance(statement, ResolvedBuiltinCall):
