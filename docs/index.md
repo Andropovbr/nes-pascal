@@ -52,5 +52,6 @@ Planned work is tracked separately in the
 - [Builtin / intrinsic infrastructure (0.5.6)](compiler/builtin-infrastructure.md)
 - [Low-risk code generation improvements (0.5.7)](compiler/low-risk-codegen-0.5.7.md)
 - [Array implementation and measurements (0.5.8)](compiler/arrays-0.5.8.md)
+- [Semantic test coverage map](compiler/test-coverage-map.md)
 - [Unsupported features](reference/unsupported-features.md)
 - [Compiler diagnostics](reference/diagnostics/index.md)
