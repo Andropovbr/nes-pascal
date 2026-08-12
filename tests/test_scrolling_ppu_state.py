@@ -60,6 +60,22 @@ class ScrollParserAndSemanticTests(unittest.TestCase):
             analyze(parse(source), source)
         self.assertEqual(raised.exception.code, "E4004")
 
+    def test_boolean_x_argument_fixture_emits_type_diagnostic_not_argument_count(self) -> None:
+        """Verify E4004 is raised for boolean in x position; E3046 must not take precedence."""
+        path = Path(__file__).parent / "fixtures" / "diagnostics" / "invalid_set_scroll_x_type.nsp"
+        source = path.read_text(encoding="utf-8")
+        with self.assertRaises(CompilerError) as raised:
+            analyze(parse(source, str(path)), source, str(path))
+        self.assertEqual(raised.exception.code, "E4004")
+
+    def test_boolean_y_argument_fixture_emits_type_diagnostic_not_argument_count(self) -> None:
+        """Verify E4004 is raised for boolean in y position; E3046 must not take precedence."""
+        path = Path(__file__).parent / "fixtures" / "diagnostics" / "invalid_set_scroll_y_type.nsp"
+        source = path.read_text(encoding="utf-8")
+        with self.assertRaises(CompilerError) as raised:
+            analyze(parse(source, str(path)), source, str(path))
+        self.assertEqual(raised.exception.code, "E4004")
+
 
 class ScrollBackendTests(unittest.TestCase):
     def test_default_state_and_four_authoritative_shadows_are_emitted(self) -> None:

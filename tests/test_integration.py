@@ -792,6 +792,14 @@ class MesenIntegrationTests(unittest.TestCase):
             "verify_scrolling_ppu_state.lua",
         )
 
+    def test_chr_asset_is_visible_in_ppu_pattern_tables(self) -> None:
+        self._run_mesen_test(
+            "chr_asset",
+            "verify_chr_asset.lua",
+            chr_path="assets/chr_asset.chr",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
+
