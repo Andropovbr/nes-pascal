@@ -115,11 +115,21 @@ jobs:
 
   ci-gate:
     name: ci-gate
+    if: ${{ always() }}
     needs:
       - compiler-toolchain
       - mesen-runtime
     runs-on: ubuntu-latest
     steps:
       - name: Validate pipeline status
+        env:
+          COMPILER_RESULT: ${{ needs.compiler-toolchain.result }}
+          MESEN_RESULT: ${{ needs.mesen-runtime.result }}
         run: |
-          echo "All required checks (compiler-toolchain and mesen-runtime) passed successfully."
+          echo "compiler-toolchain: $COMPILER_RESULT"
+          echo "mesen-runtime: $MESEN_RESULT"
+
+          test "$COMPILER_RESULT" = "success"
+          test "$MESEN_RESULT" = "success"
+
+          echo "All required checks passed successfully."
