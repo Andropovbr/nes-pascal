@@ -1,0 +1,28 @@
+program LowRiskCodegen;
+
+var
+    Left: byte;
+    Right: byte;
+    Result: byte;
+    Stored: boolean;
+    Other: boolean;
+
+begin
+    Left := $02;
+    Right := $03;
+    Result := Left + $01;
+    Result := Result - Right;
+    Stored := Left < $08;
+    Other := Left <> Right;
+    if (Left < Right) and not Other then
+        Result := Result + $01;
+    if Stored or Other then
+        Result := Result + Right;
+    while Left <> $04 do
+        Left := Left + $01;
+    repeat
+        Right := Right - $01;
+    until Right = $00;
+    nes.set_background_color($0F);
+    nes.run;
+end.

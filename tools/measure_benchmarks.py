@@ -24,6 +24,7 @@ from nes_pascal.ast import (
     BooleanBinaryExpression,
     BooleanNotExpression,
     ComparisonExpression,
+    ImmediateValue,
     Program,
     ResolvedAssignment,
     ResolvedBinaryExpression,
@@ -33,6 +34,8 @@ from nes_pascal.ast import (
     ResolvedComparisonExpression,
     ResolvedForStatement,
     ResolvedIfStatement,
+    ResolvedIncrementStatement,
+    ResolvedDecrementStatement,
     ResolvedProcedure,
     ResolvedProcedureCall,
     ResolvedProgram,
@@ -43,14 +46,17 @@ from nes_pascal.ast import (
     ResolvedWhileStatement,
     UnaryExpression,
     ValueExpression,
+    VariableValue,
 )
 from nes_pascal.builtins import BuiltinId
 from nes_pascal.backend_ca65 import generate
+from nes_pascal.codegen_analysis import can_use_direct_rhs_operand
 from nes_pascal.memory_layout import (
     DEFAULT_MEMORY_LAYOUT_SETTINGS,
     MemoryLayoutSettings,
     ProgramMemoryLayout,
     build_memory_layout,
+    collect_runtime_features,
     generate_linker_config,
     generate_memory_map,
 )
@@ -137,13 +143,19 @@ def get_expression_metrics(val: ResolvedValue) -> tuple[int, int]:
       Right operand is evaluated first into temp_D, then left operand is evaluated.
       For simple leaves (e.g. A + B), 1 temporary (temp_0) is used while A is loaded.
     """
-    if isinstance(val, (ResolvedBinaryExpression, ResolvedComparisonExpression, ResolvedBooleanBinaryExpression)):
+    if isinstance(val, (ResolvedBinaryExpression, ResolvedComparisonExpression)):
         d_l, t_l = get_expression_metrics(val.left)
         d_r, t_r = get_expression_metrics(val.right)
         tree_depth = 1 + max(d_l, d_r)
+        if can_use_direct_rhs_operand(val.left, val.right):
+            return tree_depth, t_l
         # Right evaluated first, then stored in temp_D while left is evaluated:
         live_temps = max(t_r, 1 + t_l)
         return tree_depth, live_temps
+    if isinstance(val, ResolvedBooleanBinaryExpression):
+        d_l, t_l = get_expression_metrics(val.left)
+        d_r, t_r = get_expression_metrics(val.right)
+        return 1 + max(d_l, d_r), max(t_l, t_r)
     if isinstance(val, (ResolvedBooleanNotExpression, ResolvedUnaryExpression)):
         d, t = get_expression_metrics(val.operand)
         return 1 + d, t
@@ -194,6 +206,15 @@ def collect_statement_metrics(stmts: tuple[ResolvedStatement, ...]) -> tuple[int
         elif isinstance(s, ResolvedProcedureCall):
             for arg in s.arguments:
                 d, t = get_expression_metrics(arg.value)
+                max_d, max_t = max(max_d, d), max(max_t, t)
+        elif isinstance(s, (ResolvedIncrementStatement, ResolvedDecrementStatement)):
+            if s.amount is not None:
+                d, t = get_expression_metrics(s.amount)
+                if isinstance(s, ResolvedDecrementStatement) and not isinstance(
+                    s.amount,
+                    (ImmediateValue, VariableValue),
+                ):
+                    t = max(t, 1)
                 max_d, max_t = max(max_d, d), max(max_t, t)
     return max_d, max_t
 
@@ -258,6 +279,8 @@ class BenchmarkMetrics:
     max_live_temporaries: int
     assembly_line_count: int
     pattern_stats: AssemblyPatternStats
+    estimated_static_base_cycles: int
+    runtime_features: tuple[str, ...]
     emitted_runtime_symbols: list[str] = field(default_factory=list)
     emitted_runtime_routines: list[str] = field(default_factory=list)
     ram_symbol_breakdown: dict[str, int] = field(default_factory=dict)
@@ -426,6 +449,162 @@ def analyze_assembly_text(assembly: str) -> tuple[list[str], list[str]]:
     return routines, symbols
 
 
+_IMPLIED_CYCLES = {
+    "brk": 7,
+    "clc": 2,
+    "cld": 2,
+    "cli": 2,
+    "clv": 2,
+    "dex": 2,
+    "dey": 2,
+    "inx": 2,
+    "iny": 2,
+    "nop": 2,
+    "pha": 3,
+    "php": 3,
+    "pla": 4,
+    "plp": 4,
+    "rti": 6,
+    "rts": 6,
+    "sec": 2,
+    "sed": 2,
+    "sei": 2,
+    "tax": 2,
+    "tay": 2,
+    "tsx": 2,
+    "txa": 2,
+    "txs": 2,
+    "tya": 2,
+}
+_BRANCH_MNEMONICS = {"bcc", "bcs", "beq", "bmi", "bne", "bpl", "bvc", "bvs"}
+_READ_CYCLES = {
+    "immediate": 2,
+    "zero_page": 3,
+    "zero_page_indexed": 4,
+    "absolute": 4,
+    "absolute_indexed": 4,
+    "indexed_indirect": 6,
+    "indirect_indexed": 5,
+}
+_STORE_CYCLES = {
+    "zero_page": 3,
+    "zero_page_indexed": 4,
+    "absolute": 4,
+    "absolute_indexed": 5,
+    "indexed_indirect": 6,
+    "indirect_indexed": 6,
+}
+
+
+def _operand_base_address(
+    operand: str,
+    symbol_addresses: dict[str, int],
+) -> int | None:
+    normalized = operand.strip().strip("()")
+    normalized = re.sub(r",\s*[xy]$", "", normalized, flags=re.I).strip()
+    normalized = normalized.strip("()")
+    if normalized.startswith("$"):
+        match = re.match(r"\$([0-9A-Fa-f]+)", normalized)
+        return int(match.group(1), 16) if match else None
+    symbol = re.match(r"[A-Za-z_@][A-Za-z0-9_@]*", normalized)
+    if symbol is None:
+        return None
+    name = symbol.group(0)
+    if name.startswith("expression_temporary_") or name.startswith("for_limit_"):
+        return 0x10
+    return symbol_addresses.get(name)
+
+
+def _addressing_mode(
+    mnemonic: str,
+    operand: str,
+    symbol_addresses: dict[str, int],
+) -> str:
+    if not operand:
+        return "implied"
+    if operand.lower() == "a":
+        return "accumulator"
+    if operand.startswith("#"):
+        return "immediate"
+    if mnemonic in _BRANCH_MNEMONICS:
+        return "relative"
+    compact = re.sub(r"\s+", "", operand.lower())
+    if compact.startswith("(") and compact.endswith(",x)"):
+        return "indexed_indirect"
+    if compact.startswith("(") and compact.endswith("),y"):
+        return "indirect_indexed"
+    if compact.startswith("("):
+        return "indirect"
+    indexed = bool(re.search(r",\s*[xy]$", operand, flags=re.I))
+    address = _operand_base_address(operand, symbol_addresses)
+    zero_page = address is not None and address <= 0xFF
+    if indexed:
+        return "zero_page_indexed" if zero_page else "absolute_indexed"
+    return "zero_page" if zero_page else "absolute"
+
+
+def estimate_static_base_cycles(
+    assembly: str,
+    layout: ProgramMemoryLayout,
+) -> int:
+    """Estimate one base-cycle cost for every emitted instruction.
+
+    This is a deterministic static corpus metric, not a runtime path estimate:
+    branches are counted at their untaken base cost, each instruction is counted
+    once, and loop iterations, page crossing, interrupts, and DMA are excluded.
+    """
+
+    symbol_addresses = {
+        symbol.assembly_symbol: symbol.address
+        for symbol in (
+            *layout.runtime_symbols,
+            *layout.temporary_symbols,
+            *layout.user_symbols,
+        )
+    }
+    total = 0
+    for raw_line in assembly.splitlines():
+        line = raw_line.split(";", 1)[0].strip()
+        match = re.match(r"^([a-z]{3})(?:\s+(.*))?$", line, flags=re.I)
+        if match is None:
+            continue
+        mnemonic = match.group(1).lower()
+        operand = (match.group(2) or "").strip()
+        mode = _addressing_mode(mnemonic, operand, symbol_addresses)
+        if mnemonic in _IMPLIED_CYCLES:
+            total += _IMPLIED_CYCLES[mnemonic]
+        elif mnemonic in _BRANCH_MNEMONICS:
+            total += 2
+        elif mnemonic == "jmp":
+            total += 5 if mode == "indirect" else 3
+        elif mnemonic == "jsr":
+            total += 6
+        elif mnemonic in {"lda", "and", "ora", "eor", "adc", "sbc", "cmp"}:
+            total += _READ_CYCLES[mode]
+        elif mnemonic in {"ldx", "ldy", "cpx", "cpy", "bit"}:
+            total += _READ_CYCLES[mode]
+        elif mnemonic in {"sta", "stx", "sty"}:
+            total += _STORE_CYCLES[mode]
+        elif mnemonic in {"asl", "lsr", "rol", "ror"}:
+            total += {
+                "accumulator": 2,
+                "zero_page": 5,
+                "zero_page_indexed": 6,
+                "absolute": 6,
+                "absolute_indexed": 7,
+            }[mode]
+        elif mnemonic in {"inc", "dec"}:
+            total += {
+                "zero_page": 5,
+                "zero_page_indexed": 6,
+                "absolute": 6,
+                "absolute_indexed": 7,
+            }[mode]
+        else:
+            raise AssertionError(f"cycle estimator does not recognize instruction: {line}")
+    return total
+
+
 def measure_benchmark(spec: BenchmarkSpec) -> BenchmarkMetrics:
     source_path = ROOT / spec.source_file
     source = source_path.read_text(encoding="utf-8")
@@ -497,6 +676,10 @@ def measure_benchmark(spec: BenchmarkSpec) -> BenchmarkMetrics:
 
     routines, symbols = analyze_assembly_text(assembly)
     patterns = analyze_assembly_patterns(assembly)
+    estimated_static_base_cycles = estimate_static_base_cycles(assembly, layout)
+    runtime_features = tuple(
+        sorted(feature.name for feature in collect_runtime_features(resolved))
+    )
 
     all_symbols = (*layout.runtime_symbols, *layout.temporary_symbols, *layout.user_symbols)
     ram_breakdown = {s.assembly_symbol: s.size for s in all_symbols}
@@ -512,6 +695,8 @@ def measure_benchmark(spec: BenchmarkSpec) -> BenchmarkMetrics:
         max_live_temporaries=live_temps,
         assembly_line_count=len(assembly.splitlines()),
         pattern_stats=patterns,
+        estimated_static_base_cycles=estimated_static_base_cycles,
+        runtime_features=runtime_features,
         emitted_runtime_symbols=symbols,
         emitted_runtime_routines=routines,
         ram_symbol_breakdown=ram_breakdown,
@@ -528,9 +713,9 @@ def run_all_benchmarks() -> list[BenchmarkMetrics]:
 
 def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
     lines: list[str] = [
-        "# NES Pascal 0.5.5 Compiler Optimization & Architecture Benchmark Results",
+        "# NES Pascal Compiler Benchmark Results (0.5.5 Corpus)",
         "",
-        "## 1. CPU RAM Accounting Baseline",
+        "## 1. CPU RAM Accounting",
         "",
         "| Benchmark | ZP Runtime Symbols | ZP Temp Reserved | ZP Temp Required | ZP Promoted | ZP Benchmark Alloc./Reserved | ZP Policy Reserved | ZP Allocator Free | Regular Runtime/User | OAM Shadow | Non-ZP Allocated | Stack Reserved | Regular Allocator Free | Total Allocator Free | Compiler/Runtime/User Alloc./Reserved | Total Committed/Reserved |",
         "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
@@ -556,20 +741,35 @@ def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
         "consumption. `Total Committed/Reserved` includes compiler/runtime/user storage, "
         "hardware stack reservation, and policy-reserved Zero Page.",
         "",
-        "## 2. Code and Expression Baseline",
+        "## 2. Code and Expression Metrics",
         "",
-        "| Benchmark | Category | PRG Code | PRG Occupied | Tree Depth | Max Live Temps | Instructions |",
-        "| :--- | :--- | :---: | :---: | :---: | :---: | :---: |",
+        "| Benchmark | Category | PRG Code | PRG Occupied | Tree Depth | Max Live Temps | Instructions | Estimated Static Base Cycles |",
+        "| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |",
     ])
     for m in metrics_list:
         lines.append(
             f"| `{m.spec.name}` | {m.spec.category} | {m.prg_code_bytes} B | "
             f"{m.prg_total_used_bytes} B | {m.max_expression_tree_depth} | "
-            f"{m.max_live_temporaries} | {m.pattern_stats.total_instructions} |"
+            f"{m.max_live_temporaries} | {m.pattern_stats.total_instructions} | "
+            f"{m.estimated_static_base_cycles} |"
         )
     lines.extend([
         "",
-        "## 3. Inefficient Assembly Pattern Frequency",
+        "`Estimated Static Base Cycles` is a deterministic corpus estimate: each emitted "
+        "instruction is counted once at its base cost, branches are treated as not taken, "
+        "and dynamic loop counts, page crossing, interrupts, and DMA are excluded.",
+        "",
+        "## 3. Runtime Feature Selection",
+        "",
+        "| Benchmark | Registry runtime features |",
+        "| :--- | :--- |",
+    ])
+    for m in metrics_list:
+        features = ", ".join(f"`{name}`" for name in m.runtime_features) or "None"
+        lines.append(f"| `{m.spec.name}` | {features} |")
+    lines.extend([
+        "",
+        "## 4. Inefficient Assembly Pattern Frequency",
         "",
         "| Benchmark | Redundant Temp Stores | Boolean Materializations ($00/$01) | Redundant CMP #$00 | STA->LDA Roundtrips | Total Instructions |",
         "| :--- | :---: | :---: | :---: | :---: | :---: |",

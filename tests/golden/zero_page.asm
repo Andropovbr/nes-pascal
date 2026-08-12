@@ -23,7 +23,7 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
-expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
+    ; no compiler temporaries required
 
 .segment "ZERO_PAGE_VARIABLES": zeropage
 ; Source: optional global-variable promotion with regular-RAM fallback
@@ -120,12 +120,9 @@ RESET:
     inc variable_Counter
 
 ; Source: Matches := value
-    ; comparison =: evaluate right operand
-    lda #$01
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison =: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
+    cmp #$01
     beq @comparison_true_0
 @comparison_false_1:
     lda #$00              ; false
@@ -137,7 +134,6 @@ RESET:
 
 ; Source: if condition then
     lda variable_Matches
-    cmp #$00
     bne @if_then_3
     jmp @if_else_5       ; long-branch-safe false path
 @if_then_3:

@@ -23,13 +23,12 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
-expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
-for_limit_0: .res 1 ; $0011: cached for-loop final value
-for_limit_1: .res 1 ; $0012: cached for-loop final value
-for_limit_2: .res 1 ; $0013: cached for-loop final value
-for_limit_3: .res 1 ; $0014: cached for-loop final value
-for_limit_4: .res 1 ; $0015: cached for-loop final value
-for_limit_5: .res 1 ; $0016: cached for-loop final value
+for_limit_0: .res 1 ; $0010: cached for-loop final value
+for_limit_1: .res 1 ; $0011: cached for-loop final value
+for_limit_2: .res 1 ; $0012: cached for-loop final value
+for_limit_3: .res 1 ; $0013: cached for-loop final value
+for_limit_4: .res 1 ; $0014: cached for-loop final value
+for_limit_5: .res 1 ; $0015: cached for-loop final value
 
 .segment "ZERO_PAGE_VARIABLES": zeropage
 ; Source: optional global-variable promotion with regular-RAM fallback
@@ -137,11 +136,9 @@ RESET:
     dec variable_Counter
 
 ; Source: dec(Counter, amount)
-    lda #$02
-    sta expression_temporary_0
     lda variable_Counter
     sec
-    sbc expression_temporary_0
+    sbc #$02
     sta variable_Counter
 
 ; Source: Sum := value
@@ -285,48 +282,18 @@ RESET:
 @for_end_19:
 
 ; Source: if condition then
-    ; boolean and: evaluate left operand
-    ; comparison =: evaluate right operand
-    lda #$FD
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; boolean and: branch left operand
+    ; comparison =: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
-    beq @comparison_true_31
-@comparison_false_32:
-    lda #$00              ; false
-    jmp @comparison_end_33
-@comparison_true_31:
-    lda #$01              ; true
-@comparison_end_33:
-    cmp #$00
-    bne @boolean_evaluate_right_27
-    jmp @boolean_false_29       ; short-circuit false
-@boolean_evaluate_right_27:
-    ; evaluate right operand
-    ; comparison =: evaluate right operand
-    lda #$10
-    sta expression_temporary_0
-    ; evaluate left operand
+    cmp #$FD
+    beq @boolean_branch_right_27
+    jmp @if_else_26       ; long-branch-safe false path
+@boolean_branch_right_27:
+    ; boolean and: branch right operand
+    ; comparison =: direct right operand
     lda variable_Sum
-    cmp expression_temporary_0
-    beq @comparison_true_34
-@comparison_false_35:
-    lda #$00              ; false
-    jmp @comparison_end_36
-@comparison_true_34:
-    lda #$01              ; true
-@comparison_end_36:
-    cmp #$00
-    bne @boolean_true_28
-@boolean_false_29:
-    lda #$00              ; false
-    jmp @boolean_end_30
-@boolean_true_28:
-    lda #$01              ; true
-@boolean_end_30:
-    cmp #$00
-    bne @if_then_24
+    cmp #$10
+    beq @if_then_24
     jmp @if_else_26       ; long-branch-safe false path
 @if_then_24:
 
@@ -351,9 +318,9 @@ RESET:
 
 ; Source: nes.run
 ; Runtime: defer rendering-sensitive setup to VBlank
-@wait_render_vblank_37:
+@wait_render_vblank_28:
     bit $2002
-    bpl @wait_render_vblank_37
+    bpl @wait_render_vblank_28
     lda runtime_ppuctrl_shadow
     ora #$80
     sta runtime_ppuctrl_shadow ; preserve bits and enable NMI

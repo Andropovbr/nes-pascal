@@ -297,14 +297,15 @@ end.
         )
         metrics = measure_benchmark(specification)
         accounting = metrics.memory
-        self.assertEqual(metrics.prg_code_bytes, 3478)
-        self.assertEqual(metrics.prg_total_used_bytes, 3484)
+        self.assertEqual(metrics.prg_code_bytes, 3350)
+        self.assertEqual(metrics.prg_total_used_bytes, 3356)
         self.assertEqual(metrics.max_expression_tree_depth, 1)
         self.assertEqual(metrics.max_live_temporaries, 1)
-        self.assertEqual(metrics.pattern_stats.total_instructions, 874)
+        self.assertEqual(metrics.pattern_stats.total_instructions, 815)
+        self.assertEqual(metrics.estimated_static_base_cycles, 2712)
         self.assertEqual(accounting.zp_runtime_symbol_bytes, 13)
         self.assertEqual(accounting.zp_temporary_reserved_bytes, 16)
-        self.assertEqual(accounting.zp_temporary_required_bytes, 1)
+        self.assertEqual(accounting.zp_temporary_required_bytes, 0)
         self.assertEqual(accounting.zp_promoted_user_bytes, 4)
         self.assertEqual(accounting.zp_benchmark_allocated_or_reserved_bytes, 33)
         self.assertEqual(accounting.zp_policy_reserved_unavailable_bytes, 99)
@@ -409,7 +410,7 @@ end.
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertRegex(
             listing,
-            r"85 rr\s+sta expression_temporary_0",
+            r"85 rr\s+sta for_limit_0",
         )
         self.assertRegex(
             listing,
@@ -631,6 +632,15 @@ class MesenIntegrationTests(unittest.TestCase):
 
     def test_loop_example_reaches_expected_runtime_state(self) -> None:
         self._run_mesen_test("loops", "verify_loops.lua")
+
+    def test_low_risk_codegen_preserves_boolean_and_loop_behavior(self) -> None:
+        self._run_mesen_test(
+            "low_risk_codegen",
+            "verify_low_risk_codegen.lua",
+            source_path=(
+                ROOT / "tests" / "fixtures" / "runtime" / "low_risk_codegen.nsp"
+            ),
+        )
 
     def test_counting_example_reaches_expected_runtime_state(self) -> None:
         self._run_mesen_test(

@@ -70,4 +70,5 @@ Esta pasta contém a tradução completa da documentação do **NES Pascal** par
 
 ### Compiler Internals (Internos do Compilador)
 - [x] `docs/compiler/builtin-infrastructure.md` -> `docs/pt-BR/compiler/builtin-infrastructure.md`
+- [x] `docs/compiler/low-risk-codegen-0.5.7.md` -> `docs/pt-BR/compiler/low-risk-codegen-0.5.7.md`
 - [x] `docs/compiler/optimization-audit-0.5.5.md` -> `docs/pt-BR/compiler/optimization-audit-0.5.5.md`

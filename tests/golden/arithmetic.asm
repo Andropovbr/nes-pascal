@@ -23,8 +23,7 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
-expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
-expression_temporary_1: .res 1 ; $0011: reusable expression evaluation byte
+    ; no compiler temporaries required
 
 .segment "ZERO_PAGE_VARIABLES": zeropage
 ; Source: optional global-variable promotion with regular-RAM fallback
@@ -119,22 +118,16 @@ RESET:
     sta variable_Counter
 
 ; Source: Result := value
-    ; binary -: evaluate right operand
-    lda #$01
-    sta expression_temporary_0
-    ; evaluate left operand
-    ; binary +: evaluate right operand
-    lda #$02
-    sta expression_temporary_1
-    ; evaluate left operand
+    ; binary -: direct right operand
+    ; binary +: direct right operand
     lda variable_Counter
     clc
-    adc expression_temporary_1
+    adc #$02
     eor #$FF                ; unary -: two's complement
     clc
     adc #$01
     sec
-    sbc expression_temporary_0
+    sbc #$01
     sta variable_Result
 
 ; Source: BackgroundColor := value

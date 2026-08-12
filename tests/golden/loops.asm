@@ -23,7 +23,7 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
-expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
+    ; no compiler temporaries required
 
 .segment "ZERO_PAGE_VARIABLES": zeropage
 ; Source: optional global-variable promotion with regular-RAM fallback
@@ -123,152 +123,88 @@ RESET:
 
 ; Source: while condition do
 @while_condition_0:
-    ; comparison <: evaluate right operand
-    lda #$06
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison <: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
-    bcc @comparison_true_3
-@comparison_false_4:
-    lda #$00              ; false
-    jmp @comparison_end_5
-@comparison_true_3:
-    lda #$01              ; true
-@comparison_end_5:
-    cmp #$00
-    bne @while_body_1
+    cmp #$06
+    bcc @while_body_1
     jmp @while_end_2       ; long-branch-safe loop exit
 @while_body_1:
 
 ; Source: Counter := value
-    ; binary +: evaluate right operand
-    lda #$01
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; binary +: direct right operand
     lda variable_Counter
     clc
-    adc expression_temporary_0
+    adc #$01
     sta variable_Counter
 
 ; Source: if condition then
-    ; comparison =: evaluate right operand
-    lda #$02
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison =: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
-    beq @comparison_true_8
-@comparison_false_9:
-    lda #$00              ; false
-    jmp @comparison_end_10
-@comparison_true_8:
-    lda #$01              ; true
-@comparison_end_10:
-    cmp #$00
-    bne @if_then_6
-    jmp @if_end_7       ; long-branch-safe false path
-@if_then_6:
+    cmp #$02
+    beq @if_then_3
+    jmp @if_end_4       ; long-branch-safe false path
+@if_then_3:
 
 ; Source: continue
     jmp @while_condition_0
-@if_end_7:
+@if_end_4:
 
 ; Source: if condition then
-    ; comparison =: evaluate right operand
-    lda #$05
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison =: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
-    beq @comparison_true_13
-@comparison_false_14:
-    lda #$00              ; false
-    jmp @comparison_end_15
-@comparison_true_13:
-    lda #$01              ; true
-@comparison_end_15:
-    cmp #$00
-    bne @if_then_11
-    jmp @if_end_12       ; long-branch-safe false path
-@if_then_11:
+    cmp #$05
+    beq @if_then_5
+    jmp @if_end_6       ; long-branch-safe false path
+@if_then_5:
 
 ; Source: break
     jmp @while_end_2
-@if_end_12:
+@if_end_6:
 
 ; Source: InnerCounter := value
-    ; binary +: evaluate right operand
-    lda #$01
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; binary +: direct right operand
     lda variable_InnerCounter
     clc
-    adc expression_temporary_0
+    adc #$01
     sta variable_InnerCounter
     jmp @while_condition_0
 @while_end_2:
 
 ; Source: repeat until condition
-@repeat_body_16:
+@repeat_body_7:
 
 ; Source: InnerCounter := value
-    ; binary -: evaluate right operand
-    lda #$01
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; binary -: direct right operand
     lda variable_InnerCounter
     sec
-    sbc expression_temporary_0
+    sbc #$01
     sta variable_InnerCounter
-@repeat_condition_17:
-    ; comparison =: evaluate right operand
-    lda #$00
-    sta expression_temporary_0
-    ; evaluate left operand
+@repeat_condition_8:
+    ; comparison =: direct right operand
     lda variable_InnerCounter
-    cmp expression_temporary_0
-    beq @comparison_true_19
-@comparison_false_20:
-    lda #$00              ; false
-    jmp @comparison_end_21
-@comparison_true_19:
-    lda #$01              ; true
-@comparison_end_21:
     cmp #$00
-    bne @repeat_end_18
-    jmp @repeat_body_16       ; long-branch-safe repeat
-@repeat_end_18:
+    beq @repeat_end_9
+    jmp @repeat_body_7       ; long-branch-safe repeat
+@repeat_end_9:
 
 ; Source: if condition then
-    ; comparison =: evaluate right operand
-    lda #$05
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison =: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
-    beq @comparison_true_25
-@comparison_false_26:
-    lda #$00              ; false
-    jmp @comparison_end_27
-@comparison_true_25:
-    lda #$01              ; true
-@comparison_end_27:
-    cmp #$00
-    bne @if_then_22
-    jmp @if_else_24       ; long-branch-safe false path
-@if_then_22:
+    cmp #$05
+    beq @if_then_10
+    jmp @if_else_12       ; long-branch-safe false path
+@if_then_10:
 
 ; Source: BackgroundColor := value
     lda #$21
     sta variable_BackgroundColor
-    jmp @if_end_23
-@if_else_24:
+    jmp @if_end_11
+@if_else_12:
 
 ; Source: BackgroundColor := value
     lda #$0F
     sta variable_BackgroundColor
-@if_end_23:
+@if_end_11:
 
 ; Source: nes.set_background_color(value)
     lda #$3F
@@ -280,9 +216,9 @@ RESET:
 
 ; Source: nes.run
 ; Runtime: defer rendering-sensitive setup to VBlank
-@wait_render_vblank_28:
+@wait_render_vblank_13:
     bit $2002
-    bpl @wait_render_vblank_28
+    bpl @wait_render_vblank_13
     lda runtime_ppuctrl_shadow
     ora #$80
     sta runtime_ppuctrl_shadow ; preserve bits and enable NMI

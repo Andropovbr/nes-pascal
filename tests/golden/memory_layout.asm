@@ -23,8 +23,7 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
-expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
-for_limit_0: .res 1 ; $0011: cached for-loop final value
+for_limit_0: .res 1 ; $0010: cached for-loop final value
 
 .segment "ZERO_PAGE_VARIABLES": zeropage
 ; Source: optional global-variable promotion with regular-RAM fallback
@@ -163,17 +162,13 @@ RESET:
 ; Source: ExpectedState := value
     ; boolean and: evaluate left operand
     lda variable_RenderingEnabled
-    cmp #$00
     bne @boolean_evaluate_right_4
     jmp @boolean_false_6       ; short-circuit false
 @boolean_evaluate_right_4:
     ; evaluate right operand
-    ; comparison >: evaluate right operand
-    lda #$03
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison >: direct right operand
     lda variable_NextFrameCounter
-    cmp expression_temporary_0
+    cmp #$03
     beq @comparison_false_9
     bcs @comparison_true_8
 @comparison_false_9:
@@ -182,7 +177,6 @@ RESET:
 @comparison_true_8:
     lda #$01              ; true
 @comparison_end_10:
-    cmp #$00
     bne @boolean_true_5
 @boolean_false_6:
     lda #$00              ; false
@@ -194,7 +188,6 @@ RESET:
 
 ; Source: if condition then
     lda variable_ExpectedState
-    cmp #$00
     bne @if_then_11
     jmp @if_else_13       ; long-branch-safe false path
 @if_then_11:
@@ -292,13 +285,10 @@ procedure_InitializeCounters:
     sta variable_FrameCounter
 
 ; Source: NextFrameCounter := value
-    ; binary +: evaluate right operand
-    lda parameter_InitializeCounters_Increment
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; binary +: direct right operand
     lda variable_FrameCounter
     clc
-    adc expression_temporary_0
+    adc parameter_InitializeCounters_Increment
     sta variable_NextFrameCounter
 
 ; Source: RenderingEnabled := value

@@ -23,7 +23,7 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
-expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
+    ; no compiler temporaries required
 
 .segment "ZERO_PAGE_VARIABLES": zeropage
 ; Source: optional global-variable promotion with regular-RAM fallback
@@ -117,12 +117,9 @@ RESET:
     sta variable_Counter
 
 ; Source: Enabled := value
-    ; comparison <=: evaluate right operand
-    lda #$10
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison <=: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
+    cmp #$10
     bcc @comparison_true_0
     beq @comparison_true_0
 @comparison_false_1:
@@ -135,7 +132,6 @@ RESET:
 
 ; Source: if condition then
     lda variable_Enabled
-    cmp #$00
     bne @if_then_3
     jmp @if_else_5       ; long-branch-safe false path
 @if_then_3:
@@ -147,22 +143,12 @@ RESET:
 @if_else_5:
 
 ; Source: if condition then
-    ; comparison >: evaluate right operand
-    lda #$10
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison >: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
-    beq @comparison_false_10
-    bcs @comparison_true_9
-@comparison_false_10:
-    lda #$00              ; false
-    jmp @comparison_end_11
-@comparison_true_9:
-    lda #$01              ; true
-@comparison_end_11:
-    cmp #$00
-    bne @if_then_6
+    cmp #$10
+    beq @comparison_branch_false_9
+    bcs @if_then_6
+@comparison_branch_false_9:
     jmp @if_else_8       ; long-branch-safe false path
 @if_then_6:
 
@@ -188,9 +174,9 @@ RESET:
 
 ; Source: nes.run
 ; Runtime: defer rendering-sensitive setup to VBlank
-@wait_render_vblank_12:
+@wait_render_vblank_10:
     bit $2002
-    bpl @wait_render_vblank_12
+    bpl @wait_render_vblank_10
     lda runtime_ppuctrl_shadow
     ora #$80
     sta runtime_ppuctrl_shadow ; preserve bits and enable NMI

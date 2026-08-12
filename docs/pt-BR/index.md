@@ -49,5 +49,6 @@ O trabalho planejado é acompanhado separadamente no
 - [Pipeline do compilador](reference/compiler-pipeline.md)
 - [Auditoria de otimização e arquitetura (0.5.5)](compiler/optimization-audit-0.5.5.md)
 - [Infraestrutura de builtins / intrínsecos (0.5.6)](compiler/builtin-infrastructure.md)
+- [Melhorias de baixo risco na geração de código (0.5.7)](compiler/low-risk-codegen-0.5.7.md)
 - [Recursos não suportados](reference/unsupported-features.md)
 - [Diagnósticos do compilador](reference/diagnostics/index.md)

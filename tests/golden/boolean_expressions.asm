@@ -23,7 +23,7 @@ runtime_controller_poll_valid: .res 1 ; $0008: distinguishes an initial zero byt
 
 .segment "ZERO_PAGE_TEMPORARIES": zeropage
 ; Compiler: mandatory expression and loop storage in Zero Page
-expression_temporary_0: .res 1 ; $0010: reusable expression evaluation byte
+    ; no compiler temporaries required
 
 .segment "ZERO_PAGE_VARIABLES": zeropage
 ; Source: optional global-variable promotion with regular-RAM fallback
@@ -123,12 +123,9 @@ RESET:
     sta variable_Counter
 
 ; Source: Equal := value
-    ; comparison =: evaluate right operand
-    lda #$10
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison =: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
+    cmp #$10
     beq @comparison_true_0
 @comparison_false_1:
     lda #$00              ; false
@@ -139,12 +136,9 @@ RESET:
     sta variable_Equal
 
 ; Source: Different := value
-    ; comparison <>: evaluate right operand
-    lda #$10
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison <>: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
+    cmp #$10
     bne @comparison_true_3
 @comparison_false_4:
     lda #$00              ; false
@@ -155,12 +149,9 @@ RESET:
     sta variable_Different
 
 ; Source: Less := value
-    ; comparison <: evaluate right operand
-    lda #$10
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison <: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
+    cmp #$10
     bcc @comparison_true_6
 @comparison_false_7:
     lda #$00              ; false
@@ -171,12 +162,9 @@ RESET:
     sta variable_Less
 
 ; Source: Greater := value
-    ; comparison >: evaluate right operand
-    lda #$00
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison >: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
+    cmp #$00
     beq @comparison_false_10
     bcs @comparison_true_9
 @comparison_false_10:
@@ -188,12 +176,9 @@ RESET:
     sta variable_Greater
 
 ; Source: LessOrEqual := value
-    ; comparison <=: evaluate right operand
-    lda #$10
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison <=: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
+    cmp #$10
     bcc @comparison_true_12
     beq @comparison_true_12
 @comparison_false_13:
@@ -205,12 +190,9 @@ RESET:
     sta variable_LessOrEqual
 
 ; Source: GreaterOrEqual := value
-    ; comparison >=: evaluate right operand
-    lda #$10
-    sta expression_temporary_0
-    ; evaluate left operand
+    ; comparison >=: direct right operand
     lda variable_Counter
-    cmp expression_temporary_0
+    cmp #$10
     bcs @comparison_true_15
 @comparison_false_16:
     lda #$00              ; false
@@ -224,27 +206,23 @@ RESET:
     ; boolean and: evaluate left operand
     ; boolean not
     lda variable_Equal
-    cmp #$00
     beq @not_true_22
     lda #$00              ; false
     jmp @not_end_23
 @not_true_22:
     lda #$01              ; true
 @not_end_23:
-    cmp #$00
     bne @boolean_evaluate_right_18
     jmp @boolean_false_20       ; short-circuit false
 @boolean_evaluate_right_18:
     ; evaluate right operand
     ; boolean or: evaluate left operand
     lda variable_Less
-    cmp #$00
     beq @boolean_evaluate_right_24
     jmp @boolean_true_25        ; short-circuit true
 @boolean_evaluate_right_24:
     ; evaluate right operand
     lda variable_GreaterOrEqual
-    cmp #$00
     bne @boolean_true_25
 @boolean_false_26:
     lda #$00              ; false
@@ -252,7 +230,6 @@ RESET:
 @boolean_true_25:
     lda #$01              ; true
 @boolean_end_27:
-    cmp #$00
     bne @boolean_true_19
 @boolean_false_20:
     lda #$00              ; false
