@@ -1,519 +1,696 @@
 # AGENTS.md
 
-## Project objective
+## Purpose
 
-This repository contains a prototype of a compiled, strongly typed, structured
-language inspired by Pascal and specialized for Nintendo Entertainment System
-game development.
+This file defines stable working rules for automated coding agents contributing to this repository.
 
-The language compiles to ca65-compatible Assembly. ca65 and ld65 produce the
-final ROM in iNES format.
+It must contain long-lived engineering principles and workflow rules only.
 
-The goal is not to implement complete Pascal or initially create a
-general-purpose language.
+Do not use this file to record:
 
-## Philosophy
+* the current milestone;
+* the current release;
+* the next planned feature;
+* temporary implementation status;
+* historical project state;
+* lists of currently supported language features;
+* version-specific feature inventories.
 
-The language must:
+Those belong in the roadmap, documentation, project configuration, source code, and tests.
 
-- be easy to read;
-- use strong typing;
-- avoid implicit conversions;
-- generate predictable code;
-- expose relevant hardware costs;
-- prevent dangerous constructs whenever possible;
-- produce educational error messages;
-- generate readable ca65 Assembly;
-- let programmers understand the relationship between source and generated Assembly;
-- prefer simplicity over completeness;
-- every new feature should justify its existence;
-- do not add abstractions, optimizations, or language constructs unless they are required by the current milestone;
-- the generated Assembly should be easy to understand, even if a future optimization could make it smaller or faster;
-- the language must not completely hide how the NES works.
+When this file conflicts with explicit instructions from the user for the current task, follow the user's explicit instructions.
 
-English is the only language used in source code, diagnostics, documentation,
-tests, generated output, and developer-facing artifacts. Do not add
-localization infrastructure.
+---
 
-## Initial constraints
+## Project Objective
 
-For the current prototype:
+NES Pascal is a compiled, strongly typed, structured language inspired by Pascal and specialized for Nintendo Entertainment System development.
 
-- use Python 3.11 or newer to implement the compiler;
-- generate ca65-compatible Assembly;
-- generate ROMs for NTSC NES;
-- use only Ricoh 2A03/6502 instructions;
-- do not use 65C02-only instructions;
-- use mapper 0, NROM;
-- use 32 KiB of PRG-ROM;
-- use 8 KiB of CHR-ROM;
-- do not implement dynamic memory;
-- do not implement recursion;
-- do not implement object orientation;
-- do not implement runtime strings;
-- do not implement advanced optimizations prematurely;
-- do not generate intermediate C.
+The project prioritizes:
 
+* readable source code;
+* strong and predictable semantics;
+* explicit hardware costs;
+* deterministic code generation;
+* understandable generated Assembly;
+* useful compiler diagnostics;
+* incremental evolution;
+* close correspondence between language behavior and NES hardware behavior.
 
-## Current milestone
+The goal is not to reproduce complete ISO Pascal or to become a general-purpose programming language.
 
-The compiler must accept:
+---
 
-```pascal
-program Minimal;
+## Sources of Truth
 
-const
-    DefaultBackgroundColor: nes_color = $21;
-    MaximumFrameCounter: byte = $10;
+Do not infer current project state from this file.
 
-var
-    BackgroundColor: nes_color;
-    FrameCounter: byte;
-    NextFrameCounter: byte;
-    RenderingEnabled: boolean;
-    WithinLimit: boolean;
+Before making changes, inspect the relevant authoritative sources.
 
-procedure InitializeCounters(
-    Start: byte;
-    Increment: byte;
-    EnabledValue: boolean
-);
-begin
-    FrameCounter := Start;
-    NextFrameCounter := FrameCounter + Increment;
-    RenderingEnabled := EnabledValue;
-end;
+Use the following hierarchy:
 
-begin
-    BackgroundColor := DefaultBackgroundColor;
-    InitializeCounters($00, $01, true);
-    inc(NextFrameCounter);
-    for FrameCounter := $00 to MaximumFrameCounter do
-        inc(NextFrameCounter);
-    WithinLimit := RenderingEnabled and
-        (NextFrameCounter <= MaximumFrameCounter);
-    if WithinLimit then
-        BackgroundColor := DefaultBackgroundColor
-    else
-        BackgroundColor := $0F;
-    nes.set_background_color(BackgroundColor);
-    nes.run;
-end.
-```
+1. the user's explicit task;
+2. the roadmap for milestone scope and planned work;
+3. canonical documentation for public behavior;
+4. project configuration for supported tools and environments;
+5. source code for implementation details;
+6. automated tests for established behavior and regression coverage;
+7. GitHub Actions for authoritative full-regression validation.
 
-The built-in types `nes_color`, `byte`, and `boolean` each occupy one byte.
-Variables require explicit declarations and assignments require exact type
-matches. A direct hexadecimal literal remains valid as the argument to
-`nes.set_background_color`. Arithmetic expressions support unary and binary
-`+` and `-`, parentheses, and `byte` operands only. Arithmetic wraps modulo
-256. Comparisons produce `boolean` values. Boolean expressions support `not`,
-`and`, and `or`, with short-circuit evaluation for the binary operators.
-Conditional statements support `if`, optional `else`, nested conditionals,
-and compound `begin`/`end` branches. Loops support `while`, `repeat`/`until`,
-`for` with `to` or `downto`, nesting, `break`, and `continue`. Initialized
-`byte` variables support `inc` and `dec` with optional amounts. Procedures
-support forward and nested acyclic calls, plus `byte` and `boolean` value
-parameters stored in procedure-specific RAM slots.
+For milestone work:
 
-The compiler must generate ca65 Assembly, assemble it, and link a valid `.nes`
-ROM. When opened in an emulator, the NES must:
+1. read `roadmap/README.md`;
+2. identify the explicit current milestone;
+3. open the relevant release roadmap;
+4. implement only the requested scope.
 
-1. initialize correctly;
-2. wait for a safe time to access the PPU;
-3. set the universal background color;
-4. enable rendering;
-5. remain in a stable loop.
+Never determine the current milestone by historical numbering, assumptions, or content from this file.
 
-Do not implement multiplication, division, reference parameters, return
-values, recursion, sprites, controller input, or audio yet.
+---
 
-## Expected pipeline
+## Engineering Philosophy
 
-```text
-examples/minimal.nsp
-        |
-        v
-lexer
-        |
-        v
-parser
-        |
-        v
-AST
-        |
-        v
-semantic analysis, name resolution, and type checking
-        |
-        v
-resolved AST
-        |
-        v
-ca65 backend
-        |
-        v
-build/minimal.asm
-        |
-        v
-ca65 and ld65
-        |
-        v
-build/minimal.nes
-```
+Prefer simple, explicit, predictable solutions.
 
-## Compiler architecture
+The project should:
 
-Keep components separate:
+* favor readability over cleverness;
+* prefer small specialized abstractions over generic frameworks;
+* avoid premature optimization;
+* avoid unnecessary dependencies;
+* expose relevant NES hardware constraints rather than hiding them completely;
+* generate Assembly that remains understandable to a human reader;
+* preserve deterministic behavior whenever practical;
+* evolve through small, complete increments;
+* keep language semantics strict and unsurprising.
 
-- `lexer.py`: converts characters to tokens;
-- `parser.py`: converts tokens to an AST;
-- `ast.py`: contains parsed and resolved AST nodes;
-- `semantic.py`: validates declarations, resolves names, checks assignments,
-  and enforces definite assignment;
-- `backend_ca65.py`: converts the resolved AST to ca65 Assembly;
-- `cli.py`: coordinates compilation, file generation, and external tools.
+Every new abstraction, optimization, language construct, runtime mechanism, or dependency must justify its existence.
 
-Do not translate source text directly to Assembly with string replacement.
-Keep a small explicit AST even in the prototype.
+Do not introduce architecture intended only for hypothetical future features.
 
-## NES backend rules
+Do not implement future roadmap work opportunistically.
 
-- Generated code must use ca65 syntax.
-- Produce the iNES header explicitly.
-- Provide NMI, RESET, and IRQ vectors.
-- RESET must disable interrupts, initialize the stack, and stabilize the PPU.
-- Write to the PPU only at safe times.
-- Use an empty 8 KiB CHR-ROM.
-- Allocate current variables in regular CPU RAM, not zero page.
-- Include generated Assembly comments identifying the source of each block.
-- Do not introduce a generic game engine.
-- Do not copy a large library to solve the minimal program.
+---
 
-## Type and syntax scope
+## Scope Discipline
 
-The language is strongly typed, but implement types only when explicitly
-requested.
+Implement only what is required by the current task and its explicitly defined acceptance criteria.
 
-Currently supported:
+Do not:
 
-- `nes_color`: one byte, `$00..$3F`, intended for NES palette values;
-- `byte`: one byte, `$00..$FF`;
-- `boolean`: one byte, `false` or `true`;
-- explicitly typed constants;
-- explicitly typed variables in a `var` section;
-- assignment with `:=`;
-- constant and initialized-variable references;
-- `byte` arithmetic using unary and binary `+` and `-`;
-- equality and inequality for operands of exactly matching types;
-- ordered comparisons for `byte`;
-- boolean operators `not`, `and`, and `or`;
-- `if` statements with optional `else`;
-- nested conditionals and compound branches;
-- `while` and `repeat`/`until` loops;
-- nested loops, `break`, and `continue`;
-- `inc` and `dec` operations for initialized `byte` variables;
-- ascending and descending `for` loops with `byte` control variables;
-- procedures with optional `byte` and `boolean` value parameters;
-- forward and nested acyclic procedure calls;
-- parentheses in expressions.
+* expand the task into adjacent roadmap items;
+* perform broad refactors without a concrete need;
+* redesign working subsystems merely for stylistic reasons;
+* introduce speculative extensibility;
+* silently change public language behavior;
+* silently change future roadmap scope;
+* remove planned roadmap work without explicit approval.
 
-Do not implement type inference, implicit conversions, user-defined types,
-reference parameters, return values, recursion, multiplication, or division
-yet.
+If the requested work exposes missing architectural or roadmap work, report it separately.
+
+Prefer:
+
+> small, complete, tested change
+
+over:
+
+> broad, partially implemented redesign.
+
+---
+
+## Repository Awareness
+
+Before editing code:
+
+1. inspect the working tree;
+2. identify the active branch;
+3. inspect relevant recent commits when useful;
+4. read the files directly related to the task;
+5. read relevant tests;
+6. read relevant documentation;
+7. understand existing conventions before introducing new ones.
+
+Do not assume a file, subsystem, command, dependency, mapper, runtime model, memory policy, or language feature exists merely because it would be conventional.
+
+Inspect first.
+
+Do not overwrite or discard unrelated local changes.
+
+Do not clean the working tree by deleting files unless you have established that they are generated or disposable.
+
+---
+
+## Language and Compiler Architecture
+
+Keep compiler stages clearly separated.
+
+Typical responsibilities include:
+
+* lexical analysis;
+* parsing;
+* AST representation;
+* semantic analysis and name resolution;
+* type checking;
+* memory/resource analysis;
+* backend code generation;
+* command-line/build orchestration.
+
+Do not bypass established compiler stages with ad-hoc source-text transformation.
+
+Do not translate source code directly into Assembly through string replacement or similar shortcuts.
+
+Public language behavior should have an explicit representation in the compiler architecture.
+
+When introducing a new language feature, determine which compiler stages genuinely need to understand it and avoid duplicating feature-specific logic unnecessarily across the pipeline.
+
+Prefer shared infrastructure when multiple features have the same semantics, but do not create generic machinery solely in anticipation of future use.
+
+---
+
+## Type-System Principles
+
+NES Pascal is strongly typed.
+
+Unless explicitly defined otherwise by the language specification or roadmap:
+
+* avoid implicit conversions;
+* require predictable type compatibility;
+* reject ambiguous operations;
+* preserve deterministic evaluation semantics;
+* keep compiler diagnostics precise when types are incompatible.
+
+Do not invent new types, conversions, operators, or coercion rules outside the requested scope.
+
+The canonical language documentation defines currently supported types and syntax.
+
+---
+
+## NES Backend Principles
+
+Generated code must respect the actual target hardware.
+
+Backend work should:
+
+* generate valid ca65-compatible Assembly;
+* use only instructions valid for the configured CPU target;
+* respect PPU timing and synchronization requirements;
+* preserve interrupt and runtime invariants;
+* respect the compiler's memory-layout model;
+* keep generated code deterministic whenever practical;
+* avoid hidden runtime costs when they can reasonably be exposed;
+* keep generated Assembly readable;
+* identify compiler/runtime-generated behavior clearly when useful;
+* avoid unnecessary runtime code and data when a feature is unused.
+
+Do not assume a specific mapper, ROM size, CHR strategy, memory allocation policy, mirroring mode, or other evolving target constraint from this file.
+
+Read the roadmap, documentation, configuration, and implementation that define the target currently being worked on.
+
+Do not introduce a generic game engine as part of compiler work unless explicitly requested.
+
+---
+
+## Memory and Runtime Discipline
+
+NES memory is limited and hardware-visible.
+
+When changing memory allocation or runtime state:
+
+* understand which physical memory region owns each allocation;
+* preserve non-overlap guarantees;
+* preserve deterministic allocation when expected;
+* distinguish runtime, compiler temporary, hardware shadow, and user storage;
+* account for both zero-page and regular RAM costs where relevant;
+* avoid allocating state for unused features when practical;
+* verify that linker configuration and compiler memory accounting agree.
+
+Changes affecting shared memory layout have a broad regression surface and require stronger validation.
+
+---
 
 ## Diagnostics
 
-Whenever possible, every compiler error must include:
+Compiler diagnostics are part of the public interface.
 
-- file;
-- line;
-- column;
-- error code;
-- clear description;
-- related source excerpt;
-- correction suggestion when useful.
+Diagnostics must be:
 
-Example:
+* stable;
+* specific;
+* actionable;
+* associated with the correct compiler phase;
+* useful to a programmer learning what went wrong.
 
-```text
-E2101 examples/minimal.nsp:7:5
+Whenever practical, diagnostics should include:
 
-Unknown command: nes.background.
+* file;
+* line;
+* column;
+* diagnostic code;
+* concise description;
+* relevant source context;
+* corrective guidance when useful.
 
-Perhaps you meant:
-    nes.set_background_color(value);
-```
+Ordinary source errors must not expose Python stack traces.
 
-Do not expose Python stack traces for ordinary source errors.
+Maintain the canonical diagnostic namespaces defined by the project.
 
-## Quality
+Do not:
 
-Before completing a task:
+* reuse an existing diagnostic code for a different meaning;
+* assign one code to multiple unrelated diagnostics;
+* silently change a documented diagnostic contract;
+* emit diagnostics outside the project's defined ranges.
 
-1. run the tests;
-2. compile the minimal example;
-3. confirm a valid iNES header;
-4. confirm the NROM image size;
-5. add and run a practical gameplay-oriented test when the implemented
-   features make one possible;
-6. report the commands run;
-7. describe known limitations;
-8. never alter golden tests merely to hide a failure;
-9. Every new language feature must extend the automated test suite;
-10. A feature is not considered complete if its behavior is validated only manually.
+When introducing or changing a diagnostic:
 
-## Tests
+1. register it in the canonical diagnostic catalog;
+2. add a focused negative fixture;
+3. verify the expected diagnostic is emitted;
+4. verify unrelated diagnostics are not emitted;
+5. update the diagnostic documentation.
 
-Use:
+---
 
-- unit tests for lexer and parser;
-- semantic-analysis and type-checking tests;
-- assignment and variable-storage tests;
-- golden tests for generated Assembly;
-- an integration test invoking ca65 and ld65;
-- header and ROM-size validation;
-- invalid syntax and invalid semantic value tests.
+## Test Strategy
 
-Tests that require ca65 must be skipped with a clear message when the toolchain
-is not installed.
+Automated tests are required for project behavior.
 
-Whenever practical, complement unit, golden, and structural ROM tests with a
-small behavior-oriented example based on a realistic NES use case. If the
-current language or runtime cannot express the scenario yet, document the
-missing capabilities instead of claiming that the behavior was validated.
+Use the smallest appropriate layer for each assertion:
 
-Every new feature should include:
+* lexer/parser tests for syntax;
+* semantic tests for language rules;
+* backend tests for generated code structure;
+* golden tests for stable generated Assembly;
+* diagnostic fixtures for error behavior;
+* toolchain integration tests for ca65/ld65 compatibility;
+* ROM/header/layout checks for generated artifacts;
+* emulator tests for behavior that must be verified at runtime.
 
-- positive tests;
-- negative tests when applicable;
-- edge-case tests;
-- regression tests whenever a bug is fixed.
+Tests should verify behavior, not implementation accidents, unless the implementation property itself is an intentional contract.
+
+Every new capability should include appropriate:
+
+* positive tests;
+* negative tests;
+* edge cases;
+* integration coverage when relevant.
+
+Every bug fix should include a regression test reproducing the original problem whenever practical.
+
+A bug should not be considered permanently fixed if nothing prevents the same regression from returning.
+
+---
+
+## Local Test Execution Policy
+
+GitHub Actions is the authoritative full-regression environment.
+
+During normal implementation work:
+
+1. run focused tests for the subsystem being changed;
+2. run representative build or compilation smoke tests;
+3. run relevant runtime/emulator tests when practical;
+4. iterate using the smallest test set that gives useful feedback.
+
+Do not repeatedly run the entire regression suite locally after every small edit.
+
+Run broader or full local regression when modifying high-impact shared infrastructure such as:
+
+* parser infrastructure;
+* AST representation;
+* semantic-analysis infrastructure;
+* builtin registration or dispatch;
+* backend code-generation infrastructure;
+* memory layout or allocation;
+* shared interrupt/NMI behavior;
+* shared runtime infrastructure;
+* build/link infrastructure.
+
+A focused test failure may also justify expanding the local test scope.
+
+---
+
+## CI Policy
+
+The GitHub Actions pipeline is the authoritative full-regression check.
+
+The final commit of completed work should pass the repository's CI gate.
+
+Required CI dependencies must be explicitly installed and validated.
+
+A missing required dependency must not produce a false green result.
+
+In particular:
+
+* required toolchain components must be present;
+* required emulator/runtime dependencies must be present;
+* runtime tests must actually execute in their authoritative CI job;
+* infrastructure failures must fail the appropriate job.
+
+Never hide failures using mechanisms such as:
+
+* `continue-on-error`;
+* `|| true` around required validation;
+* shell pipelines that discard the real exit status;
+* unconditional success commands;
+* dependency-related skips presented as successful runtime validation.
+
+When piping required test output through tools such as `tee`, preserve the test process exit status.
+
+Diagnostic artifact upload may run after a failure, but artifact handling must never convert a failed validation into success.
+
+The aggregate CI gate must fail whenever any required upstream validation does not succeed.
+
+A task is not fully validated until the final commit passes the authoritative CI gate when remote CI validation is available.
+
+If CI cannot be accessed, report that clearly instead of claiming full validation.
+
+---
+
+## Local Dependency Skips
+
+Some integration tests may support graceful local skipping when optional external tools are not installed.
+
+That behavior is useful for local development and must not be confused with authoritative CI validation.
+
+Local execution may report a clear skip when an optional local dependency is unavailable.
+
+Authoritative CI jobs must install and validate the dependencies required by those jobs and must not rely on skips as proof of success.
+
+---
+
+## Golden Tests
+
+Golden Assembly is an intentional regression contract.
+
+Never update a golden file merely because a test failed.
+
+When generated Assembly changes:
+
+1. determine why it changed;
+2. verify that the change is required and correct;
+3. inspect the semantic and runtime consequences;
+4. update the golden file only when the new output represents the intended behavior;
+5. document meaningful behavioral or architectural changes when appropriate.
+
+An unexpected golden diff is evidence to investigate, not something to normalize automatically.
+
+---
+
+## Runtime and Emulator Tests
+
+Use emulator-based tests when behavior cannot be proven reliably from generated Assembly alone.
+
+Runtime tests are especially valuable for:
+
+* frame synchronization;
+* NMI behavior;
+* PPU state;
+* controller state;
+* sprite/OAM behavior;
+* animation;
+* timing-sensitive runtime state;
+* interactions among multiple compiler/runtime features.
+
+Prefer deterministic tests that:
+
+* execute a generated ROM;
+* inspect known runtime state;
+* terminate explicitly with success or failure;
+* have bounded execution time.
+
+Do not replace automated runtime validation with manual emulator inspection when an automated assertion is practical.
+
+Manual testing may complement automated tests but does not replace them.
+
+---
 
 ## Documentation
 
-Documentation is a first-class deliverable and must always remain synchronized with the implementation.
+Documentation is a first-class deliverable.
 
-Every completed feature or milestone must include documentation updates before the work is considered finished.
+Canonical English documentation must remain synchronized with implementation.
 
-### General Rules
+When changing user-visible behavior:
 
-- Use English for all documentation.
-- Use Markdown as the source format.
-- Do not write HTML documentation manually.
-- Keep documentation concise, accurate, and implementation-driven.
-- Remove obsolete documentation whenever behavior changes.
+1. identify affected canonical documentation;
+2. update it in the same task whenever practical;
+3. update examples and references that would otherwise become stale;
+4. remove obsolete statements instead of accumulating contradictory history.
 
-### Documentation Updates
+Prefer updating an existing document over creating a new document unnecessarily.
 
-When implementing a new feature, always update every affected document.
+Do not put temporary implementation status in long-lived reference documentation.
 
-This may include:
+### Documentation Languages
 
-- [README.md](README.md)
-- [roadmap index](roadmap/README.md)
-- [language guide](docs/language/index.md)
-- compiler architecture documentation
-- runtime documentation
-- backend documentation
-- examples
-- API reference
-- language reference
+English is canonical for:
 
-If a document does not exist yet and would improve the project, create it.
+* source code;
+* identifiers;
+* compiler diagnostics;
+* tests;
+* generated output;
+* internal developer-facing artifacts;
+* primary documentation.
 
-Prefer extending existing documents before creating new ones.
+Translated documentation may exist in locale-specific directories such as `docs/pt-BR/`.
 
-### Examples
+Canonical English documentation remains the source of truth.
 
-Every user-visible language feature should include at least one working example.
+When a maintained translated version exists for canonical documentation changed by the task, keep the translation synchronized when documentation updates are within task scope.
 
-Examples must compile successfully and remain synchronized with the compiler behavior.
+Do not localize:
 
-### Roadmap
+* language syntax;
+* compiler diagnostic identifiers;
+* generated Assembly symbols;
+* internal source identifiers;
 
-Before starting milestone work:
+unless explicitly planned.
 
-1. read the [roadmap index](roadmap/README.md);
-2. use the index to identify the explicit current and next milestone;
-3. open the relevant major-version roadmap file;
-4. implement only the requested milestone.
+---
+
+## Examples
+
+User-visible language features should have representative example programs whenever appropriate.
+
+Examples must:
+
+* compile successfully;
+* remain synchronized with current language behavior;
+* stay focused;
+* demonstrate intended usage;
+* avoid unrelated complexity.
+
+Examples should also serve as useful regression inputs when practical.
+
+Do not keep obsolete examples merely as historical artifacts inside the active documentation or test path.
+
+Historical material belongs in version control history unless there is an explicit reason to preserve it in the repository.
+
+---
+
+## Roadmap Discipline
+
+The roadmap defines project evolution.
+
+Before milestone work:
+
+1. read the roadmap index;
+2. identify the explicitly designated current milestone;
+3. open the relevant release roadmap;
+4. understand its acceptance criteria;
+5. implement only that scope.
 
 When a milestone is completed:
 
-- update its checklist and status in the relevant major-version roadmap file;
-- update the current release, last completed milestone, and next milestone in
-  the [roadmap index](roadmap/README.md);
-- keep the roadmap aligned with the current implementation;
-- never silently change future roadmap scope;
-- propose missing roadmap work separately when implementation reveals it.
+* update its status and checklist;
+* update the roadmap index;
+* identify the next milestone using the roadmap;
+* keep roadmap state aligned with implementation.
 
-### Consistency
+Do not infer the next milestone from numbering alone.
 
-Never leave documentation behind the implementation.
+Do not renumber or rewrite completed historical milestones without explicit approval.
 
-Code, tests, examples, and documentation must evolve together.
+Do not silently expand, remove, or redefine future roadmap scope.
 
-Documentation changes should be part of the same commit whenever practical.
+If implementation exposes missing future work, propose it separately.
 
-## Project Evolution
-
-The compiler must evolve through small, incremental milestones.
-
-Each milestone should:
-
-- introduce a minimal set of new features;
-- keep the compiler in a working state;
-- include automated tests;
-- update the documentation;
-- avoid implementing features from future milestones.
-
-Do not implement functionality that has not yet been planned.
-
-Prefer a small, complete milestone over a large, incomplete implementation.
-
-## Compiler Diagnostics
-
-Compiler diagnostics are part of the public API.
-
-Every diagnostic must have:
-
-- a stable diagnostic code;
-- a concise title;
-- a detailed explanation;
-- one or more code examples;
-- suggested fixes.
-
-Whenever a new diagnostic is introduced or an existing one changes, update the diagnostics reference.
-
-Diagnostics documentation must remain synchronized with the compiler implementation.
-
-Maintain a diagnostics index listing every diagnostic code and its meaning.
-
-Diagnostics are educational.
-
-Every error message should help the programmer understand:
-
-- what happened;
-- why it happened;
-- how to fix it.
-
-Prefer clear explanations over short messages.
-
-Use the canonical diagnostic namespaces:
-
-```text
-E1000-E1999  Lexical Analysis
-E2000-E2999  Parser / Syntax
-E3000-E3999  Semantic Analysis
-E4000-E4999  Type System
-E5000-E5999  Code Generation
-E6000-E6999  Runtime Validation
-W1000-W1999  Warnings
-I1000-I1999  Informational Messages
-```
-
-Never emit a diagnostic outside these ranges, assign one code to multiple
-diagnostics, or reuse a retired code for a different meaning. Register new
-errors in `nes_pascal/diagnostics.py` and document them in
-the [diagnostics reference](docs/reference/diagnostics/index.md).
-
-## Diagnostics Validation
-
-Every new language feature must include negative test cases.
-
-Whenever a new compiler diagnostic is introduced or modified:
-
-- create at least one source file that intentionally triggers it;
-- verify that the expected diagnostic is emitted;
-- verify that unrelated diagnostics are not emitted;
-- update the diagnostics documentation.
-
-Diagnostics are part of the compiler's public interface and must remain stable.
-
-## Example Programs
-
-Every new language feature must include at least one example program.
-
-Example programs are part of the project and must compile successfully.
-
-When implementing a feature:
-
-- create a new example if none exists;
-- update existing examples when appropriate;
-- keep examples small and focused;
-- demonstrate the intended usage of the feature.
-
-Examples should also serve as regression tests for future compiler changes.
-
-## Implementation style
-
-- Prefer simple, explicit code.
-- Use Python type hints.
-- Avoid dependencies when the standard library is sufficient.
-- Do not use parser generators in the prototype.
-- Use custom exceptions for compilation errors.
-- Document important architectural decisions.
-- Do not perform broad refactors outside the task scope.
-- Do not implement future features without a request.
-
-## Milestone Completion
-
-A milestone is only considered complete when all of the following are satisfied:
-
-- implementation is complete;
-- automated tests pass;
-- example programs compile successfully;
-- documentation is updated;
-- diagnostics are documented;
-- the [roadmap index](roadmap/README.md) and relevant major-version roadmap
-  file reflect the current state.
-
-When completing a milestone, never silently introduce new scope into later
-milestones or remove existing roadmap items. If a milestone reveals missing
-work, propose roadmap changes separately instead of modifying future planning
-without explanation.
-
-Passing the existing test suite is necessary but not sufficient.
-Every new capability must be accompanied by the tests, documentation,
-diagnostics, and examples required to validate that capability.
-
-## Milestone Identifiers
-
-Milestone numbering is scoped to a release and may be reorganized while the
-release is still planned.
-
-- Treat the milestone title and anchor as the stable identity.
-- Use the [roadmap index](roadmap/README.md) to determine the current and next
-  milestone.
-- Do not select the next milestone by numeric inference alone.
-- Do not rely on historical milestone numbers.
-- Planned milestones may be renumbered within the same release when necessary.
-- A completed milestone is considered stable history and must not be
-  renumbered, reordered, or have its scope changed without explicit user
-  approval.
+---
 
 ## Regression Policy
 
-Existing behavior must not regress.
+Existing documented behavior must not regress unintentionally.
 
-When fixing a bug:
+When changing shared infrastructure, consider downstream effects across:
 
-- add a regression test reproducing the original problem;
-- verify that the bug no longer occurs;
-- verify that previously working examples continue to compile.
+* parsing;
+* semantic analysis;
+* generated Assembly;
+* memory usage;
+* ROM construction;
+* runtime behavior;
+* diagnostics;
+* examples;
+* documentation.
 
-Every reported bug should become a permanent automated test whenever practical.
+Passing focused tests is necessary during development.
 
-## Work process
+Passing authoritative CI is required for final regression confidence.
 
-Before writing code:
+Passing the existing suite is necessary but not sufficient for a new feature: new behavior must have tests that actually exercise it.
+
+---
+
+## Implementation Style
+
+Prefer:
+
+* straightforward Python;
+* type hints;
+* small functions with clear responsibilities;
+* explicit data structures;
+* deterministic output;
+* standard-library solutions when sufficient;
+* focused commits;
+* minimal diffs.
+
+Avoid:
+
+* broad unrelated refactors;
+* hidden global state;
+* unnecessary metaprogramming;
+* speculative abstractions;
+* parser generators unless explicitly adopted by the project;
+* dependencies that provide little value;
+* generated code that is difficult to relate back to source behavior.
+
+Follow existing project conventions before introducing new ones.
+
+---
+
+## Generated and Temporary Files
+
+Do not commit generated or temporary artifacts unless they are intentionally versioned fixtures, assets, golden outputs, or examples.
+
+Before deleting or ignoring a file type, verify whether the repository intentionally versions files of that type.
+
+NES development commonly uses file extensions that may represent either generated output or canonical project assets.
+
+Do not globally ignore or delete formats such as Assembly, linker configuration, ROM, CHR, palette, map, or metadata files without inspecting their role in the repository.
+
+Keep temporary build artifacts out of commits.
+
+---
+
+## Git Workflow
+
+Before starting:
+
+* inspect `git status`;
+* identify the current branch;
+* avoid modifying unrelated work.
+
+During implementation:
+
+* keep changes focused;
+* use meaningful commits;
+* do not mix unrelated cleanup with feature work;
+* preserve useful history when debugging CI or regressions.
+
+Before completion:
+
+1. review the full diff;
+2. ensure no accidental files were added;
+3. run appropriate focused local validation;
+4. commit the intended changes;
+5. push the branch when requested or required by the workflow;
+6. confirm CI was triggered when remote access is available;
+7. verify the final CI result.
+
+Never claim a remote validation succeeded without checking it.
+
+---
+
+## Work Process
+
+For a normal task:
 
 1. read this file;
-2. read the [roadmap index](roadmap/README.md);
-3. open the relevant major-version roadmap file when doing milestone work;
-4. read relevant documents under `docs/`;
-5. inspect the existing structure;
-6. present a short plan;
-7. implement only the requested milestone.
+2. understand the user's request;
+3. inspect repository status and structure;
+4. read relevant roadmap entries when scope depends on them;
+5. read relevant documentation;
+6. inspect relevant implementation and tests;
+7. form a short implementation plan;
+8. make the smallest correct change;
+9. run focused tests while iterating;
+10. expand testing when the change has broader impact;
+11. update tests, examples, diagnostics, and documentation as required;
+12. review the final diff;
+13. commit and push when appropriate;
+14. verify authoritative CI when available;
+15. report the result accurately.
 
-When choosing between a generic solution and a small predictable solution,
-choose the small predictable solution.
+Do not spend time rediscovering unrelated parts of the repository.
+
+---
+
+## Completion Criteria
+
+A task is complete only when all requirements relevant to that task have been addressed.
+
+For feature or milestone work, this normally includes:
+
+* implementation;
+* appropriate automated tests;
+* regression coverage;
+* examples when applicable;
+* diagnostics when applicable;
+* documentation;
+* roadmap updates when applicable;
+* focused local validation;
+* successful authoritative CI validation when available.
+
+Before reporting completion, provide:
+
+* a concise summary of what changed;
+* files or subsystems changed;
+* local tests executed;
+* CI status;
+* known limitations or unresolved issues;
+* any proposed follow-up work that was intentionally kept out of scope.
+
+Do not present planned, skipped, unverified, or partially implemented work as complete.
+
+---
+
+## Maintaining This File
+
+`AGENTS.md` should remain stable and policy-oriented.
+
+Do not add:
+
+* current milestone descriptions;
+* feature inventories;
+* release status;
+* temporary workarounds;
+* implementation snapshots;
+* benchmark results;
+* historical notes;
+* task-specific instructions.
+
+If information changes frequently, it belongs somewhere else.
+
+Use:
+
+* the roadmap for planning and milestone state;
+* documentation for public behavior;
+* project configuration for supported environments and dependencies;
+* tests for executable behavior contracts;
+* source code for implementation details;
+* version control history for historical state.
+
+The purpose of this file is to help an agent reliably understand **how to work on the project**, not to describe **where the project happens to be today**.
