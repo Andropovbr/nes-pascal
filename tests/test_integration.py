@@ -648,6 +648,15 @@ class MesenIntegrationTests(unittest.TestCase):
     def test_arrays_preserve_indexed_storage_and_boolean_branching(self) -> None:
         self._run_mesen_test("arrays", "verify_arrays.lua")
 
+    def test_array_boundary_runtime_state(self) -> None:
+        self._run_mesen_test(
+            "array_boundary",
+            "verify_array_boundary.lua",
+            source_path=(
+                ROOT / "tests" / "fixtures" / "runtime" / "array_boundary.nsp"
+            ),
+        )
+
     def test_counting_example_reaches_expected_runtime_state(self) -> None:
         self._run_mesen_test(
             "counting",

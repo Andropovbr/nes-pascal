@@ -87,25 +87,42 @@ unavailable.
 ## Continuous Integration (CI)
 
 The repository uses GitHub Actions for automated regression testing on every
-push and manual trigger (`workflow_dispatch`). The pipeline consists of three
-jobs:
+push and manual trigger (`workflow_dispatch`). All CI jobs run on pinned
+`ubuntu-24.04` runners. The pipeline consists of three jobs:
 
 1. **`compiler-toolchain`**: Installs Python and the `cc65` toolchain (`ca65`
-   and `ld65`), and executes the complete compiler regression test suite
-   (lexer, parser, semantic, memory layout, diagnostics, golden assembly, and
-   ROM build integration tests).
+   and `ld65`), executes the complete compiler regression test suite (lexer,
+   parser, semantic, memory layout, diagnostics, golden assembly, and ROM build
+   integration tests), and generates the compiler benchmark report using
+   `tools/measure_benchmarks.py`. The generated report is published directly to
+   the job step summary and uploaded as the `benchmark-report` build artifact.
+   Benchmark metrics are currently observable and informational rather than
+   threshold-gated.
 2. **`mesen-runtime`**: Depends on `compiler-toolchain`, installs `ca65`/`ld65`
    and MesenCE 2.2.1, configures `MESEN_PATH`, and executes the complete
    suite of headless Mesen behavioral runtime tests.
-3. **`ci-gate`**: Acts as the single required gate verifying that both
-   `compiler-toolchain` and `mesen-runtime` passed successfully.
+3. **`ci-gate`**: Acts as the single authoritative gate verifying that both
+   `compiler-toolchain` and `mesen-runtime` completed successfully.
 
-To run the equivalent test stages locally:
+### Local vs CI Execution Policy
+
+During development, iterate using focused tests for the subsystem being modified.
+While local integration tests gracefully skip when external dependencies (`ca65`,
+`ld65`, or Mesen) are absent, authoritative CI jobs must install all required
+dependencies and execute all assertions without skipping.
+
+To run the equivalent stages locally:
 
 ```text
-# Run the compiler and toolchain regression suite (requires ca65 and ld65 on PATH)
+# Run focused unit tests during development (e.g. arrays)
+python -m unittest tests.test_arrays -v
+
+# Run the complete compiler and toolchain regression suite (requires ca65 and ld65 on PATH)
 python -m unittest discover -s tests -v
 
 # Run the Mesen runtime behavioral suite (requires ca65, ld65, and MESEN_PATH)
 python -m unittest tests.test_integration.MesenIntegrationTests -v
+
+# Generate the benchmark metrics report locally (requires ca65 and ld65 on PATH)
+python tools/measure_benchmarks.py
 ```
