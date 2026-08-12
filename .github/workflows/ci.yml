@@ -69,7 +69,7 @@ jobs:
       - name: Install cc65 and runtime dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cc65 libsdl2-dev libfontconfig1 libgl1 libgtk-3-0 curl unzip
+          sudo apt-get install -y cc65 libsdl2-dev libfontconfig1 libgl1 libgtk-3-0 xvfb curl unzip
 
       - name: Validate toolchain installation
         run: |
@@ -92,7 +92,8 @@ jobs:
       - name: Run Mesen runtime emulation tests
         id: mesen_tests
         run: |
-          python -m unittest tests.test_integration.MesenIntegrationTests -v 2>&1 | tee mesen_tests.log
+          set -o pipefail
+          xvfb-run -a -s "-screen 0 1024x768x24" python -m unittest tests.test_integration.MesenIntegrationTests -v 2>&1 | tee mesen_tests.log
 
       - name: Upload Mesen test log artifact
         if: always()
