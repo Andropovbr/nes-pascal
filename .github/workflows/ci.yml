@@ -82,10 +82,13 @@ jobs:
           unzip -o "$HOME/.mesen/Mesen_2.2.1_Linux_x64.zip" -d "$HOME/.mesen"
           chmod +x "$HOME/.mesen/Mesen"
           echo "MESEN_PATH=$HOME/.mesen/Mesen" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.config/MesenCE"
+          echo '{"Version": "2.2.1", "ConfigUpgrade": 5}' > "$HOME/.config/MesenCE/settings.json"
 
       - name: Validate Mesen installation
         run: |
           test -x "$MESEN_PATH"
+          test -f "$HOME/.config/MesenCE/settings.json"
           echo "MesenCE 2.2.1 binary ready at: $MESEN_PATH"
 
       - name: Run Mesen runtime emulation tests
