@@ -201,5 +201,30 @@ class MirroringIntegrationTests(unittest.TestCase):
         self.assertIn("vertical", str(raised.exception))
 
 
+@unittest.skipUnless(TOOLCHAIN_AVAILABLE, "scrolling benchmark measurement requires ca65 and ld65")
+class ScrollingBenchmarkTests(unittest.TestCase):
+    def test_scrolling_ppu_state_benchmark_reports_focused_resource_accounting(self) -> None:
+        from tools.measure_benchmarks import BENCHMARKS, measure_benchmark
+
+        spec = next(item for item in BENCHMARKS if item.name == "scrolling_ppu_state")
+        metrics = measure_benchmark(spec)
+
+        self.assertEqual(metrics.prg_code_bytes, 528)
+        self.assertEqual(metrics.prg_total_used_bytes, 534)
+        self.assertEqual(metrics.pattern_stats.total_instructions, 229)
+        self.assertEqual(metrics.estimated_static_base_cycles, 753)
+        self.assertEqual(metrics.max_expression_tree_depth, 0)
+        self.assertEqual(metrics.max_live_temporaries, 0)
+        self.assertEqual(metrics.memory.zp_temporary_reserved_bytes, 16)
+        self.assertEqual(metrics.memory.zp_temporary_required_bytes, 0)
+        self.assertEqual(metrics.memory.regular_user_bytes, 0)
+        self.assertEqual(metrics.memory.zp_promoted_user_bytes, 0)
+        self.assertEqual(metrics.memory.regular_runtime_bytes, 48)
+        self.assertEqual(metrics.memory.regular_runtime_user_allocated_bytes, 48)
+        self.assertEqual(metrics.memory.oam_shadow_allocated_bytes, 0)
+        self.assertEqual(metrics.runtime_features, ("PALETTE_QUEUE", "SCROLL"))
+
+
 if __name__ == "__main__":
     unittest.main()
+

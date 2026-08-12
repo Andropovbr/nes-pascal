@@ -36,7 +36,7 @@ A matriz adota os seguintes níveis de verificação semântica:
 | 18 | **Carregamento de nametable** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Ausente | Transferência de 1 KiB raw na inicialização |
 | 19 | **Atualizações de fundo em runtime** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Fila de VBlank com 4 escritas, shadow de tiles |
 | 20 | **Gerenciamento de paletas** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Shadow de 32 bytes, uploader em VBlank |
-| 21 | **Rolagem e estado da PPU** | Forte | Forte | **Forte** | Forte | Forte | Ausente | Forte | Forte | Ausente | Preparação de scroll, restauração de latch; fixtures de tipo para ambas as posições de argumento |
+| 21 | **Rolagem e estado da PPU** | Forte | Forte | **Forte** | Forte | Forte | Ausente | Forte | Forte | Forte | Preparação de scroll, restauração de latch; fixtures de tipo para ambas as posições de argumento |
 | 22 | **Sprites de hardware básicos** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Shadow de 64 entradas de OAM, DMA em NMI |
 | 23 | **Gerenciamento de sprites** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Reserva estática de pool de 64 slots |
 | 24 | **Metasprites** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Geometria de âncora, flip, recorte de borda |
@@ -113,11 +113,11 @@ A matriz adota os seguintes níveis de verificação semântica:
    * *Relevância:* Embora protegidos por testes estruturais com regex e testes no Mesen, trechos golden focados evitam regressões inesperadas no emissor de assembly.
    * *Escopo:* Médio (5 arquivos golden `.asm` focados).
 
-2. **P2 — Incluir `scrolling_ppu_state` no corpus de benchmark**:
+2. **✅ P2 — Incluir `scrolling_ppu_state` no corpus de benchmark** *(resolvido)*:
    * *Subsistema:* Rolagem e Estado da PPU
-   * *Camada Ausente:* Medição de Benchmark / Recursos
-   * *Relevância:* Mede o impacto em ciclos estáticos e pegada em PRG da preparação de rolagem e restauração de PPU.
-   * *Escopo:* Pequeno (Adicionar entrada em `tools/measure_benchmarks.py`).
+   * *Adicionado:* `BenchmarkSpec("scrolling_ppu_state", "Scrolling and PPU State", "examples/scrolling_ppu_state.nsp")` em `tools/measure_benchmarks.py`.
+   * *Teste focado:* `ScrollingBenchmarkTests.test_scrolling_ppu_state_benchmark_reports_focused_resource_accounting` em `tests/test_scrolling_ppu_state.py` verifica PRG, contagem de instruções, estimativa de ciclos, contabilização de ZP/RAM e conjunto de features de runtime.
+   * *Atualização na matriz:* Subsistema 21 — camada Corpus de Benchmark: **Ausente → Forte**.
 
 3. **P2 — Dividir `tests/test_integration.py` em suítes de teste focadas**:
    * *Subsistema:* Infraestrutura de Testes
@@ -138,7 +138,7 @@ A matriz adota os seguintes níveis de verificação semântica:
 
 * `[P1 ✅]` ~~Adicionar teste de validação de padrões da PPU no Mesen para carregamento de CHR-ROM (`verify_chr_asset.lua`).~~ **Resolvido** — `tests/mesen/verify_chr_asset.lua` valida todos os 8 192 bytes da tabela de padrões da PPU em runtime.
 * `[P1 ✅]` ~~Adicionar fixture negativo de diagnóstico focado para tipos inválidos de argumentos em `nes.set_scroll`.~~ **Resolvido** — Fixtures `invalid_set_scroll_x_type.nsp` e `invalid_set_scroll_y_type.nsp` com asserções de `E4004` para ambas as posições de argumento.
+* `[P2 ✅]` ~~Adicionar especificação de benchmark de `scrolling_ppu_state` em `tools/measure_benchmarks.py`.~~ **Resolvido** — `scrolling_ppu_state` agora integra o corpus de benchmark com um teste focado de verificação de recursos.
 * `[P2]` Adicionar fixtures de golden assembly focados para rotinas de runtime de hardware (paletas, fila de fundo, renderizador de metasprites).
-* `[P2]` Adicionar especificação de benchmark de `scrolling_ppu_state` em `tools/measure_benchmarks.py`.
 * `[P2]` Separar `tests/test_integration.py` em `test_toolchain.py`, `test_goldens.py` e `test_mesen.py`.
 * `[P3]` Limpar convenções de nomenclatura e docstrings de testes legados.

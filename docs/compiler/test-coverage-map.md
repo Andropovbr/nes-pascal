@@ -36,7 +36,7 @@ The matrix uses semantic verification tiers:
 | 18 | **Nametable loading** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Missing | Full raw 1 KiB upload |
 | 19 | **Runtime BG updates** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | 4-write VBlank queue, tile shadow |
 | 20 | **Palette management** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | 32-byte shadow, VBlank uploader |
-| 21 | **Scrolling & PPU state** | Strong | Strong | **Strong** | Strong | Strong | Missing | Strong | Strong | Missing | Scroll staging, latch restore; type fixtures for both arg positions |
+| 21 | **Scrolling & PPU state** | Strong | Strong | **Strong** | Strong | Strong | Missing | Strong | Strong | Strong | Scroll staging, latch restore; type fixtures for both arg positions |
 | 22 | **Basic hardware sprites** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | 64-entry OAM shadow, NMI DMA |
 | 23 | **Sprite management** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | Static 64-slot pool reservation |
 | 24 | **Metasprites** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | Anchor geometry, flipping, clipping |
@@ -113,11 +113,11 @@ The matrix uses semantic verification tiers:
    * *Why it matters:* While protected by backend regex tests and Mesen runtime checks, focused golden snippets prevent unexpected assembly emitter regressions.
    * *Scope:* Medium (5 focused `.asm` goldens).
 
-2. **P2 — Include `scrolling_ppu_state` in benchmark corpus**:
+2. **✅ P2 — Include `scrolling_ppu_state` in benchmark corpus** *(resolved)*:
    * *Subsystem:* Scrolling & PPU State
-   * *Missing Layer:* Benchmark / Resource Measurement
-   * *Why it matters:* Measures static cycle and PRG footprint impact of scroll staging and PPU restoration.
-   * *Scope:* Small (Add entry to `tools/measure_benchmarks.py`).
+   * *Added:* `BenchmarkSpec("scrolling_ppu_state", "Scrolling and PPU State", "examples/scrolling_ppu_state.nsp")` in `tools/measure_benchmarks.py`.
+   * *Focused test:* `ScrollingBenchmarkTests.test_scrolling_ppu_state_benchmark_reports_focused_resource_accounting` in `tests/test_scrolling_ppu_state.py` asserts stable PRG, instruction count, cycle estimate, ZP/RAM accounting, and runtime feature set.
+   * *Matrix update:* Subsystem 21 — Benchmark Corpus tier: **Missing → Strong**.
 
 3. **P2 — Split `tests/test_integration.py` into focused test suites**:
    * *Subsystem:* Test Infrastructure
@@ -138,7 +138,7 @@ The matrix uses semantic verification tiers:
 
 * `[P1 ✅]` ~~Add Mesen PPU pattern validation test for CHR-ROM loading (`verify_chr_asset.lua`).~~ **Resolved** — `tests/mesen/verify_chr_asset.lua` validates all 8 192 PPU pattern-table bytes at runtime.
 * `[P1 ✅]` ~~Add focused negative diagnostic fixture for invalid `nes.set_scroll` argument types.~~ **Resolved** — `invalid_set_scroll_x_type.nsp` and `invalid_set_scroll_y_type.nsp` fixtures with test assertions for `E4004` in both argument positions.
+* `[P2 ✅]` ~~Add `scrolling_ppu_state` benchmark spec to `tools/measure_benchmarks.py`.~~ **Resolved** — `scrolling_ppu_state` is now in the benchmark corpus with a dedicated focused resource-accounting regression test.
 * `[P2]` Add focused golden assembly fixtures for hardware runtime routines (palettes, background queue, metasprite renderer).
-* `[P2]` Add `scrolling_ppu_state` benchmark spec to `tools/measure_benchmarks.py`.
 * `[P2]` Separate `tests/test_integration.py` into `test_toolchain.py`, `test_goldens.py`, and `test_mesen.py`.
 * `[P3]` Clean up legacy test naming and docstring conventions.
