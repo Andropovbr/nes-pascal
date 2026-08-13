@@ -1,6 +1,6 @@
 # Built-in types
 
-English | [Português (Brasil)](..\pt-BR\language\types.md)
+English | [Português (Brasil)](../pt-BR/language/types.md)
 
 NES Pascal provides five built-in types. Each occupies one byte, but the
 types are distinct and are not implicitly converted. It also supports

@@ -1,0 +1,28 @@
+program ArrayBoundaryRuntime;
+
+var
+    Values: array[$00..$FF] of byte;
+    Index: byte;
+    DirectFirst: byte;
+    DirectLast: byte;
+    VariableFirst: byte;
+    VariableLast: byte;
+
+begin
+    Values[$00] := $A1;
+    Values[$FF] := $B2;
+
+    DirectFirst := Values[$00];
+    DirectLast := Values[$FF];
+
+    Index := $00;
+    Values[Index] := $C3;
+    VariableFirst := Values[Index];
+
+    Index := $FF;
+    Values[Index] := $D4;
+    VariableLast := Values[Index];
+
+    nes.set_background_color($0F);
+    nes.run;
+end.

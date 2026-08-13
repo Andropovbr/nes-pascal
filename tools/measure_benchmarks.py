@@ -1,4 +1,4 @@
-"""Measurement and pattern analysis tooling for Milestone 0.5.5.
+"""Measurement and pattern analysis tooling for NES Pascal benchmark corpus.
 
 Collects deterministic resource metrics, analyzes generated assembly patterns,
 computes AST tree depth and live expression temporaries, and analyzes RAM breakdowns.
@@ -124,6 +124,11 @@ BENCHMARKS: tuple[BenchmarkSpec, ...] = (
         "frame_callbacks",
         "Frame Callbacks",
         "examples/frame_callbacks.nsp",
+    ),
+    BenchmarkSpec(
+        "scrolling_ppu_state",
+        "Scrolling and PPU State",
+        "examples/scrolling_ppu_state.nsp",
     ),
     BenchmarkSpec(
         "arrays",

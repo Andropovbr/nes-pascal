@@ -1,0 +1,6 @@
+program InvalidSetScrollYType;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+    nes.set_scroll($00, true);
+end.

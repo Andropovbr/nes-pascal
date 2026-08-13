@@ -9,7 +9,7 @@ Esta pasta contém a tradução completa da documentação do **NES Pascal** par
 - **Fonte canônica:** A documentação em inglês (`docs/`) é a fonte oficial e autoritativa do projeto.
 - **Espelhamento de estrutura:** A estrutura de diretórios e os nomes de arquivos em `docs/pt-BR/` espelham exatamente a documentação em inglês para permitir comparações automatizadas e navegação consistente.
 - **Nomes de arquivos inalterados:** Caminhos e nomes de arquivos não são traduzidos.
-- **Sincronização:** Todas as 49 páginas de documentação voltadas ao usuário estão 100% traduzidas e sincronizadas.
+- **Sincronização:** Todas as 53 páginas de documentação voltadas ao usuário estão 100% traduzidas e sincronizadas.
 
 ## Status da Tradução
 
@@ -75,4 +75,5 @@ Esta pasta contém a tradução completa da documentação do **NES Pascal** par
 - [x] `docs/compiler/low-risk-codegen-0.5.7.md` -> `docs/pt-BR/compiler/low-risk-codegen-0.5.7.md`
 - [x] `docs/compiler/arrays-0.5.8.md` -> `docs/pt-BR/compiler/arrays-0.5.8.md`
 - [x] `docs/compiler/enumerations-0.5.9.md` -> `docs/pt-BR/compiler/enumerations-0.5.9.md`
+- [x] `docs/compiler/test-coverage-map.md` -> `docs/pt-BR/compiler/test-coverage-map.md`
 - [x] `docs/compiler/optimization-audit-0.5.5.md` -> `docs/pt-BR/compiler/optimization-audit-0.5.5.md`

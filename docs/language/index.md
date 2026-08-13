@@ -1,6 +1,6 @@
 # Language Guide
 
-English | [Português (Brasil)](..\pt-BR\language\index.md)
+English | [Português (Brasil)](../pt-BR/language/index.md)
 
 This guide describes only the subset currently implemented by NES Pascal. The
 syntax is inspired by Pascal, but the language is not intended to be

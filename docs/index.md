@@ -9,7 +9,7 @@ systems.
 
 This documentation describes only behavior implemented by the compiler.
 Planned work is tracked separately in the
-[project roadmap](https://github.com/Andropovbr/nes-pascal/blob/main/roadmap/README.md).
+[project roadmap](../roadmap/README.md).
 
 ## Getting Started
 
@@ -54,5 +54,6 @@ Planned work is tracked separately in the
 - [Low-risk code generation improvements (0.5.7)](compiler/low-risk-codegen-0.5.7.md)
 - [Array implementation and measurements (0.5.8)](compiler/arrays-0.5.8.md)
 - [Enumeration implementation and measurements (0.5.9)](compiler/enumerations-0.5.9.md)
+- [Semantic test coverage map](compiler/test-coverage-map.md)
 - [Unsupported features](reference/unsupported-features.md)
 - [Compiler diagnostics](reference/diagnostics/index.md)

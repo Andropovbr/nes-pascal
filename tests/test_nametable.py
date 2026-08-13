@@ -254,6 +254,18 @@ class NametableLanguageTests(unittest.TestCase):
         self.assertEqual(split.nametable_tiles, "tiles.bin")
         self.assertEqual(split.nametable_attributes, "attributes.bin")
 
+    def test_command_line_version_flag_reports_version(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+        from nes_pascal import __version__
+
+        parser = build_argument_parser()
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), self.assertRaises(SystemExit) as context:
+            parser.parse_args(["--version"])
+        self.assertEqual(context.exception.code, 0)
+        self.assertIn(f"nes-pascal {__version__}", buffer.getvalue())
+
     def test_invalid_source_forms_have_stable_diagnostics(self) -> None:
         fixtures = {
             "invalid_background_load_argument_count.nsp": "E3035",

@@ -1,6 +1,6 @@
 # Program structure
 
-English | [Português (Brasil)](..\pt-BR\language\program-structure.md)
+English | [Português (Brasil)](../pt-BR/language/program-structure.md)
 
 A program contains:
 

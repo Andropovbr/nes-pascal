@@ -1,6 +1,6 @@
 # Code-generation diagnostics
 
-English | [Português (Brasil)](..\..\pt-BR\reference\diagnostics\code-generation.md)
+English | [Português (Brasil)](../../pt-BR/reference/diagnostics/code-generation.md)
 
 Code-generation diagnostics use the E5000-E5999 range.
 

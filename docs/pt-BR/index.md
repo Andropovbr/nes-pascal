@@ -9,7 +9,7 @@ NES NTSC.
 
 Esta documentação descreve apenas o comportamento implementado pelo compilador.
 O trabalho planejado é acompanhado separadamente no
-[roadmap do projeto](https://github.com/Andropovbr/nes-pascal/blob/main/roadmap/README.md).
+[roadmap do projeto](../../roadmap/README.md).
 
 ## Primeiros Passos
 
@@ -54,5 +54,6 @@ O trabalho planejado é acompanhado separadamente no
 - [Melhorias de baixo risco na geração de código (0.5.7)](compiler/low-risk-codegen-0.5.7.md)
 - [Implementação e medições de arrays (0.5.8)](compiler/arrays-0.5.8.md)
 - [Implementação e medições de enumerações (0.5.9)](compiler/enumerations-0.5.9.md)
+- [Mapa de cobertura de testes semânticos](compiler/test-coverage-map.md)
 - [Recursos não suportados](reference/unsupported-features.md)
 - [Diagnósticos do compilador](reference/diagnostics/index.md)

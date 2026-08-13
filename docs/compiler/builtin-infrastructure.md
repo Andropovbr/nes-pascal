@@ -1,6 +1,6 @@
 # Builtin / Intrinsic Infrastructure
 
-English | [Português (Brasil)](..\pt-BR\compiler\builtin-infrastructure.md)
+English | [Português (Brasil)](../pt-BR/compiler/builtin-infrastructure.md)
 
 Milestone 0.5.6 gives ordinary `nes.*` calls one compile-time pipeline:
 

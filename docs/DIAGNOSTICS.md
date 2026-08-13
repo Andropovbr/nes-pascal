@@ -1,6 +1,6 @@
 # Compiler diagnostics
 
-English | [Português (Brasil)](pt-BR\DIAGNOSTICS.md)
+English | [Português (Brasil)](pt-BR/DIAGNOSTICS.md)
 
 The full diagnostics reference has moved to
 [Reference / Diagnostics](reference/diagnostics/index.md).

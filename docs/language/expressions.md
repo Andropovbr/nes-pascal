@@ -1,6 +1,6 @@
 # Expressions
 
-English | [Português (Brasil)](..\pt-BR\language\expressions.md)
+English | [Português (Brasil)](../pt-BR/language/expressions.md)
 
 ## Arithmetic expressions
 

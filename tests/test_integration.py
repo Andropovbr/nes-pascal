@@ -654,6 +654,15 @@ class MesenIntegrationTests(unittest.TestCase):
     def test_enumerations_preserve_nominal_state_transitions(self) -> None:
         self._run_mesen_test("enumerations", "verify_enumerations.lua")
 
+    def test_array_boundary_runtime_state(self) -> None:
+        self._run_mesen_test(
+            "array_boundary",
+            "verify_array_boundary.lua",
+            source_path=(
+                ROOT / "tests" / "fixtures" / "runtime" / "array_boundary.nsp"
+            ),
+        )
+
     def test_counting_example_reaches_expected_runtime_state(self) -> None:
         self._run_mesen_test(
             "counting",
@@ -787,6 +796,13 @@ class MesenIntegrationTests(unittest.TestCase):
         self._run_mesen_test(
             "scrolling_ppu_state",
             "verify_scrolling_ppu_state.lua",
+        )
+
+    def test_chr_asset_is_visible_in_ppu_pattern_tables(self) -> None:
+        self._run_mesen_test(
+            "chr_asset",
+            "verify_chr_asset.lua",
+            chr_path="assets/chr_asset.chr",
         )
 
 

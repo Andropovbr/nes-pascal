@@ -1,6 +1,6 @@
 # Parser and syntax diagnostics
 
-English | [Português (Brasil)](..\..\pt-BR\reference\diagnostics\syntax.md)
+English | [Português (Brasil)](../../pt-BR/reference/diagnostics/syntax.md)
 
 Parser and syntax diagnostics use the E2000-E2999 range.
 
