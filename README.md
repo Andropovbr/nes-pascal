@@ -9,7 +9,9 @@ The compiler currently supports explicitly typed constants and global
 variables, exact-type assignments, one-byte arithmetic, comparisons,
 short-circuit Boolean expressions, structured conditionals and loops,
 increment and decrement operations, and acyclic procedures with `byte` and
-`boolean` value parameters. Fixed global arrays provide contiguous static
+`boolean` value parameters. User-defined nominal enumerations provide
+byte-sized game-state values with exact-type assignment and equality rules.
+Fixed global arrays provide contiguous static
 storage for `byte` and `boolean` elements with direct or native indexed
 addressing. The one-byte `sprite` type strongly selects one of
 64 hardware OAM entries, while the opaque `metasprite` type identifies a

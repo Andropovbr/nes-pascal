@@ -210,3 +210,34 @@ Diagnósticos do sistema de tipos utilizam o intervalo E4000-E4999.
 - **Gatilho:** Declarar `array[$01..$04] of byte`.
 - **Correção sugerida:** Declare um intervalo como
   `array[$00..$03] of byte`.
+
+## E4015 - Membro de enumeração duplicado
+
+- **Categoria:** Type System
+- **Explicação:** Todo nome de membro dentro de uma enumeração deve ser único.
+- **Gatilho:** Declarar `GameState = (Title, Playing, Title)`.
+- **Correção sugerida:** Renomeie ou remova o membro repetido.
+
+## E4016 - Membros de enumeração em excesso
+
+- **Categoria:** Type System
+- **Explicação:** Valores enum ocupam um byte e podem representar no máximo 256
+  membros.
+- **Gatilho:** Declarar uma enumeração com 257 membros.
+- **Correção sugerida:** Reduza a declaração para 256 membros ou menos.
+
+## E4017 - Comparação de enumeração inválida
+
+- **Categoria:** Type System
+- **Explicação:** Enumerações expõem igualdade e desigualdade, não ordenação ordinal.
+- **Gatilho:** Compilar `State < Playing` para uma variável enum.
+- **Correção sugerida:** Use `=` ou `<>`, ou modele uma ordenação necessária com
+  `byte`.
+
+## E4018 - Membro de enumeração desconhecido
+
+- **Categoria:** Type System
+- **Explicação:** Um valor esperado como membro de enum não foi declarado por
+  essa enumeração.
+- **Gatilho:** Atribuir `Missing` a uma variável `GameState`.
+- **Correção sugerida:** Use um membro declarado pelo tipo enum de destino.

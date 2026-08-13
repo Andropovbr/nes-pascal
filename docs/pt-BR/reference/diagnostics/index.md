@@ -99,6 +99,10 @@ devem utilizar o intervalo reservado para a sua categoria.
 | [E4012](type-system.md) | Type System | Índice de array fora dos limites |
 | [E4013](type-system.md) | Type System | Uso inválido de array |
 | [E4014](type-system.md) | Type System | Limites de array inválidos |
+| [E4015](type-system.md) | Type System | Membro de enumeração duplicado |
+| [E4016](type-system.md) | Type System | Membros de enumeração em excesso |
+| [E4017](type-system.md) | Type System | Comparação de enumeração inválida |
+| [E4018](type-system.md) | Type System | Membro de enumeração desconhecido |
 | [E5001](code-generation.md) | Code Generation | Toolchain ausente |
 | [E5002](code-generation.md) | Code Generation | Falha no toolchain |
 | [E5003](code-generation.md) | Code Generation | RAM do usuário esgotada |

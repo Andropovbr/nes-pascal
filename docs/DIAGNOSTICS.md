@@ -88,6 +88,10 @@ diagnostics section.
 | E4012 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4013 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4014 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4015 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4016 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4017 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4018 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E5001 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5002 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5003 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |

@@ -10,6 +10,7 @@ language guide and runtime API.
 - [Builtin / intrinsic infrastructure (0.5.6)](../compiler/builtin-infrastructure.md)
 - [Low-risk code generation improvements (0.5.7)](../compiler/low-risk-codegen-0.5.7.md)
 - [Array implementation and measurements (0.5.8)](../compiler/arrays-0.5.8.md)
+- [Enumeration implementation and measurements (0.5.9)](../compiler/enumerations-0.5.9.md)
 - [Unsupported features](unsupported-features.md)
 - [Compiler diagnostics](diagnostics/index.md)
 

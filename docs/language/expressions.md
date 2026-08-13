@@ -41,7 +41,8 @@ Every comparison produces a normalized `boolean` value: `$00` for `false` or
 `$01` for `true`.
 
 Equality and inequality use `=` and `<>`. Both operands must have exactly the
-same type. They support `byte`, `nes_color`, and `boolean`:
+same type. They support `byte`, `nes_color`, `boolean`, and values of the
+same user-defined [enumeration](enumerations.md):
 
 ```pascal
 Equal := Counter = Limit;
@@ -57,8 +58,8 @@ BelowLimit := Counter < Limit;
 AtLeastOne := Counter >= $01;
 ```
 
-Comparing different types or using `nes_color` or `boolean` with an ordered
-operator produces E4004.
+Comparing different types produces E4004. Ordered enum comparisons produce
+E4017; enum values expose equality and inequality only.
 
 ## Boolean expressions
 

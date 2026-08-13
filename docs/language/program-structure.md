@@ -7,13 +7,14 @@ A program contains:
 1. the `program` keyword;
 2. a program name;
 3. a semicolon;
-4. an optional `const` section;
-5. an optional `var` section;
-6. zero or more procedure declarations;
-7. a block beginning with `begin`;
-8. a sequence of statements;
-9. the `end` keyword;
-10. a final period.
+4. an optional `type` section;
+5. an optional `const` section;
+6. an optional `var` section;
+7. zero or more procedure declarations;
+8. a block beginning with `begin`;
+9. a sequence of statements;
+10. the `end` keyword;
+11. a final period.
 
 Example:
 
@@ -42,7 +43,8 @@ begin
 end.
 ```
 
-The declaration sections must appear in this order. The main block contains
+The declaration sections must appear in this order: `type`, `const`, then
+`var`. The main block contains
 the top-level initialization sequence and may continue with frame-synchronized
 main-thread logic after `nes.run`.
 

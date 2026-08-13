@@ -26,7 +26,7 @@ constantes nem conter expressões aritméticas.
 
 ## Variáveis
 
-Declarações de variáveis aparecem após a seção opcional `const` e antes das declarações
+Declarações de variáveis aparecem após as seções opcionais `type` e `const` e antes das declarações
 de procedimentos e do bloco principal:
 
 ```pascal
@@ -36,7 +36,7 @@ var
     Enabled: boolean;
 ```
 
-Cada declaração contém exatamente um identificador e um tipo escalar ou de array
+Cada declaração contém exatamente um identificador e um tipo escalar, de enumeração ou de array
 fixo explícito. O armazenamento é determinístico. Uma variável global escalar referenciada por pelo menos
 três operações do código-fonte é elegível para promoção automática para a Zero Page
 na ordem de declaração. Se o espaço de promoção opcional não estiver disponível, ela
@@ -47,6 +47,8 @@ esgotados. Consulte a [Referência de memória da CPU](../runtime/cpu-memory.md)
 
 Arrays fixos são sempre alocações contíguas na RAM comum. Consulte
 [Arrays](arrays.md) para a sintaxe, os tipos de elemento e o custo exato de memória.
+Variáveis de enumeração definidas pelo usuário são alocações escalares de um
+byte; consulte [Enumerações](enumerations.md).
 
 ## Nomes e declarações duplicadas
 

@@ -11,6 +11,7 @@ com Pascal ou Free Pascal.
 - [Tipos embutidos](types.md)
 - [Constantes e variáveis](constants-and-variables.md)
 - [Arrays](arrays.md)
+- [Enumerações](enumerations.md)
 - [Atribuições](assignments.md)
 - [Expressões](expressions.md)
 - [Estruturas condicionais](conditionals.md)

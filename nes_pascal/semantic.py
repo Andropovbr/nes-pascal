@@ -23,6 +23,7 @@ from .ast import (
     ConstantReference,
     ContinueStatement,
     DecrementStatement,
+    EnumType,
     ForStatement,
     HexLiteral,
     IfStatement,
@@ -68,6 +69,7 @@ from .ast import (
     ResolvedWhileStatement,
     ResolvedUnaryExpression,
     Run,
+    ScalarType,
     SourcePosition,
     Statement,
     UnaryExpression,
@@ -141,7 +143,7 @@ def _parsed_builtin_id(call: BuiltinCall) -> BuiltinId:
 
 @dataclass(frozen=True, slots=True)
 class TypedConstant:
-    type: BuiltInType
+    type: ScalarType
     value: int
 
 
@@ -220,6 +222,45 @@ class SemanticAnalyzer:
                     frame.id,
                 )
         declared_names: set[str] = set()
+        for declaration in program.enum_types:
+            enum_type = declaration.type
+            self._ensure_unique_name(
+                enum_type.name,
+                declaration.position,
+                declared_names,
+            )
+            if len(declaration.members) > 256:
+                self._error(
+                    declaration.position,
+                    DiagnosticCode.ENUM_TOO_MANY_MEMBERS,
+                    f"Enumeration {enum_type.name} declares {len(declaration.members)} "
+                    "members, but a byte-sized enumeration supports at most 256.",
+                    "Remove members so the enumeration contains at most 256 values.",
+                    len(enum_type.name),
+                )
+            declared_names.add(enum_type.name.lower())
+
+            member_names: set[str] = set()
+            for value, member in enumerate(declaration.members):
+                normalized_name = member.name.lower()
+                if normalized_name in member_names:
+                    self._error(
+                        member.position,
+                        DiagnosticCode.DUPLICATE_ENUM_MEMBER,
+                        f"Enumeration {enum_type.name} already declares member "
+                        f"{member.name}.",
+                        "Use a unique member name within the enumeration.",
+                        len(member.name),
+                    )
+                self._ensure_unique_name(
+                    member.name,
+                    member.position,
+                    declared_names,
+                )
+                member_names.add(normalized_name)
+                declared_names.add(normalized_name)
+                constants[normalized_name] = TypedConstant(enum_type, value)
+
         for declaration in program.constants:
             normalized_name = declaration.name.lower()
             self._ensure_unique_name(
@@ -2256,7 +2297,7 @@ class SemanticAnalyzer:
     def _resolve_value(
         self,
         expression: ValueExpression,
-        expected_type: BuiltInType,
+        expected_type: ScalarType,
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
         assigned_variables: set[str],
@@ -2346,6 +2387,15 @@ class SemanticAnalyzer:
 
         variable = variables.get(normalized_name)
         if variable is None:
+            if isinstance(expected_type, EnumType):
+                self._error(
+                    expression.position,
+                    DiagnosticCode.UNKNOWN_ENUM_MEMBER,
+                    f"{expression.name} is not a member of enumeration "
+                    f"{expected_type.value}.",
+                    f"Use a member declared by {expected_type.value}.",
+                    len(expression.name),
+                )
             self._error(
                 expression.position,
                 DiagnosticCode.UNKNOWN_IDENTIFIER,
@@ -2384,7 +2434,7 @@ class SemanticAnalyzer:
     def _resolve_array_element(
         self,
         expression: ArrayIndexExpression,
-        expected_type: BuiltInType,
+        expected_type: ScalarType,
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
         assigned_variables: set[str],
@@ -2818,7 +2868,7 @@ class SemanticAnalyzer:
     def _resolve_arithmetic_expression(
         self,
         expression: UnaryExpression | BinaryExpression,
-        expected_type: BuiltInType,
+        expected_type: ScalarType,
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
         assigned_variables: set[str],
@@ -2871,7 +2921,7 @@ class SemanticAnalyzer:
     def _resolve_boolean_expression(
         self,
         expression: BooleanNotExpression | BooleanBinaryExpression,
-        expected_type: BuiltInType,
+        expected_type: ScalarType,
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
         assigned_variables: set[str],
@@ -2913,7 +2963,7 @@ class SemanticAnalyzer:
     def _resolve_comparison_expression(
         self,
         expression: ComparisonExpression,
-        expected_type: BuiltInType,
+        expected_type: ScalarType,
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
         assigned_variables: set[str],
@@ -2933,6 +2983,33 @@ class SemanticAnalyzer:
             ComparisonOperator.GREATER_EQUAL,
         }
         if expression.operator in ordered_operators:
+            left_type = self._expression_type_hint(
+                expression.left,
+                constants,
+                variables,
+            )
+            right_type = self._expression_type_hint(
+                expression.right,
+                constants,
+                variables,
+            )
+            enum_type = next(
+                (
+                    type_
+                    for type_ in (left_type, right_type)
+                    if isinstance(type_, EnumType)
+                ),
+                None,
+            )
+            if enum_type is not None:
+                self._error(
+                    expression.position,
+                    DiagnosticCode.INVALID_ENUM_COMPARISON,
+                    f"Enumeration {enum_type.value} supports only '=' and '<>' "
+                    "comparisons.",
+                    "Compare enum values for equality or inequality.",
+                    len(expression.operator.value),
+                )
             operand_type = BuiltInType.BYTE
         else:
             left_type = self._expression_type_hint(
@@ -2982,7 +3059,7 @@ class SemanticAnalyzer:
         expression: ValueExpression,
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
-    ) -> BuiltInType | None:
+    ) -> ScalarType | None:
         if isinstance(expression, ArrayIndexExpression):
             variable = variables.get(expression.array_name.lower())
             if variable is not None and isinstance(variable.type, ArrayType):
@@ -3013,15 +3090,15 @@ class SemanticAnalyzer:
         variable = variables.get(expression.name.lower())
         return (
             variable.type
-            if variable is not None and isinstance(variable.type, BuiltInType)
+            if variable is not None and not isinstance(variable.type, ArrayType)
             else None
         )
 
     def _require_expression_result_type(
         self,
         position: SourcePosition,
-        actual_type: BuiltInType,
-        expected_type: BuiltInType,
+        actual_type: ScalarType,
+        expected_type: ScalarType,
         description: str,
         assignment_target: ResolvedVariable | None,
     ) -> None:
@@ -3048,8 +3125,8 @@ class SemanticAnalyzer:
         self,
         name: str,
         position: SourcePosition,
-        actual_type: BuiltInType,
-        expected_type: BuiltInType,
+        actual_type: ScalarType,
+        expected_type: ScalarType,
         assignment_target: ResolvedVariable | None = None,
     ) -> None:
         if actual_type is expected_type:
@@ -3075,9 +3152,16 @@ class SemanticAnalyzer:
     def _evaluate_literal(
         self,
         literal: HexLiteral | BooleanLiteral,
-        expected_type: BuiltInType,
+        expected_type: ScalarType,
         assignment_target: ResolvedVariable | None = None,
     ) -> int:
+        if isinstance(expected_type, EnumType):
+            self._literal_type_error(
+                literal,
+                "boolean" if isinstance(literal, BooleanLiteral) else "hexadecimal",
+                expected_type,
+                assignment_target,
+            )
         if isinstance(literal, BooleanLiteral):
             if expected_type is not BuiltInType.BOOLEAN:
                 self._literal_type_error(
@@ -3137,7 +3221,7 @@ class SemanticAnalyzer:
         self,
         literal: HexLiteral | BooleanLiteral,
         literal_type: str,
-        expected_type: BuiltInType,
+        expected_type: ScalarType,
         assignment_target: ResolvedVariable | None,
     ) -> None:
         if assignment_target is not None:

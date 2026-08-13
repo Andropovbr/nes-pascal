@@ -16,6 +16,8 @@ O lado direito pode ser:
 - `true` ou `false`;
 - uma referência a uma constante;
 - uma referência a uma variável previamente atribuída;
+- um membro de enumeração ou variável de enumeração previamente atribuída do
+  mesmo tipo exato;
 - uma expressão aritmética de `byte`;
 - uma comparação ou expressão booleana cujo resultado seja `boolean`.
 

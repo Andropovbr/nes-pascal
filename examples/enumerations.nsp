@@ -1,0 +1,26 @@
+program Enumerations;
+
+type
+    GameState = (Title, Playing, Paused, GameOver);
+
+var
+    State: GameState;
+    PreviousState: GameState;
+    IsGameOver: boolean;
+
+begin
+    State := Title;
+
+    if State = Title then
+        State := Playing;
+
+    PreviousState := State;
+
+    if PreviousState <> Paused then
+        State := GameOver;
+
+    IsGameOver := State = GameOver;
+
+    nes.set_background_color($0F);
+    nes.run;
+end.

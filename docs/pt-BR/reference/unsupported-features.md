@@ -9,23 +9,25 @@ parte da linguagem suportada.
 
 ## Limitações da linguagem
 
-- `nes_color`, `byte`, `boolean`, `sprite` e `metasprite` são os únicos tipos embutidos.
-- Declarações `type` e tipos definidos pelo usuário não são suportados.
+- `nes_color`, `byte`, `boolean`, `sprite` e `metasprite` são os tipos embutidos.
+  Declarações `type` definidas pelo usuário atualmente suportam apenas enumerações.
 - Constantes não podem se referir a outras constantes, e inicializadores de constantes
   não podem conter expressões.
 - Inferência de tipos e conversões implícitas não são suportadas.
 - A aritmética é limitada a operandos `byte` com `+` e `-` unários, `+` e `-` binários
   e parênteses.
 - Multiplicação e divisão não são suportadas.
-- Igualdade e desigualdade exigem tipos correspondentes; comparações ordenadas são
-  limitadas a `byte`.
+- Igualdade e desigualdade exigem tipos correspondentes; enumerações suportam apenas
+  essas duas comparações. Comparações ordenadas são limitadas a `byte`.
 - Expressões booleanas suportam apenas `not`, `and` e `or`.
 - `case`, records, funções gerais, strings em tempo de execução e Assembly inline
   não são suportados. Arrays são limitados a arrays globais unidimensionais de
-  tamanho fixo com elementos `byte` ou `boolean`. Um pequeno conjunto fixo de expressões de consulta embutidas e os
+  tamanho fixo com elementos `byte` ou `boolean`; arrays de enum não são suportados.
+  Um pequeno conjunto fixo de expressões de consulta embutidas e os
   intrínsecos estaticamente resolvidos `nes.sprite_create()` e `nes.metasprite_create(frame)`
   são suportados.
-- Parâmetros de procedimentos são limitados a valores `byte` e `boolean`. Não há parâmetros
+- Parâmetros de procedimentos são limitados a valores `byte` e `boolean`; parâmetros
+  enum ainda não são suportados. Não há parâmetros
   por referência, valores padrão, valores de retorno ou variáveis locais gerais.
 - Chamadas de procedimentos podem ser aninhadas, mas não podem ser recursivas.
 - Memória dinâmica e orientação a objetos não são suportadas.

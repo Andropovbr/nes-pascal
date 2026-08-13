@@ -1,0 +1,7 @@
+program DuplicateEnumMember;
+type
+    GameState = (Title, Playing, Title);
+begin
+    nes.set_background_color($0F);
+    nes.run;
+end.

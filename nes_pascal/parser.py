@@ -22,6 +22,9 @@ from .ast import (
     ComparisonOperator,
     ContinueStatement,
     DecrementStatement,
+    EnumMember,
+    EnumType,
+    EnumTypeDeclaration,
     ForDirection,
     ForStatement,
     HexLiteral,
@@ -36,6 +39,7 @@ from .ast import (
     ProcedureParameter,
     RepeatStatement,
     Run,
+    ScalarType,
     SourcePosition,
     Statement,
     UnaryExpression,
@@ -58,6 +62,7 @@ class Parser:
         self.source_lines = source.splitlines()
         self.filename = filename
         self.position = 0
+        self.enum_types: dict[str, EnumType] = {}
         self.constant_names: set[str] = set()
         self.variable_names: set[str] = set()
         self.parameter_names: set[str] = set()
@@ -69,6 +74,7 @@ class Parser:
         )
         self._expect(TokenKind.SEMICOLON, "Expected ';' after the program name.")
 
+        enum_types = self._parse_enum_types()
         constants = self._parse_constants()
         self.constant_names = {declaration.name.lower() for declaration in constants}
         variables = self._parse_variables()
@@ -94,12 +100,66 @@ class Parser:
 
         return Program(
             name.text,
+            tuple(enum_types),
             tuple(constants),
             tuple(variables),
             tuple(procedures),
             tuple(statements),
             SourcePosition(end_token.line, end_token.column),
         )
+
+    def _parse_enum_types(self) -> list[EnumTypeDeclaration]:
+        if not self._match(TokenKind.TYPE):
+            return []
+        if not self._check(TokenKind.IDENTIFIER):
+            self._error(
+                self._current(),
+                DiagnosticCode.INVALID_SYNTAX,
+                "Expected an enumeration type declaration after 'type'.",
+                "Declare an enumeration as: GameState = (Title, Playing);",
+            )
+
+        declarations: list[EnumTypeDeclaration] = []
+        while self._check(TokenKind.IDENTIFIER):
+            name = self._expect(TokenKind.IDENTIFIER, "Expected an enumeration type name.")
+            self._expect(TokenKind.EQUAL, "Expected '=' after the enumeration type name.")
+            self._expect(TokenKind.LEFT_PAREN, "Expected '(' before enumeration members.")
+            if self._check(TokenKind.RIGHT_PAREN):
+                self._error(
+                    self._current(),
+                    DiagnosticCode.INVALID_SYNTAX,
+                    "An enumeration must declare at least one member.",
+                    "Add one or more member names inside the parentheses.",
+                )
+
+            members: list[EnumMember] = []
+            while True:
+                member = self._expect(TokenKind.IDENTIFIER, "Expected an enumeration member name.")
+                members.append(
+                    EnumMember(member.text, SourcePosition(member.line, member.column))
+                )
+                if not self._match(TokenKind.COMMA):
+                    break
+                if self._check(TokenKind.RIGHT_PAREN):
+                    self._error(
+                        self._current(),
+                        DiagnosticCode.INVALID_SYNTAX,
+                        "Expected an enumeration member after ','.",
+                        "Remove the trailing comma or add another member name.",
+                    )
+            self._expect(TokenKind.RIGHT_PAREN, "Expected ')' after enumeration members.")
+            self._expect(TokenKind.SEMICOLON, "Expected ';' after the enumeration declaration.")
+
+            enum_type = EnumType(name.text, tuple(member.name for member in members))
+            self.enum_types[name.text.lower()] = enum_type
+            declarations.append(
+                EnumTypeDeclaration(
+                    enum_type,
+                    tuple(members),
+                    SourcePosition(name.line, name.column),
+                )
+            )
+        return declarations
 
     def _parse_constants(self) -> list[ConstantDeclaration]:
         if not self._match(TokenKind.CONST):
@@ -116,7 +176,7 @@ class Parser:
         while self._check(TokenKind.IDENTIFIER):
             name = self._expect(TokenKind.IDENTIFIER, "Expected a constant name.")
             self._expect(TokenKind.COLON, "Expected ':' after the constant name.")
-            declared_type = self._parse_type()
+            declared_type = self._parse_builtin_type()
             self._expect(TokenKind.EQUAL, "Expected '=' after the constant type.")
             literal = self._parse_literal("constant value")
             self._expect(
@@ -160,9 +220,9 @@ class Parser:
             )
         return declarations
 
-    def _parse_variable_type(self) -> BuiltInType | ArrayType:
+    def _parse_variable_type(self) -> ScalarType | ArrayType:
         if not self._match(TokenKind.ARRAY):
-            return self._parse_type()
+            return self._parse_scalar_type()
 
         array_token = self._previous()
         self._expect(TokenKind.LEFT_BRACKET, "Expected '[' after 'array'.")
@@ -179,7 +239,7 @@ class Parser:
         self._expect(TokenKind.RIGHT_BRACKET, "Expected ']' after array bounds.")
         self._expect(TokenKind.OF, "Expected 'of' after array bounds.")
         element_token = self._current()
-        element_type = self._parse_type()
+        element_type = self._parse_scalar_type()
         assert lower.value is not None and upper.value is not None
         return ArrayType(
             element_type,
@@ -191,7 +251,7 @@ class Parser:
             SourcePosition(element_token.line, element_token.column),
         )
 
-    def _parse_type(self) -> BuiltInType:
+    def _parse_builtin_type(self) -> BuiltInType:
         token = self._expect(TokenKind.IDENTIFIER, "Expected a type after ':'.")
         public_types = tuple(
             type_
@@ -211,6 +271,38 @@ class Parser:
             DiagnosticCode.UNKNOWN_TYPE,
             f"Unknown type: {token.text}.",
             f"Supported types: {supported}.",
+        )
+        raise AssertionError("unreachable")
+
+    def _parse_scalar_type(self) -> ScalarType:
+        token = self._expect(TokenKind.IDENTIFIER, "Expected a type after ':'.")
+        for built_in_type in BuiltInType:
+            if (
+                token.text.lower() == built_in_type.value
+                and built_in_type
+                not in (
+                    BuiltInType.METASPRITE_FRAME,
+                    BuiltInType.METASPRITE_ANIMATION,
+                )
+            ):
+                return built_in_type
+        enum_type = self.enum_types.get(token.text.lower())
+        if enum_type is not None:
+            return enum_type
+        supported = ", ".join(
+            type_.value
+            for type_ in BuiltInType
+            if type_
+            not in (
+                BuiltInType.METASPRITE_FRAME,
+                BuiltInType.METASPRITE_ANIMATION,
+            )
+        )
+        self._error(
+            token,
+            DiagnosticCode.UNKNOWN_TYPE,
+            f"Unknown type: {token.text}.",
+            f"Supported built-in types: {supported}; or a declared enumeration type.",
         )
         raise AssertionError("unreachable")
 
@@ -285,7 +377,7 @@ class Parser:
             )
             self._expect(TokenKind.COLON, "Expected ':' after the parameter name.")
             type_token = self._current()
-            declared_type = self._parse_type()
+            declared_type = self._parse_builtin_type()
             parameters.append(
                 ProcedureParameter(
                     name.text,

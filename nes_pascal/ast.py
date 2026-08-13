@@ -26,11 +26,26 @@ class BuiltInType(Enum):
     METASPRITE_ANIMATION = "metasprite_animation"
 
 
+@dataclass(frozen=True, slots=True, eq=False)
+class EnumType:
+    """A nominal, byte-sized user-defined enumeration type."""
+
+    name: str
+    members: tuple[str, ...]
+
+    @property
+    def value(self) -> str:
+        return self.name
+
+
+ScalarType = BuiltInType | EnumType
+
+
 @dataclass(frozen=True, slots=True)
 class ArrayType:
     """A fixed-size, zero-based global array type."""
 
-    element_type: BuiltInType
+    element_type: ScalarType
     lower_bound: int
     upper_bound: int
     position: SourcePosition | None = field(default=None, compare=False)
@@ -50,7 +65,7 @@ class ArrayType:
         )
 
 
-VariableType = BuiltInType | ArrayType
+VariableType = ScalarType | ArrayType
 
 
 class UnaryOperator(Enum):
@@ -104,6 +119,19 @@ class ConstantDeclaration:
     name: str
     type: BuiltInType
     value: Literal
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class EnumMember:
+    name: str
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class EnumTypeDeclaration:
+    type: EnumType
+    members: tuple[EnumMember, ...]
     position: SourcePosition
 
 
@@ -342,6 +370,7 @@ class ProcedureDeclaration:
 @dataclass(frozen=True, slots=True)
 class Program:
     name: str
+    enum_types: tuple[EnumTypeDeclaration, ...]
     constants: tuple[ConstantDeclaration, ...]
     variables: tuple[VariableDeclaration, ...]
     procedures: tuple[ProcedureDeclaration, ...]
@@ -360,7 +389,7 @@ class ResolvedVariable:
 @dataclass(frozen=True, slots=True)
 class ImmediateValue:
     value: int
-    type: BuiltInType
+    type: ScalarType
 
 
 @dataclass(frozen=True, slots=True)

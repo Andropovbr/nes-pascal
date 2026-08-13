@@ -1,0 +1,12 @@
+program InvalidEnumOrdering;
+type
+    GameState = (Title, Playing);
+var
+    State: GameState;
+    Enabled: boolean;
+begin
+    State := Title;
+    Enabled := State < Playing;
+    nes.set_background_color($0F);
+    nes.run;
+end.

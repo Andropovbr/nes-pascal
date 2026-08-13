@@ -3,7 +3,8 @@
 [English](../../language/types.md) | Português (Brasil)
 
 O NES Pascal oferece cinco tipos embutidos. Cada um ocupa um byte, mas os tipos
-são distintos e não são convertidos implicitamente.
+são distintos e não são convertidos implicitamente. Também há
+[enumerações definidas pelo usuário](enumerations.md), que são tipos nominais de um byte.
 
 ## `nes_color`
 

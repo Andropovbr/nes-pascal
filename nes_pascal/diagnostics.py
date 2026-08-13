@@ -90,6 +90,10 @@ class DiagnosticCode(StrEnum):
     ARRAY_INDEX_OUT_OF_BOUNDS = "E4012"
     INVALID_ARRAY_USAGE = "E4013"
     INVALID_ARRAY_BOUNDS = "E4014"
+    DUPLICATE_ENUM_MEMBER = "E4015"
+    ENUM_TOO_MANY_MEMBERS = "E4016"
+    INVALID_ENUM_COMPARISON = "E4017"
+    UNKNOWN_ENUM_MEMBER = "E4018"
     MISSING_TOOLCHAIN = "E5001"
     TOOLCHAIN_FAILURE = "E5002"
     USER_RAM_EXHAUSTED = "E5003"
@@ -356,6 +360,18 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INVALID_ARRAY_BOUNDS: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Invalid array bounds"
+    ),
+    DiagnosticCode.DUPLICATE_ENUM_MEMBER: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Duplicate enumeration member"
+    ),
+    DiagnosticCode.ENUM_TOO_MANY_MEMBERS: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Too many enumeration members"
+    ),
+    DiagnosticCode.INVALID_ENUM_COMPARISON: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Invalid enumeration comparison"
+    ),
+    DiagnosticCode.UNKNOWN_ENUM_MEMBER: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Unknown enumeration member"
     ),
     DiagnosticCode.MISSING_TOOLCHAIN: DiagnosticDefinition(
         DiagnosticCategory.CODE_GENERATION, "Missing toolchain"
