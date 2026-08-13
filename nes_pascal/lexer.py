@@ -8,6 +8,7 @@ from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
 
 class TokenKind(Enum):
     PROGRAM = auto()
+    TYPE = auto()
     CONST = auto()
     VAR = auto()
     PROCEDURE = auto()
@@ -58,6 +59,7 @@ class TokenKind(Enum):
 
 KEYWORDS = {
     "program": TokenKind.PROGRAM,
+    "type": TokenKind.TYPE,
     "const": TokenKind.CONST,
     "var": TokenKind.VAR,
     "procedure": TokenKind.PROCEDURE,

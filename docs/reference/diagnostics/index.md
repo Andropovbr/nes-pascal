@@ -99,6 +99,10 @@ the range reserved for their category.
 | [E4012](type-system.md) | Type System | Array index out of bounds |
 | [E4013](type-system.md) | Type System | Invalid array usage |
 | [E4014](type-system.md) | Type System | Invalid array bounds |
+| [E4015](type-system.md) | Type System | Duplicate enumeration member |
+| [E4016](type-system.md) | Type System | Too many enumeration members |
+| [E4017](type-system.md) | Type System | Invalid enumeration comparison |
+| [E4018](type-system.md) | Type System | Unknown enumeration member |
 | [E5001](code-generation.md) | Code Generation | Missing toolchain |
 | [E5002](code-generation.md) | Code Generation | Toolchain failure |
 | [E5003](code-generation.md) | Code Generation | User RAM exhausted |

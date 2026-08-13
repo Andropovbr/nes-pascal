@@ -93,6 +93,9 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_arrays_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("arrays")
 
+    def test_enumerations_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("enumerations")
+
     def test_procedure_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("procedures")
 
@@ -648,6 +651,9 @@ class MesenIntegrationTests(unittest.TestCase):
     def test_arrays_preserve_indexed_storage_and_boolean_branching(self) -> None:
         self._run_mesen_test("arrays", "verify_arrays.lua")
 
+    def test_enumerations_preserve_nominal_state_transitions(self) -> None:
+        self._run_mesen_test("enumerations", "verify_enumerations.lua")
+
     def test_array_boundary_runtime_state(self) -> None:
         self._run_mesen_test(
             "array_boundary",
@@ -802,4 +808,3 @@ class MesenIntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

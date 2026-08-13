@@ -11,6 +11,7 @@ compatible with Pascal or Free Pascal.
 - [Built-in types](types.md)
 - [Constants and variables](constants-and-variables.md)
 - [Arrays](arrays.md)
+- [Enumerations](enumerations.md)
 - [Assignments](assignments.md)
 - [Expressions](expressions.md)
 - [Conditional statements](conditionals.md)

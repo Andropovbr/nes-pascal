@@ -20,4 +20,3 @@ clean:
 	$(PYTHON) -c "import shutil, glob, os; shutil.rmtree('build', ignore_errors=True); [os.remove(f) for f in glob.glob('*.log') + glob.glob('benchmark-report.md') if os.path.exists(f)]"
 
 validate: test-all benchmark rom
-

@@ -219,3 +219,34 @@ Type-system diagnostics use the E4000-E4999 range.
   and upper bound no greater than `$FF`.
 - **Trigger:** Declare `array[$01..$04] of byte`.
 - **Suggested fix:** Declare a range such as `array[$00..$03] of byte`.
+
+## E4015 - Duplicate enumeration member
+
+- **Category:** Type System
+- **Explanation:** Every member name in one enumeration must be unique.
+- **Trigger:** Declare `GameState = (Title, Playing, Title)`.
+- **Suggested fix:** Rename or remove the repeated member.
+
+## E4016 - Too many enumeration members
+
+- **Category:** Type System
+- **Explanation:** Enum values are byte-sized and can represent at most 256
+  members.
+- **Trigger:** Declare an enumeration with 257 members.
+- **Suggested fix:** Reduce the declaration to 256 or fewer members.
+
+## E4017 - Invalid enumeration comparison
+
+- **Category:** Type System
+- **Explanation:** Enums expose equality and inequality, not ordinal ordering.
+- **Trigger:** Compile `State < Playing` for an enum variable.
+- **Suggested fix:** Use `=` or `<>`, or model ordered state separately with a
+  `byte` if ordinal behavior is genuinely needed.
+
+## E4018 - Unknown enumeration member
+
+- **Category:** Type System
+- **Explanation:** A value expected to be a member of an enum is not declared
+  by that enum.
+- **Trigger:** Assign `Missing` to a `GameState` variable.
+- **Suggested fix:** Use a member declared by the target enum type.

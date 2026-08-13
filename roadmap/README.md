@@ -6,9 +6,9 @@ progression. Do not infer the current or next milestone from numbering alone.
 ## Current roadmap state
 
 - **Current release:** Release 0.5 — Sprites and Gameplay
-- **Last completed milestone:** [`0.5.8 — Arrays`](0.md#arrays)
-- **Next milestone:** [`0.5.9 — Enumerations`](0.md#enumerations)
-- **Next milestone file:** [Version 0 roadmap](0.md#enumerations)
+- **Last completed milestone:** [`0.5.9 — Enumerations`](0.md#enumerations)
+- **Next milestone:** [`0.5.10 — Records`](0.md#records)
+- **Next milestone file:** [Version 0 roadmap](0.md#records)
 
 ## Philosophy
 

@@ -16,6 +16,7 @@ The right-hand side may be:
 - `true` or `false`;
 - a constant reference;
 - a previously assigned variable reference;
+- an enum member or previously assigned enum variable of the exact same enum type;
 - a `byte` arithmetic expression;
 - a comparison or Boolean expression whose result is `boolean`.
 

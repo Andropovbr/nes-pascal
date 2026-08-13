@@ -7,13 +7,14 @@ Um programa contém:
 1. a palavra-chave `program`;
 2. um nome de programa;
 3. um ponto e vírgula;
-4. uma seção opcional `const`;
-5. uma seção opcional `var`;
-6. zero ou mais declarações de procedimentos;
-7. um bloco que se inicia com `begin`;
-8. uma sequência de instruções;
-9. a palavra-chave `end`;
-10. um ponto final.
+4. uma seção opcional `type`;
+5. uma seção opcional `const`;
+6. uma seção opcional `var`;
+7. zero ou mais declarações de procedimentos;
+8. um bloco que se inicia com `begin`;
+9. uma sequência de instruções;
+10. a palavra-chave `end`;
+11. um ponto final.
 
 Exemplo:
 
@@ -42,7 +43,8 @@ begin
 end.
 ```
 
-As seções de declaração devem aparecer nesta ordem. O bloco principal contém
+As seções de declaração devem aparecer nesta ordem: `type`, `const` e `var`.
+O bloco principal contém
 a sequência de inicialização de nível superior e pode continuar com a lógica
 da thread principal sincronizada por quadros após `nes.run`.
 

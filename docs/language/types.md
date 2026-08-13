@@ -3,7 +3,8 @@
 English | [Português (Brasil)](../pt-BR/language/types.md)
 
 NES Pascal provides five built-in types. Each occupies one byte, but the
-types are distinct and are not implicitly converted.
+types are distinct and are not implicitly converted. It also supports
+[user-defined enumerations](enumerations.md), which are nominal one-byte types.
 
 ## `nes_color`
 

@@ -9,24 +9,24 @@ the supported language.
 
 ## Language limitations
 
-- `nes_color`, `byte`, `boolean`, `sprite`, and `metasprite` are the only
-  built-in types.
-- `type` declarations and user-defined types are not supported.
+- `nes_color`, `byte`, `boolean`, `sprite`, and `metasprite` are the built-in
+  types. User-defined `type` declarations currently support enumerations only.
 - Constants cannot refer to other constants, and constant initializers cannot
   contain expressions.
 - Type inference and implicit conversions are not supported.
 - Arithmetic is limited to `byte` operands with unary `+` and `-`, binary `+`
   and `-`, and parentheses.
 - Multiplication and division are not supported.
-- Equality and inequality require matching types; ordered comparisons are
-  limited to `byte`.
+- Equality and inequality require matching types; enums support only those two
+  comparisons. Ordered comparisons are limited to `byte`.
 - Boolean expressions support only `not`, `and`, and `or`.
 - `case`, records, general functions, runtime strings, and inline Assembly are
   not supported. Arrays are limited to fixed-size, one-dimensional global
-  arrays of `byte` or `boolean`. A small fixed set of built-in query expressions
+  arrays of `byte` or `boolean`; arrays of enum are not supported. A small fixed set of built-in query expressions
   and the statically resolved `nes.sprite_create()` and
   `nes.metasprite_create(frame)` intrinsics are supported.
-- Procedure parameters are limited to `byte` and `boolean` values. There are
+- Procedure parameters are limited to `byte` and `boolean` values; enum
+  parameters are not yet supported. There are
   no reference parameters, default values, return values, or general local
   variables.
 - Procedure calls may be nested but cannot be recursive.

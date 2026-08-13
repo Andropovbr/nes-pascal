@@ -1,0 +1,10 @@
+program UnknownEnumMember;
+type
+    GameState = (Title, Playing);
+var
+    State: GameState;
+begin
+    State := Missing;
+    nes.set_background_color($0F);
+    nes.run;
+end.

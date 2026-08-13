@@ -83,6 +83,15 @@ apenas na nova seção de diagnósticos.
 | E4007 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E4008 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E4009 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4010 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4011 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4012 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4013 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4014 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4015 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4016 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4017 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4018 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E5001 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |
 | E5002 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |
 | E5003 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |

@@ -143,4 +143,3 @@ python tools/measure_benchmarks.py
 # Build the representative minimal ROM
 python -m nes_pascal.cli examples/minimal.nsp -o build/minimal.nes
 ```
-
