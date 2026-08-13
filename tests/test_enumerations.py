@@ -155,6 +155,8 @@ end.
             "duplicate_enum_member.nsp": "E4015",
             "invalid_enum_ordering.nsp": "E4017",
             "unknown_enum_member.nsp": "E4018",
+            "enum_too_many_members.nsp": "E4016",  # P1-1
+            "enum_inc_dec.nsp": "E4004",  # P1-3: INCOMPATIBLE_TYPES
         }
         for name, code in expected.items():
             with self.subTest(name=name):
@@ -164,6 +166,41 @@ end.
                     resolve(source, str(path))
                 self.assertEqual(context.exception.code, code)
                 self.assertEqual(str(context.exception).count(code), 1)
+
+    def test_enum_too_many_members_fixture_emits_e4016(self) -> None:
+        """P1-1: enum_too_many_members.nsp fixture triggers E4016."""
+        path = DIAGNOSTICS / "enum_too_many_members.nsp"
+        source = path.read_text(encoding="utf-8")
+        with self.assertRaises(CompilerError) as context:
+            resolve(source, str(path))
+        self.assertEqual(context.exception.code, "E4016")
+        self.assertIn("Overflow", str(context.exception))
+
+    def test_enum_as_procedure_parameter_emits_e4005(self) -> None:
+        """P1-2: using an enum type as a procedure parameter emits E4005, not E4001."""
+        path = DIAGNOSTICS / "enum_procedure_parameter.nsp"
+        source = path.read_text(encoding="utf-8")
+        with self.assertRaises(CompilerError) as context:
+            resolve(source, str(path))
+        self.assertEqual(context.exception.code, "E4005")
+        self.assertIn("GameState", str(context.exception))
+
+    def test_inc_dec_on_enum_variable_emits_incompatible_types(self) -> None:
+        """P1-3: inc and dec on an enum variable emits INCOMPATIBLE_TYPES."""
+        cases = (
+            ("inc(State);", "E4004"),
+            ("dec(State);", "E4004"),
+        )
+        for body, code in cases:
+            with self.subTest(body=body):
+                source = program_with(
+                    f"    State := Title;\n    {body}",
+                    "    GameState = (Title, Playing, Paused);",
+                    "    State: GameState;",
+                )
+                with self.assertRaises(CompilerError) as context:
+                    resolve(source)
+                self.assertEqual(context.exception.code, code)
 
     def test_rejects_more_than_256_members_without_value_wraparound(self) -> None:
         members = ", ".join(f"Value{index}" for index in range(257))
@@ -175,6 +212,21 @@ end.
         with self.assertRaises(CompilerError) as context:
             resolve(source)
         self.assertEqual(context.exception.code, "E4016")
+
+    def test_require_expression_result_type_suggestion_names_expected_type(self) -> None:
+        """P3-2: _require_expression_result_type suggestion is dynamic, not hardcoded 'boolean'."""
+        # A byte expression where a boolean is expected: suggestion must mention 'boolean'.
+        source_byte_to_bool = program_with(
+            "    Enabled := $01;",
+            "    GameState = (Title, Playing);",
+            "    Enabled: boolean;",
+        )
+        with self.assertRaises(CompilerError) as context:
+            resolve(source_byte_to_bool)
+        suggestion = str(context.exception)
+        self.assertIn("boolean", suggestion)
+        self.assertNotIn("byte value", suggestion)
+
 
 
 class EnumerationMemoryAndBackendTests(unittest.TestCase):
