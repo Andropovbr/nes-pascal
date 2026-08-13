@@ -34,12 +34,12 @@ A matriz adota os seguintes níveis de verificação semântica:
 | 16 | **Entrada de controles** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Leitura de portas duplas, botões |
 | 17 | **Carregamento de CHR-ROM** | N/A | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Ausente | Validação de `--chr` (8 KiB exatos) |
 | 18 | **Carregamento de nametable** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Ausente | Transferência de 1 KiB raw na inicialização |
-| 19 | **Atualizações de fundo em runtime** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Fila de VBlank com 4 escritas, shadow de tiles |
-| 20 | **Gerenciamento de paletas** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Shadow de 32 bytes, uploader em VBlank |
+| 19 | **Atualizações de fundo em runtime** | Forte | Forte | Forte | Forte | Forte | **Forte** | Forte | Forte | Forte | Fila de VBlank com 4 escritas, shadow de tiles; golden: travessia da fila, escrita PPU, cancel-lock, confirmação de shadow |
+| 20 | **Gerenciamento de paletas** | Forte | Forte | Forte | Forte | Forte | **Forte** | Forte | Forte | Forte | Shadow de 32 bytes, uploader em VBlank; golden: loop de dirty-flag, escrita PPU de triplet, latch $3F/$2006 |
 | 21 | **Rolagem e estado da PPU** | Forte | Forte | **Forte** | Forte | Forte | Ausente | Forte | Forte | Forte | Preparação de scroll, restauração de latch; fixtures de tipo para ambas as posições de argumento |
 | 22 | **Sprites de hardware básicos** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Shadow de 64 entradas de OAM, DMA em NMI |
 | 23 | **Gerenciamento de sprites** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Reserva estática de pool de 64 slots |
-| 24 | **Metasprites** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Geometria de âncora, flip, recorte de borda |
+| 24 | **Metasprites** | Forte | Forte | Forte | Forte | Forte | **Forte** | Forte | Forte | Forte | Geometria de âncora, flip, recorte de borda; golden: loop do renderizador, escritas no OAM shadow, DMA inline |
 | 25 | **Animação de sprites** | Forte | Forte | Forte | Forte | Forte | Ausente | Forte | Forte | Forte | Sequências, temporizadores, avanço |
 | 26 | **Infraestrutura de builtins** | Forte | Forte | Forte | Forte | Forte | Parcial | Forte | Forte | Forte | Registro unificado e validação |
 | 27 | **Otimizações de codegen de baixo risco** | N/A | N/A | N/A | Forte | Forte | Forte | Forte | Forte | Forte | Operandos diretos, branch em flags |
@@ -107,11 +107,15 @@ A matriz adota os seguintes níveis de verificação semântica:
    * *Atualização na matriz:* Subsistema 21 — camada Diagnósticos: anotação atualizada para indicar que ambas as posições de argumento estão cobertas.
 
 ### Média Prioridade (P2)
-1. **P2 — Adicionar fixtures focados de Golden Assembly para subsistemas de hardware**:
-   * *Subsistemas:* Metasprites, Animação de Sprites, Paletas, Atualizações de Fundo, Rolagem
-   * *Camada Ausente:* Golden Assembly
-   * *Relevância:* Embora protegidos por testes estruturais com regex e testes no Mesen, trechos golden focados evitam regressões inesperadas no emissor de assembly.
-   * *Escopo:* Médio (5 arquivos golden `.asm` focados).
+1. **✅ P2 — Adicionar fixtures focados de Golden Assembly para subsistemas de hardware** *(resolvido para paletas, atualizações de fundo e metasprites)*:
+   * *Subsistemas cobertos:* Paletas (subsistema 20), Atualizações de Fundo em Runtime (subsistema 19), Metasprites (subsistema 24).
+   * *Arquivos golden adicionados:*
+     - `tests/golden/palette_support.asm` — golden completo para `examples/palette_support.nsp`; protege o loop de dirty-flag de `runtime_upload_queued_palettes`, a sequência de escrita PPU de `runtime_upload_palette_triplet` (latch $3F/$2006, loop de 3 bytes do shadow), ordem do callsite no NMI.
+     - `tests/golden/background_updates.asm` — golden completo a partir do fixture estável `BackgroundUpdates`; protege o guard de cancel-lock de `runtime_upload_queued_background`, loop de 4 slots, escritas PPU via `$2006`/`$2007`, confirmação de shadow, busca de slot em `runtime_queue_background_write`, flag de overflow, publicação atômica.
+     - `tests/golden/metasprite_player.asm` — golden completo para `examples/metasprite_player.nsp`; protege iteração de componentes em `runtime_metasprite_render`, escritas no OAM shadow, aritmética de âncora, verificações de recorte, codificação de flip, DMA de OAM inline (`sta $4014`) no NMI, tabelas de geometria dos frames.
+   * *Testes adicionados:* `test_palette_support_program_matches_golden_assembly`, `test_background_updates_program_matches_golden_assembly`, `test_metasprite_player_program_matches_golden_assembly` em `tests/test_backend.py::BackendGoldenTests`.
+   * *Intencionalmente não congelado:* Golden Assembly para Animação de Sprites (subsistema 25) e Rolagem (subsistema 21) — seus caminhos de runtime já são exercitados pelos testes de integração com o Mesen, e não há evidência de que um snapshot golden acrescentaria proteção de regressão não redundante além do que os testes Mesen e benchmark já oferecem.
+   * *Atualizações na matriz:* Subsistemas 19, 20, 24 — camada Golden Assembly: **Ausente → Forte**.
 
 2. **✅ P2 — Incluir `scrolling_ppu_state` no corpus de benchmark** *(resolvido)*:
    * *Subsistema:* Rolagem e Estado da PPU
@@ -139,6 +143,6 @@ A matriz adota os seguintes níveis de verificação semântica:
 * `[P1 ✅]` ~~Adicionar teste de validação de padrões da PPU no Mesen para carregamento de CHR-ROM (`verify_chr_asset.lua`).~~ **Resolvido** — `tests/mesen/verify_chr_asset.lua` valida todos os 8 192 bytes da tabela de padrões da PPU em runtime.
 * `[P1 ✅]` ~~Adicionar fixture negativo de diagnóstico focado para tipos inválidos de argumentos em `nes.set_scroll`.~~ **Resolvido** — Fixtures `invalid_set_scroll_x_type.nsp` e `invalid_set_scroll_y_type.nsp` com asserções de `E4004` para ambas as posições de argumento.
 * `[P2 ✅]` ~~Adicionar especificação de benchmark de `scrolling_ppu_state` em `tools/measure_benchmarks.py`.~~ **Resolvido** — `scrolling_ppu_state` agora integra o corpus de benchmark com um teste focado de verificação de recursos.
-* `[P2]` Adicionar fixtures de golden assembly focados para rotinas de runtime de hardware (paletas, fila de fundo, renderizador de metasprites).
+* `[P2 ✅]` ~~Adicionar fixtures de golden assembly focados para rotinas de runtime de hardware (paletas, fila de fundo, renderizador de metasprites).~~ **Resolvido** — `tests/golden/palette_support.asm`, `tests/golden/background_updates.asm` e `tests/golden/metasprite_player.asm` adicionados com três `BackendGoldenTests` focados em `tests/test_backend.py`.
 * `[P2]` Separar `tests/test_integration.py` em `test_toolchain.py`, `test_goldens.py` e `test_mesen.py`.
 * `[P3]` Limpar convenções de nomenclatura e docstrings de testes legados.

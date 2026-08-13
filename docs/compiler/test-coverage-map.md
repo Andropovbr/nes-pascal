@@ -34,12 +34,12 @@ The matrix uses semantic verification tiers:
 | 16 | **Controller input** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Dual-port polling, button queries |
 | 17 | **CHR-ROM asset loading** | N/A | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Missing | `--chr` validation (8 KiB exact) |
 | 18 | **Nametable loading** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Missing | Full raw 1 KiB upload |
-| 19 | **Runtime BG updates** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | 4-write VBlank queue, tile shadow |
-| 20 | **Palette management** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | 32-byte shadow, VBlank uploader |
+| 19 | **Runtime BG updates** | Strong | Strong | Strong | Strong | Strong | **Strong** | Strong | Strong | Strong | 4-write VBlank queue, tile shadow; golden: queue traversal, PPU write, cancel-lock, shadow confirm |
+| 20 | **Palette management** | Strong | Strong | Strong | Strong | Strong | **Strong** | Strong | Strong | Strong | 32-byte shadow, VBlank uploader; golden: dirty-flag loop, triplet PPU write, $3F/$2006 latch |
 | 21 | **Scrolling & PPU state** | Strong | Strong | **Strong** | Strong | Strong | Missing | Strong | Strong | Strong | Scroll staging, latch restore; type fixtures for both arg positions |
 | 22 | **Basic hardware sprites** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | 64-entry OAM shadow, NMI DMA |
 | 23 | **Sprite management** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | Static 64-slot pool reservation |
-| 24 | **Metasprites** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | Anchor geometry, flipping, clipping |
+| 24 | **Metasprites** | Strong | Strong | Strong | Strong | Strong | **Strong** | Strong | Strong | Strong | Anchor geometry, flipping, clipping; golden: renderer loop, OAM shadow writes, inline DMA |
 | 25 | **Sprite animation** | Strong | Strong | Strong | Strong | Strong | Missing | Strong | Strong | Strong | Sequences, timers, frame advance |
 | 26 | **Builtin infrastructure** | Strong | Strong | Strong | Strong | Strong | Partial | Strong | Strong | Strong | Unified registry & validation |
 | 27 | **Low-risk codegen opts** | N/A | N/A | N/A | Strong | Strong | Strong | Strong | Strong | Strong | Direct operands, flag branching |
@@ -107,11 +107,15 @@ The matrix uses semantic verification tiers:
    * *Matrix update:* Subsystem 21 — Diagnostics tier: annotation updated to note both argument positions are now covered.
 
 ### Medium Priority (P2)
-1. **P2 — Add focused Golden Assembly fixtures for hardware subsystems**:
-   * *Subsystems:* Metasprites, Sprite Animation, Palettes, Background Updates, Scrolling
-   * *Missing Layer:* Golden Assembly
-   * *Why it matters:* While protected by backend regex tests and Mesen runtime checks, focused golden snippets prevent unexpected assembly emitter regressions.
-   * *Scope:* Medium (5 focused `.asm` goldens).
+1. **✅ P2 — Add focused Golden Assembly fixtures for hardware subsystems** *(resolved for palettes, background updates, metasprites)*:
+   * *Subsystems covered:* Palettes (subsystem 20), Runtime BG Updates (subsystem 19), Metasprites (subsystem 24).
+   * *Golden files added:*
+     - `tests/golden/palette_support.asm` — full-file golden for `examples/palette_support.nsp`; protects `runtime_upload_queued_palettes` dirty-flag loop, `runtime_upload_palette_triplet` PPU write sequence ($3F/$2006 latch, 3-byte shadow loop), NMI callsite order.
+     - `tests/golden/background_updates.asm` — full-file golden from the stable `BackgroundUpdates` test fixture; protects `runtime_upload_queued_background` cancel-lock guard, 4-slot loop, PPU `$2006`/`$2007` writes, shadow confirmation, `runtime_queue_background_write` slot-find, overflow flag, atomic publication.
+     - `tests/golden/metasprite_player.asm` — full-file golden for `examples/metasprite_player.nsp`; protects `runtime_metasprite_render` component iteration, OAM shadow writes, anchor arithmetic, clip checks, flip encoding, inline OAM DMA (`sta $4014`) in NMI, frame geometry tables.
+   * *Tests added:* `test_palette_support_program_matches_golden_assembly`, `test_background_updates_program_matches_golden_assembly`, `test_metasprite_player_program_matches_golden_assembly` in `tests/test_backend.py::BackendGoldenTests`.
+   * *Intentionally not frozen:* Sprite Animation (subsystem 25) and Scrolling (subsystem 21) golden assembly — their runtime paths are fully exercised by the existing Mesen integration tests and there is no current evidence that a golden snapshot would add non-redundant regression protection beyond what the Mesen and benchmark tests already provide. These remain as documented future-backlog items.
+   * *Matrix updates:* Subsystems 19, 20, 24 — Golden Assembly tier: **Missing → Strong**.
 
 2. **✅ P2 — Include `scrolling_ppu_state` in benchmark corpus** *(resolved)*:
    * *Subsystem:* Scrolling & PPU State
@@ -139,6 +143,6 @@ The matrix uses semantic verification tiers:
 * `[P1 ✅]` ~~Add Mesen PPU pattern validation test for CHR-ROM loading (`verify_chr_asset.lua`).~~ **Resolved** — `tests/mesen/verify_chr_asset.lua` validates all 8 192 PPU pattern-table bytes at runtime.
 * `[P1 ✅]` ~~Add focused negative diagnostic fixture for invalid `nes.set_scroll` argument types.~~ **Resolved** — `invalid_set_scroll_x_type.nsp` and `invalid_set_scroll_y_type.nsp` fixtures with test assertions for `E4004` in both argument positions.
 * `[P2 ✅]` ~~Add `scrolling_ppu_state` benchmark spec to `tools/measure_benchmarks.py`.~~ **Resolved** — `scrolling_ppu_state` is now in the benchmark corpus with a dedicated focused resource-accounting regression test.
-* `[P2]` Add focused golden assembly fixtures for hardware runtime routines (palettes, background queue, metasprite renderer).
+* `[P2 ✅]` ~~Add focused golden assembly fixtures for hardware runtime routines (palettes, background queue, metasprite renderer).~~ **Resolved** — `tests/golden/palette_support.asm`, `tests/golden/background_updates.asm`, and `tests/golden/metasprite_player.asm` added with three focused `BackendGoldenTests` in `tests/test_backend.py`.
 * `[P2]` Separate `tests/test_integration.py` into `test_toolchain.py`, `test_goldens.py`, and `test_mesen.py`.
 * `[P3]` Clean up legacy test naming and docstring conventions.

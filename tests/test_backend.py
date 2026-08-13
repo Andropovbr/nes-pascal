@@ -2,6 +2,8 @@ from pathlib import Path
 import unittest
 
 from nes_pascal.backend_ca65 import generate
+from nes_pascal.memory_layout import build_memory_layout
+from nes_pascal.metasprite_assets import load_metasprite_assets
 from nes_pascal.parser import parse
 from nes_pascal.semantic import analyze
 
@@ -296,6 +298,146 @@ end.
             actual.index("sta $2007"),
             actual.index("; Source: nes.run"),
         )
+
+    def test_palette_support_program_matches_golden_assembly(self) -> None:
+        """Protect the VBlank palette uploader shape and shadow-write protocol.
+
+        Invariants frozen:
+        - runtime_upload_queued_palettes: dirty-flag check per palette, jsr to
+          runtime_upload_palette_triplet for each active slot.
+        - runtime_upload_palette_triplet: PPU latch reset (bit $2002), $3F high
+          address, low address from accumulator, three-byte shadow write loop.
+        - NMI callsite: jsr runtime_upload_queued_palettes emitted before PPU
+          state restoration (scroll/mask).
+        - Palette shadow writes in RESET: correct shadow offsets, dirty flags.
+        """
+        source_path = ROOT / "examples" / "palette_support.nsp"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        prog = analyze(parse(source, filename), source, filename)
+        layout = build_memory_layout(prog)
+        actual = generate(prog, layout)
+        expected = (ROOT / "tests" / "golden" / "palette_support.asm").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(actual, expected)
+        # Verify key structural invariants explicitly.
+        nmi = actual.split("NMI:\n", 1)[1].split("IRQ:\n", 1)[0]
+        self.assertIn("jsr runtime_upload_queued_palettes", nmi)
+        self.assertIn("runtime_upload_queued_palettes:", actual)
+        self.assertIn("runtime_upload_palette_triplet:", actual)
+        uploader = actual.split("runtime_upload_queued_palettes:\n", 1)[1].split(
+            "\nruntime_upload_palette_triplet:", 1
+        )[0]
+        self.assertIn("jsr runtime_upload_palette_triplet", uploader)
+        self.assertEqual(uploader.count("jsr runtime_upload_palette_triplet"), 8)
+        triplet = actual.split("runtime_upload_palette_triplet:\n", 1)[1].split(
+            "\n\n", 1
+        )[0]
+        self.assertIn("bit $2002", triplet)
+        self.assertIn("lda #$3F", triplet)
+        self.assertIn("sta $2006", triplet)
+        self.assertIn("sta $2007", triplet)
+
+    def test_background_updates_program_matches_golden_assembly(self) -> None:
+        """Protect the four-slot background update queue structure.
+
+        Invariants frozen:
+        - runtime_upload_queued_background: cancel-lock guard, slot loop (X
+          register 0..3), per-slot ready flag check, PPU address write via
+          $2006/$2007, shadow confirmation path.
+        - runtime_queue_background_write: slot-find loop, overflow sticky flag,
+          atomic publication (ready byte last).
+        - runtime_set_tile / runtime_set_attribute / runtime_get_tile:
+          jsr to queue helper after coordinate preparation.
+        - NMI callsite: jsr runtime_upload_queued_background present.
+        """
+        # Source matches the stable fixture used in test_background_updates.py.
+        source = (
+            "program BackgroundUpdates;\n"
+            "var\n"
+            "    X: byte;\n"
+            "    Y: byte;\n"
+            "    Tile: byte;\n"
+            "    Overflowed: boolean;\n"
+            "begin\n"
+            "    X := $01;\n"
+            "    Y := $02;\n"
+            "    Tile := $03;\n"
+            "    nes.set_background_color($0F);\n"
+            "    nes.run;\n"
+            "    nes.set_tile(X, Y, Tile);\n"
+            "    Tile := nes.get_tile(X, Y);\n"
+            "    nes.set_attribute($00, $00, $E4);\n"
+            "    Overflowed := nes.background_updates_overflowed();\n"
+            "    nes.clear_background_updates();\n"
+            "    nes.clear_background_update_overflow();\n"
+            "end.\n"
+        )
+        prog = analyze(parse(source, "background_updates.nsp"), source, "background_updates.nsp")
+        layout = build_memory_layout(prog)
+        actual = generate(prog, layout)
+        expected = (ROOT / "tests" / "golden" / "background_updates.asm").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(actual, expected)
+        # Verify key structural invariants explicitly.
+        nmi = actual.split("NMI:\n", 1)[1].split("IRQ:\n", 1)[0]
+        self.assertIn("jsr runtime_upload_queued_background", nmi)
+        self.assertIn("runtime_upload_queued_background:", actual)
+        self.assertIn("runtime_queue_background_write:", actual)
+        uploader = actual.split("runtime_upload_queued_background:\n", 1)[1].split(
+            "\nruntime_queue_background_write:", 1
+        )[0]
+        self.assertIn("runtime_background_queue_cancel_lock", uploader)
+        self.assertIn("sta $2006", uploader)
+        self.assertIn("sta $2007", uploader)
+        self.assertIn("bit $2002", uploader)
+        slot_writer = actual.split("runtime_queue_background_write:\n", 1)[1].split(
+            "\nruntime_prepare_tile_index:", 1
+        )[0]
+        self.assertIn("runtime_background_queue_overflow", slot_writer)
+        self.assertIn("runtime_background_queue_ready", slot_writer)
+
+    def test_metasprite_player_program_matches_golden_assembly(self) -> None:
+        """Protect the metasprite renderer shape and OAM shadow write protocol.
+
+        Invariants frozen:
+        - runtime_metasprite_render: component iteration, OAM shadow writes,
+          anchor-position arithmetic, clip checks, flip-flag encoding.
+        - NMI OAM DMA: runtime_oam_dma callsite present in NMI handler.
+        - Metasprite frame tables: immutable PRG-ROM geometry data emitted.
+        - jsr runtime_metasprite_render call sites for metasprite_show.
+        """
+        source_path = ROOT / "examples" / "metasprite_player.nsp"
+        metadata_path = ROOT / "examples" / "assets" / "player_idle.json"
+        chr_path = ROOT / "examples" / "assets" / "game.chr"
+        source = source_path.read_text(encoding="utf-8")
+        filename = str(source_path)
+        chr_rom = chr_path.read_bytes()
+        asset = load_metasprite_assets(
+            (metadata_path,),
+            source_path,
+            source,
+            chr_rom,
+        )[0]
+        prog = analyze(parse(source, filename), source, filename, metasprite_assets=(asset,))
+        layout = build_memory_layout(prog)
+        actual = generate(prog, layout, chr_rom=chr_rom)
+        expected = (ROOT / "tests" / "golden" / "metasprite_player.asm").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(actual, expected)
+        # Verify key structural invariants explicitly.
+        nmi = actual.split("NMI:\n", 1)[1].split("IRQ:\n", 1)[0]
+        # OAM DMA is emitted inline during VBlank: $4014 is the OAM DMA register.
+        self.assertIn("sta $4014", nmi)
+        self.assertIn("runtime_oam_shadow", nmi)
+        self.assertIn("runtime_metasprite_render:", actual)
+        self.assertIn("metasprite_frame_", actual)
+        # Renderer body references the OAM shadow (component write target).
+        renderer = actual.split("runtime_metasprite_render:\n", 1)[1]
+        self.assertIn("runtime_oam_shadow", renderer)
 
 
 if __name__ == "__main__":
