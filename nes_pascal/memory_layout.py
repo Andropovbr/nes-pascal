@@ -137,6 +137,29 @@ class MemoryLayoutSettings:
 DEFAULT_MEMORY_LAYOUT_SETTINGS = MemoryLayoutSettings()
 
 
+# Safe static callable-depth budget against the reserved 6502 hardware stack.
+#
+# The full 256-byte hardware stack ($0100-$01FF) is reserved for the runtime.
+# Every active user procedure/function `JSR` consumes two bytes for its return
+# address. At the deepest reachable call site the accounting additionally
+# reserves:
+#   - 4 bytes of runtime-internal `JSR` frames reachable from a user statement
+#     (`runtime_set_tile` -> `runtime_prepare_tile_index` or
+#     `runtime_queue_background_write`); the up-to-two user-staged `pha` bytes
+#     (indexed writes, `set_tile`/`set_attribute`) are consumed before those
+#     frames and never coincide with them;
+#   - 6 bytes of NMI headroom (3 auto-pushed bytes plus 3 pushed registers),
+#     because an NMI can fire while game code executes and VBlank-callback
+#     chains run inside that base.
+# Worst case: 2 * depth + 4 + 6 <= 256  =>  depth <= 123.
+HARDWARE_STACK_BYTES_PER_CALL = 2
+HARDWARE_STACK_OVERHEAD_BYTES = 4 + 6
+MAX_CALLABLE_DEPTH = (
+    DEFAULT_MEMORY_LAYOUT_SETTINGS.hardware_stack_size
+    - HARDWARE_STACK_OVERHEAD_BYTES
+) // HARDWARE_STACK_BYTES_PER_CALL
+
+
 @dataclass(frozen=True, slots=True)
 class BackgroundRuntimeFeatures:
     """Direct background API use and the small runtime dependencies it enables."""
@@ -438,6 +461,25 @@ def build_memory_layout(
             suggestion=(
                 "Simplify nested expressions or loops. Mandatory temporary "
                 "allocations cannot borrow optional promotion space."
+            ),
+        )
+
+    if temporary_requirements.max_call_depth > MAX_CALLABLE_DEPTH:
+        _raise_error(
+            DiagnosticCode.HARDWARE_STACK_CALL_DEPTH_EXHAUSTED,
+            "Callable nesting depth of "
+            f"{temporary_requirements.max_call_depth} exceeds the supported "
+            f"maximum of {MAX_CALLABLE_DEPTH}. Each nested procedure or "
+            "function call consumes two bytes of the 256-byte NES hardware "
+            f"stack for its JSR return address, and "
+            f"{HARDWARE_STACK_OVERHEAD_BYTES} bytes are reserved for runtime "
+            "and NMI stack usage.",
+            filename,
+            source,
+            suggestion=(
+                "Reduce the length of call chains. Recursion is not "
+                "supported; split long chains of procedures and functions "
+                "that call one another into a flatter structure."
             ),
         )
 

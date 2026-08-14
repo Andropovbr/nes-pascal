@@ -36,6 +36,12 @@ or function bodies. Ordinary `JSR` return addresses use the hardware stack;
 the benchmark reports the maximum source-call depth and its two-byte-per-call
 return-address peak separately from committed RAM.
 
+Source-call depth is bounded at compile time so return addresses stay inside
+the reserved 256-byte hardware stack: with two bytes per active `JSR` and ten
+bytes reserved for runtime `JSR` frames and NMI headroom, the supported maximum
+source-call depth is 123. Deeper acyclic chains are rejected with `E5007`;
+recursion is rejected earlier with `E3014`.
+
 The callable ABI treats `A`, `X`, `Y`, and processor flags as caller-clobbered;
 there are no callee-saved registers. `A` contains the scalar result on return,
 and loading the canonical Boolean result also leaves the zero flag valid for a

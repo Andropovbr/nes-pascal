@@ -121,3 +121,29 @@ Diagnósticos de geração de código utilizam o intervalo E5000-E5999.
 
 - **Correção sugerida:** Corrija a alocação ou geração de segmentos do compilador; alterar
   o código-fonte do usuário não deve ser necessário para uma divergência interna.
+
+## E5007 - Profundidade de chamadas de pilha de hardware esgotada
+
+- **Categoria:** Code Generation
+- **Explicação:** A profundidade máxima estaticamente conhecida de chamadas
+  aninhadas de procedimentos/funções consumiria mais da pilha de hardware de
+  256 bytes do 6502 (`$0100-$01FF`) do que a ABI permite. Cada `JSR` ativo
+  reserva dois bytes para o endereço de retorno; a capacidade restante mantém 10
+  bytes para frames de `JSR` do runtime e folga de NMI, portanto a profundidade
+  máxima suportada de chamadas de fonte é 123. Recursão é rejeitada antes com
+  `E3014`, então este diagnóstico só ocorre para cadeias de chamadas acíclicas
+  longas.
+- **Gatilho:** Um programa cuja profundidade máxima de chamadas aninhadas
+  excede 123. O limite é exercitado programaticamente em `tests/test_functions.py`
+  (124 funções encadeadas pelo caminho mais profundo emitem este diagnóstico).
+- **Saída esperada do compilador:**
+
+  ```text
+  E5007 <input>:1:1
+
+  Callable nesting depth of 124 exceeds the supported maximum of 123. Each nested procedure or function call consumes two bytes of the 256-byte NES hardware stack for its JSR return address, and 10 bytes are reserved for runtime and NMI stack usage.
+  ```
+
+- **Correção sugerida:** Reduza o comprimento das cadeias de chamadas. Recursão
+  não é suportada; divida cadeias longas de procedimentos e funções que chamam
+  umas às outras em uma estrutura mais achatada.

@@ -44,6 +44,60 @@ end.
 """
 
 
+def function_chain_program(depth: int) -> str:
+    """Generate ``depth`` chained functions: F0 calls F1 calls ... calls leaf."""
+    declarations = []
+    for index in range(depth):
+        body = (
+            f"    F{index} := F{index + 1}();\n"
+            if index < depth - 1
+            else f"    F{index} := $01;\n"
+        )
+        declarations.append(f"function F{index}: byte;\nbegin\n{body}end;\n")
+    return program_with("".join(declarations), "    Value := F0();")
+
+
+def mixed_chain_program(depth: int) -> str:
+    """Generate a ``depth``-long alternating function/procedure chain.
+
+    Even indexes are functions that call the next procedure as a statement;
+    odd indexes are procedures that assign the next function call to a value.
+    The main block enters the chain with ``F0()``.
+    """
+    declarations = []
+    for index in range(depth):
+        if index % 2 == 0:
+            body = (
+                f"    C{index + 1};\n"
+                if index < depth - 1
+                else ""
+            )
+            declarations.append(
+                f"function C{index}: byte;\nbegin\n{body}    C{index} := $01;\nend;\n"
+            )
+        else:
+            body = (
+                f"    Value := C{index + 1}();\n"
+                if index < depth - 1
+                else ""
+            )
+            declarations.append(f"procedure C{index};\nbegin\n{body}end;\n")
+    return program_with("".join(declarations), "    Value := C0();")
+
+
+def recursive_chain_program(depth: int) -> str:
+    """Generate a ``depth``-long chain closed into a cycle: the leaf calls F0."""
+    declarations = []
+    for index in range(depth):
+        body = (
+            f"    F{index} := F{index + 1}();\n"
+            if index < depth - 1
+            else f"    F{index} := F0();\n"
+        )
+        declarations.append(f"function F{index}: byte;\nbegin\n{body}end;\n")
+    return program_with("".join(declarations), "    Value := F0();")
+
+
 class FunctionTests(unittest.TestCase):
     def test_parser_represents_typed_function_and_explicit_call(self) -> None:
         source = program_with(
@@ -478,6 +532,70 @@ end;
                 self.assert_diagnostic(
                     source, DiagnosticCode.DUPLICATE_SYMBOL
                 )
+
+    def test_maximum_supported_callable_depth_is_accepted(self) -> None:
+        from nes_pascal.memory_layout import MAX_CALLABLE_DEPTH
+
+        source = function_chain_program(MAX_CALLABLE_DEPTH)
+        layout = build_memory_layout(resolve(source))
+        self.assertEqual(
+            layout.temporary_requirements.max_call_depth, MAX_CALLABLE_DEPTH
+        )
+
+    def test_callable_depth_above_maximum_is_rejected(self) -> None:
+        from nes_pascal.memory_layout import MAX_CALLABLE_DEPTH
+
+        source = function_chain_program(MAX_CALLABLE_DEPTH + 1)
+        with self.assertRaises(CompilerError) as raised:
+            build_memory_layout(resolve(source))
+        error = raised.exception
+        self.assertEqual(
+            error.code, DiagnosticCode.HARDWARE_STACK_CALL_DEPTH_EXHAUSTED
+        )
+        message = str(error)
+        self.assertIn(str(MAX_CALLABLE_DEPTH + 1), message)
+        self.assertIn(str(MAX_CALLABLE_DEPTH), message)
+        self.assertIn("256-byte NES hardware stack", message)
+        self.assertIn("JSR return address", message)
+
+    def test_mixed_function_procedure_chain_respects_the_same_boundary(self) -> None:
+        from nes_pascal.memory_layout import MAX_CALLABLE_DEPTH
+
+        accepted = build_memory_layout(
+            resolve(mixed_chain_program(MAX_CALLABLE_DEPTH))
+        )
+        self.assertEqual(
+            accepted.temporary_requirements.max_call_depth, MAX_CALLABLE_DEPTH
+        )
+        with self.assertRaises(CompilerError) as raised:
+            build_memory_layout(resolve(mixed_chain_program(MAX_CALLABLE_DEPTH + 1)))
+        self.assertEqual(
+            raised.exception.code,
+            DiagnosticCode.HARDWARE_STACK_CALL_DEPTH_EXHAUSTED,
+        )
+
+    def test_recursion_uses_the_recursion_diagnostic_not_the_depth_guard(self) -> None:
+        from nes_pascal.memory_layout import MAX_CALLABLE_DEPTH
+
+        source = recursive_chain_program(MAX_CALLABLE_DEPTH + 40)
+        self.assert_diagnostic(
+            source, DiagnosticCode.RECURSIVE_PROCEDURE_CALL
+        )
+
+    def test_shallow_ordinary_function_chain_stays_unchanged(self) -> None:
+        source = program_with(
+            """function One: byte;
+begin
+    One := $01;
+end;
+""",
+            "    Value := One();",
+        )
+        layout = build_memory_layout(resolve(source))
+        self.assertEqual(layout.temporary_requirements.max_call_depth, 1)
+        assembly = generate(resolve(source), layout)
+        self.assertIn("jsr function_One", assembly)
+        self.assertIn("lda function_result_One ; return value in A", assembly)
 
     def assert_diagnostic(self, source: str, code: DiagnosticCode) -> None:
         with self.assertRaises(CompilerError) as raised:
