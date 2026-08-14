@@ -36,6 +36,13 @@ Compile-o a partir da raiz do repositório:
 python -m nes_pascal.cli examples/minimal.nsp -o build/minimal.nes
 ```
 
+Após [instalar o pacote](prerequisites-and-installation.md), o comando
+equivalente `nes-pascal` também está disponível:
+
+```text
+nes-pascal examples/minimal.nsp -o build/minimal.nes
+```
+
 O comando gera `build/minimal.asm`, `build/minimal.cfg`,
 `build/minimal.map`, o arquivo intermediário `build/minimal.o` e
 `build/minimal.nes`. O arquivo `.map` detalha todas as alocações na RAM da CPU. Consulte

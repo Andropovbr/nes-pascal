@@ -57,6 +57,58 @@ jobs:
         run: |
           cat benchmark-report.md >> "$GITHUB_STEP_SUMMARY"
 
+packaging-smoke:
+    name: packaging-smoke
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build frontend
+        run: python -m pip install --upgrade pip build
+
+      - name: Build wheel and sdist
+        run: python -m build --outdir dist
+
+      - name: Install wheel in a fresh virtual environment
+        run: |
+          python -m venv /tmp/nes-pkg-env
+          /tmp/nes-pkg-env/bin/python -m pip install dist/nes_pascal-0.5.12-*.whl
+
+      - name: Smoke-test console script and module invocation
+        run: |
+          /tmp/nes-pkg-env/bin/nes-pascal --version
+          /tmp/nes-pkg-env/bin/python -m nes_pascal.cli --version
+
+      - name: Compile outside the repository without the toolchain
+        run: |
+          mkdir -p /tmp/nes-outside /tmp/nes-nobin
+          cp examples/minimal.nsp /tmp/nes-outside/
+          cd /tmp/nes-outside
+          set +e
+          PATH="/tmp/nes-nobin" /tmp/nes-pkg-env/bin/nes-pascal minimal.nsp -o game.nes > compile.log 2>&1
+          status=$?
+          cat compile.log
+          test "$status" -eq 1
+          grep -q "E5001" compile.log
+          test -f game.asm
+
+      - name: Install cc65 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cc65
+
+      - name: Build full ROM outside the repository
+        run: |
+          cd /tmp/nes-outside
+          /tmp/nes-pkg-env/bin/nes-pascal minimal.nsp -o game.nes
+          test -f game.nes
+
   mesen-runtime:
     name: mesen-runtime
     runs-on: ubuntu-24.04
@@ -134,17 +186,21 @@ jobs:
     needs:
       - compiler-toolchain
       - mesen-runtime
+      - packaging-smoke
     runs-on: ubuntu-24.04
     steps:
       - name: Validate pipeline status
         env:
           COMPILER_RESULT: ${{ needs.compiler-toolchain.result }}
           MESEN_RESULT: ${{ needs.mesen-runtime.result }}
+          PACKAGING_RESULT: ${{ needs.packaging-smoke.result }}
         run: |
           echo "compiler-toolchain: $COMPILER_RESULT"
           echo "mesen-runtime: $MESEN_RESULT"
+          echo "packaging-smoke: $PACKAGING_RESULT"
 
           test "$COMPILER_RESULT" = "success"
           test "$MESEN_RESULT" = "success"
+          test "$PACKAGING_RESULT" = "success"
 
           echo "All required checks passed successfully."

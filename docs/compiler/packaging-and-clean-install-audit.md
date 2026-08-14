@@ -2,6 +2,11 @@
 
 English | [Português (Brasil)] — *PT-BR translation pending*
 
+> **Status:** this audit was followed by `chore/packaging-hardening`, which
+> resolved P2-1, P2-2, P2-3, P3-1, and P3-2 at package version `0.5.12`.
+> The original findings below are preserved as historical context; see the
+> [Resolution](#resolution--packaging-hardening-0512) section for verification.
+
 ## Summary
 
 This is an independent packaging, distribution, and clean-installation audit of
@@ -253,6 +258,9 @@ All values agree today. Findings:
   `importlib.metadata` lookup is the primary source; the fallback duplicates
   the version.)
 
+> Resolution: the package version is now `0.5.12` and the hard-coded fallback
+> was removed (see [Resolution](#resolution--packaging-hardening-0512)).
+
 ## 11. Python-version compatibility
 
 - Declared range: `>=3.11`.
@@ -302,6 +310,9 @@ and `docs/getting-started/first-program.md` (EN and PT-BR mirror pages):
 Gap: the documentation never covers using the package after a clean install
 outside the repository. This is finding **P2-2**.
 
+> Resolution: the installation documentation now covers installed-package
+> usage (see [Resolution](#resolution--packaging-hardening-0512)).
+
 ## 14. CI packaging coverage
 
 Current CI (`.github/workflows/ci.yml`) installs the project with
@@ -326,6 +337,10 @@ future packaging-hardening branch (not implemented during this audit):
 4. compile a minimal `.nsp` from a directory outside the repository using the
    installed wheel (with and without the toolchain on `PATH`).
 
+> Resolution: the `packaging-smoke` CI job implements this coverage and is
+> now required by `ci-gate` (see
+> [Resolution](#resolution--packaging-hardening-0512)).
+
 ---
 
 ## Findings classification
@@ -345,42 +360,85 @@ docs:**
   `[project.scripts]`, so `pip install` never provides a `nes-pascal` command.
   The only public entry is `python -m nes_pascal.cli`. The argparse `prog`
   name `nes-pascal` suggests an intended command that is never installed.
+  *(Resolved — see [Resolution](#resolution--packaging-hardening-0512).)*
 - **P2-2 — Installation docs do not cover installed-package usage.** The
   getting-started docs only describe running from the repository root or an
   editable install. A user with only the installed package has no documented
   install (`pip install .` / wheel) or invocation path outside the repository.
+  *(Resolved — see [Resolution](#resolution--packaging-hardening-0512).)*
 - **P2-3 — No CI packaging coverage.** CI only runs `pip install -e .` from
   the checkout. No wheel/sdist build, no install-from-artifact test, no
   console-script smoke test, no outside-repository compile test. This let
   P2-1 go undetected.
+  *(Resolved — see [Resolution](#resolution--packaging-hardening-0512).)*
 
 **P3 — metadata, polish, optional CI hardening:**
 
 - **P3-1 — Metadata completeness.** No `readme`/long description, no license
   expression (only auto-detected `LICENSE` file), no `[project.urls]` in the
   wheel METADATA.
+  *(Resolved — see [Resolution](#resolution--packaging-hardening-0512).)*
 - **P3-2 — Version staleness and duplication.** Package version `0.5.8` lags
   implemented milestones 0.5.9–0.5.12, and the `0.5.8` fallback in
   `nes_pascal/__init__.py` is a second version source that can drift.
+  *(Resolved — see [Resolution](#resolution--packaging-hardening-0512).)*
 - **P3-3 — PT-BR translation.** This audit report is English-only; the
   `docs/pt-BR/` mirror index and translation-status list were not updated
   (consistent with the precedent of `diagnostic-consistency-audit.md`).
+  *(Still open — the report remains English-only.)*
 - **P3-4 — sdist test inclusion.** The sdist ships the top-level `tests/*.py`
   modules (without fixtures/golden/mesen data). Conventional and acceptable;
   listed for completeness. The wheel ships no tests.
 
-## Recommended follow-up (separate branch, out of scope here)
+## Resolution — packaging hardening (0.5.12)
 
-1. Add `[project.scripts]` with `nes-pascal = "nes_pascal.cli:main"` and a
-   corresponding smoke test.
-2. Add packaging metadata: `readme`, license expression, `[project.urls]`.
-3. Update getting-started documentation to cover `pip install .` / wheel
-   install and installed-package invocation.
-4. Add minimal CI packaging smoke coverage (wheel + sdist build,
-   install-from-artifact, console-script/module smoke test, outside-repository
-   compile).
-5. Align the package version with implemented milestone scope and remove the
-   duplicated fallback version.
+Implemented by branch `chore/packaging-hardening` (follow-up to this audit).
+No compiler semantics or runtime behavior changed.
+
+- **P2-1 (console script):** `pyproject.toml` now declares
+  `[project.scripts]` with `nes-pascal = "nes_pascal.cli:main"`. The built
+  wheel contains `entry_points.txt` with that mapping. Verified from fresh
+  wheel and sdist installations: `nes-pascal --version` →
+  `nes-pascal 0.5.12`; `nes-pascal --help` works; `python -m nes_pascal.cli`
+  remains supported. Added regression tests in `tests/test_cli.py`
+  (`PackagingMetadataTests`) asserting the declared entry point and version
+  consistency.
+- **P2-2 (installation docs):** `docs/getting-started/prerequisites-and-installation.md`
+  (EN and PT-BR) now documents supported Python (`>=3.11`), the cc65 external
+  dependency, `pip install .`, editable `pip install -e .`, the installed
+  `nes-pascal` command, the `python -m nes_pascal.cli` fallback, and the
+  `ca65`/`ld65` `PATH` requirement for final ROM generation. Both
+  `first-program.md` pages note the equivalent `nes-pascal` invocation.
+- **P2-3 (CI packaging coverage):** `.github/workflows/ci.yml` adds a small
+  `packaging-smoke` job that builds wheel and sdist with `python -m build`,
+  installs the wheel into a fresh virtual environment, smoke-tests
+  `nes-pascal --version` and `python -m nes_pascal.cli --version`, compiles a
+  minimal `.nsp` from a directory outside the repository (expecting the
+  compiler stage to succeed and E5001 without the toolchain, then a full ROM
+  build after installing cc65), and confirms the installed package does not
+  depend on editable-install behavior. `ci-gate` now requires
+  `packaging-smoke` to succeed.
+- **P3-1 (metadata):** `pyproject.toml` now declares `readme = "README.md"`,
+  `license = "MIT"`, and `[project.urls]` (`Repository` →
+  `https://github.com/Andropovbr/nes-pascal`). The built wheel METADATA shows
+  `License-Expression: MIT`, `Project-URL: Repository, ...`, and the README as
+  the long description. No runtime dependencies were added.
+- **P3-2 (version):** `pyproject.toml` version is now `0.5.12`, matching the
+  implemented milestone scope. `nes_pascal/__init__.py` no longer hard-codes a
+  fallback version: it reads `importlib.metadata` and, when metadata is
+  unavailable in a source-tree context, parses `pyproject.toml` (the single
+  authoritative source) with a neutral `0.0.0` last resort. Verified
+  agreement across `pyproject.toml`, `nes_pascal.__version__`,
+  `nes-pascal --version`, `python -m nes_pascal.cli --version`, wheel
+  METADATA, wheel filename, and sdist filename (all `0.5.12`).
+- **P3-3 (PT-BR):** still open; the report remains English-only.
+- **P3-4 (sdist tests):** unchanged, accepted convention.
+
+Clean-artifact verification (branch state): `nes_pascal-0.5.12-py3-none-any.whl`
+and `nes_pascal-0.5.12.tar.gz` built from a clean tree with `python -m build`;
+each installed into a fresh virtual environment; imports, version, console
+script, module invocation, and outside-repository full ROM build all verified.
+No `Requires-Dist` appears in the wheel METADATA.
 
 ## Local validation
 
