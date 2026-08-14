@@ -4,9 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nes-pascal"
-version = "0.5.8"
+version = "0.5.12"
 description = "Prototype Pascal compiler specialized for the NES"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+
+[project.urls]
+Repository = "https://github.com/Andropovbr/nes-pascal"
+
+[project.scripts]
+nes-pascal = "nes_pascal.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["nes_pascal*"]

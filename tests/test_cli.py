@@ -1,11 +1,13 @@
 import contextlib
 import io
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from nes_pascal import __version__
 from nes_pascal.cli import ToolchainError, compile_source, main
 
 
@@ -121,6 +123,20 @@ class FileAccessFailureTests(unittest.TestCase):
         rendered = stderr.getvalue()
         self.assertIn("E6001", rendered)
         self.assertIn("could not access a file: permission denied", rendered)
+
+
+class PackagingMetadataTests(unittest.TestCase):
+    def _pyproject(self) -> dict:
+        repository_root = Path(__file__).resolve().parent.parent
+        with (repository_root / "pyproject.toml").open("rb") as handle:
+            return tomllib.load(handle)
+
+    def test_pyproject_declares_nes_pascal_console_script(self) -> None:
+        scripts = self._pyproject()["project"]["scripts"]
+        self.assertEqual(scripts, {"nes-pascal": "nes_pascal.cli:main"})
+
+    def test_package_version_matches_pyproject(self) -> None:
+        self.assertEqual(__version__, self._pyproject()["project"]["version"])
 
 
 if __name__ == "__main__":
