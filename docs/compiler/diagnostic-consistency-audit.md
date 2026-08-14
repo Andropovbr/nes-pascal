@@ -312,9 +312,14 @@ succeed).
 
 ## 12. Final ci-gate
 
-To be recorded after the pushed branch's CI completes (see the commit message
-and the CI run for the final status). Local validation (section 10) is fully
-green; the remote gate is the authoritative confirmation.
+Not verifiable from this environment: the pushed branch's CI run cannot be
+inspected because the `gh` CLI is not installed and no token is available
+here. The commit was pushed (`cca5e78` on
+`origin/audit/diagnostic-consistency`, confirmed via `git ls-remote`), which
+triggers the workflow for the branch. Per project policy, this audit does
+**not** claim remote CI success: local validation (section 10) is fully green,
+and the aggregate `ci-gate` on the pushed branch is the authoritative
+confirmation to be checked from an environment with GitHub access.
 
 ---
 
