@@ -1,5 +1,7 @@
 # Milestone 0.5.11 — Expression Temporary Allocation: Completeness and Quality Audit
 
+English | [Português (Brasil)](../pt-BR/compiler/milestone-0.5.11-audit.md)
+
 - **Branch:** `audit/0.5.11-validation`
 - **Audit base commit:** `9640da8` (merge of PR #24, `0.5.11-expression-temporaries`)
 - **Milestone implementation commit:** `ea3e17d` ("Implement 0.5.11 expression temporary allocation")

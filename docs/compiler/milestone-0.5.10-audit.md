@@ -1,5 +1,7 @@
 # Milestone 0.5.10 — Records: Completeness and Quality Audit
 
+English | [Português (Brasil)](../pt-BR/compiler/milestone-0.5.10-audit.md)
+
 - **Branch:** `audit/0.5.10-validation`
 - **Audit base commit:** `b9e4075` (merge of PR #21, `0.5.10-records`)
 - **Milestone implementation commit:** `36534f7` ("Implement 0.5.10 records")

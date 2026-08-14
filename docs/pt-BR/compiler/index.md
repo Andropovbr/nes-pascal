@@ -49,10 +49,17 @@ relevante.
 ### 0.5.10 — Records
 
 - [Implementação e medições de records](records-0.5.10.md) — relatório de implementação.
+- [Milestone 0.5.10 — Records: auditoria de completude e qualidade](milestone-0.5.10-audit.md) — auditoria independente de marco.
 
 ### 0.5.11 — Alocação de temporários de expressão
 
 - [Alocação de temporários de expressão](expression-temporaries-0.5.11.md) — relatório de implementação.
+- [Milestone 0.5.11 — Alocação de temporários de expressão: auditoria de completude e qualidade](milestone-0.5.11-audit.md) — auditoria independente de marco.
+
+### 0.5.12 — Funções
+
+- [Implementação de funções e ABI](functions-0.5.12.md) — relatório de implementação.
+- [Milestone 0.5.12 — Funções: auditoria de completude e qualidade](milestone-0.5.12-audit.md) — auditoria independente de marco.
 
 Para material durável do compilador que não é específico de um marco, consulte
 o [Mapa de cobertura de testes semânticos](test-coverage-map.md) e a seção

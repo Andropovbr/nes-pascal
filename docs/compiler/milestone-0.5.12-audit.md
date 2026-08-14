@@ -1,5 +1,7 @@
 # Milestone 0.5.12 — Functions: Completeness and Quality Audit
 
+English | [Português (Brasil)](../pt-BR/compiler/milestone-0.5.12-audit.md)
+
 - **Branch:** `audit/0.5.12-validation`
 - **Audit base commit:** `40313d5` (merge of PR #26, `0.5.12-functions`)
 - **Milestone implementation commit:** `1c8f88d` ("Implement 0.5.12 functions")
