@@ -21,7 +21,6 @@ Planned work is tracked separately in the
 
 ## Language Guide
 
-- [Language Guide](language/index.md)
 - [Program structure](language/program-structure.md)
 - [Identifiers and literals](language/identifiers-and-literals.md)
 - [Built-in types](language/types.md)
@@ -51,14 +50,7 @@ Planned work is tracked separately in the
 
 - [Reference](reference/index.md)
 - [Compiler pipeline](reference/compiler-pipeline.md)
-- [Optimization and architecture audit (0.5.5)](compiler/optimization-audit-0.5.5.md)
-- [Builtin / intrinsic infrastructure (0.5.6)](compiler/builtin-infrastructure.md)
-- [Low-risk code generation improvements (0.5.7)](compiler/low-risk-codegen-0.5.7.md)
-- [Array implementation and measurements (0.5.8)](compiler/arrays-0.5.8.md)
-- [Enumeration implementation and measurements (0.5.9)](compiler/enumerations-0.5.9.md)
-- [Record implementation and measurements (0.5.10)](compiler/records-0.5.10.md)
-- [Expression temporary allocation (0.5.11)](compiler/expression-temporaries-0.5.11.md)
-- [Functions implementation and ABI (0.5.12)](compiler/functions-0.5.12.md)
-- [Semantic test coverage map](compiler/test-coverage-map.md)
-- [Unsupported features](reference/unsupported-features.md)
 - [Compiler diagnostics](reference/diagnostics/index.md)
+- [Unsupported features](reference/unsupported-features.md)
+- [Semantic test coverage map](compiler/test-coverage-map.md)
+- [Compiler Implementation and Audit History](compiler/index.md)

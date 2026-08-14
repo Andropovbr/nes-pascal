@@ -1,5 +1,7 @@
 # Functions 0.5.12
 
+English | [Português (Brasil)](../pt-BR/compiler/functions-0.5.12.md)
+
 Milestone 0.5.12 adds typed user functions on top of the scoped temporary
 allocator introduced in 0.5.11. It does not add local variables, runtime stack
 frames, recursion, aggregate returns, early returns, or optimizations.
