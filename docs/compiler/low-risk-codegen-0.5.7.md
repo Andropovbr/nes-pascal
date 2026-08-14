@@ -1,5 +1,8 @@
 # Low-Risk Code Generation Improvements
 
+> Historical note: the fixed reservation described below was replaced by the
+> exact scoped pool in [milestone 0.5.11](expression-temporaries-0.5.11.md).
+
 English | [Português (Brasil)](../pt-BR/compiler/low-risk-codegen-0.5.7.md)
 
 Milestone 0.5.7 adds a small set of local ca65 lowering decisions. It is not a

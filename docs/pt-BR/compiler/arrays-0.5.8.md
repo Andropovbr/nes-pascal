@@ -1,5 +1,9 @@
 # Implementação e Medições de Arrays (0.5.8)
 
+> Nota histórica: os números do pool fixo abaixo registram o estado da 0.5.8.
+> O milestone [0.5.11](expression-temporaries-0.5.11.md) agora reserva 1 byte de
+> expressão e 2 bytes separados de cache de laço, recuperando 13 bytes de ZP.
+
 [English](../../compiler/arrays-0.5.8.md) | Português (Brasil)
 
 A milestone 0.5.8 adiciona arrays globais de tamanho fixo como construção da

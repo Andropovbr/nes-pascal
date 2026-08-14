@@ -11,7 +11,8 @@ e nunca são tratados como armazenamento adicional.
 | Intervalo | Tamanho | Proprietário | Finalidade |
 | --- | ---: | --- | --- |
 | `$0000-$000F` | 16 bytes | Runtime | Reserva obrigatória de runtime na Zero Page |
-| `$0010-$001F` | 16 bytes | Compiler | Temporários obrigatórios de expressões e limites de for em cache |
+| a partir de `$0010` | 0 a 16 bytes combinados | Compiler | Temporários de expressão no pico de uso, seguidos por limites de `for` em cache |
+| até `$001F` | bytes restantes | Free | Capacidade de temporários recuperada e visível ao alocador |
 | `$0020-$007F` | 96 bytes | Reserved | Espaço estável para futuras declarações explícitas na Zero Page |
 | `$0080-$00FF` | 128 bytes | User | Promoção automática opcional de variáveis globais |
 | `$0100-$01FF` | 256 bytes | Reserved | Pilha de hardware do 6502 |
@@ -25,14 +26,37 @@ e nunca são tratados como armazenamento adicional.
 | após o shadow opcional de tiles | 0 a 23 bytes | Runtime | Estado condicionalmente selecionado de fila de fundo, flags e helpers |
 | de `$0200` sem sprites, senão `$0300` | até 1.536 ou 1.280 bytes | User/free | Variáveis globais não promovidas e todos os parâmetros de procedimentos |
 
-As partições da Zero Page são fixas e não se sobrepõem. As alocações de runtime e
-do compilador são obrigatórias. Elas nunca tomam emprestado do espaço opcional de
-promoção. O runtime detém `runtime_frame_counter` em `$0000` e `runtime_frame_ready`
+As janelas da política da Zero Page são fixas e não se sobrepõem. Símbolos de
+runtime, slots de expressão medidos e caches do compilador são obrigatórios quando
+usados. Eles nunca tomam emprestado do espaço opcional de promoção. O runtime detém
+`runtime_frame_counter` em `$0000` e `runtime_frame_ready`
 em `$0001`. O laço de atualização detém `runtime_last_processed_frame` em `$0002`.
 O estado atual, anterior e a proteção de consulta dos controles ocupam `$0003-$0008`.
 Esses bytes de runtime não podem se sobrepor ao armazenamento do compilador. O
-compilador aloca slots reutilizáveis de expressão e limites de `for` em cache em
-`$0010-$001F`. Necessitar de mais de 16 bytes temporários é um erro de compilação.
+Dentro de `$0010-$001F`, o compilador primeiro aloca exatamente o número máximo de
+slots de expressão simultaneamente ativos e depois os limites de `for` em cache. O
+sufixo não usado fica livre e visível ao alocador. Necessitar de mais de 16 bytes
+combinados de expressão/cache é um erro de compilação.
+
+Os slots de expressão têm nomes determinísticos (`expression_temporary_0`,
+`expression_temporary_1` e assim por diante). A geração adquire explicitamente o
+slot livre de menor índice, mantém o aluguel enquanto o valor é necessário e o
+libera para expressões posteriores. A reserva usa o pico medido no programa todo,
+não a profundidade da AST nem a quantidade de expressões. Um programa sem essa
+necessidade reserva zero bytes de expressão. Valores `for_limit_*` continuam sendo
+uma categoria contábil separada.
+
+Escritas com índice variável em arrays e arrays de records continuam preservando o
+índice calculado na pilha de hardware do 6502 durante a avaliação do lado direito.
+Esses bytes da pilha não contam como reserva de temporários de expressão. Argumentos
+de procedimentos e builtins mantêm sua ordem de avaliação e reutilizam o pool apenas
+depois que aluguéis anteriores terminam.
+
+Escopos de chamada preservam todos os slots pertencentes ao chamador. Uma chamada
+aninhada que produza expressão deve adquirir outro slot até o chamador liberar o
+valor ativo. Os builtins atuais já seguem essa regra. A futura geração de Functions
+deverá estender a mesma análise pelo grafo de chamadas; Functions e frames de pilha
+de runtime não são implementados aqui.
 
 Operações gerais de sprites incluem condicionalmente o shadow de OAM de 256 bytes
 alinhado a página em `$0200-$02FF`. Elas reservam `runtime_sprite_logical_y` em
@@ -103,7 +127,7 @@ de tiles confirmados. Mapas de metatiles, dicionários de tiles modificados e ca
 de leitura foram postergados porque adicionariam custo de busca ou complexidade em runtime.
 
 A validação de callbacks de VBlank rejeita qualquer operação acessível que utilize
-esses temporários compartilhados do compilador. O caminho de interrupção utiliza,
+slots de expressão ou caches compartilhados do compilador. O caminho de interrupção utiliza,
 portanto, o estado da Zero Page pertencente ao runtime mais as variáveis do callback,
 nunca expressões do contexto principal ou armazenamento de laços em cache.
 
@@ -134,15 +158,18 @@ comuns mantêm o endereçamento absoluto.
 ## Mapa de memória gerado
 
 Para uma saída chamada `build/zero_page.nes`, o compilador grava `build/zero_page.map`.
-O relatório separa reservas obrigatórias de promoções opcionais e identifica cada símbolo
-do usuário como `Zero Page` ou `Regular RAM`.
+O relatório separa a reserva de expressão no pico, caches do compilador, reserva por
+política, Zero Page recuperada, promoção opcional e reserva de hardware. Ele
+identifica cada símbolo do usuário como `Zero Page` ou `Regular RAM`.
 
 Um trecho para o exemplo focado é:
 
 ```text
 Start  End    Size  Owner     Region
 $0000  $000F    16  Runtime   Zero Page runtime
-$0010  $001F    16  Compiler  Zero Page temporaries (1 used, 15 reserved)
+$0010  ----      0  Compiler  Expression temporaries
+$0010  $0010     1  Compiler  Compiler caches
+$0011  $001F    15  Free      Recovered temporary Zero Page
 $0020  $007F    96  Reserved  Future explicit Zero Page
 $0080  $00FF   128  User      Automatic Zero Page variables (2 used, 126 available)
 $0100  $01FF   256  Reserved  6502 hardware stack
@@ -151,7 +178,9 @@ $0200  $0200     1  User      Regular user variables
 $0201  $07FF  1535  Free      General free RAM
 ```
 
-O `.cfg` gerado, os segmentos no Assembly e o relatório `.map` utilizam todos o mesmo
+O mapa também imprime `Expression temporary reservation: 0 bytes` e
+`Other compiler caches: 1 byte` neste exemplo. O `.cfg` gerado, os segmentos no
+Assembly e o relatório `.map` utilizam todos o mesmo
 objeto de layout validado, de modo que seus cálculos de endereço não podem divergir.
 
 A tabela de símbolos de runtime também reporta:

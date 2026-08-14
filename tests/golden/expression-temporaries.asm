@@ -1,0 +1,45 @@
+expression_temporary_0: .res 1 ; $0010: scoped reusable expression evaluation byte
+expression_temporary_1: .res 1 ; $0011: scoped reusable expression evaluation byte
+expression_temporary_2: .res 1 ; $0012: scoped reusable expression evaluation byte
+sta expression_temporary_0
+adc expression_temporary_0
+sta expression_temporary_0
+sta expression_temporary_1
+adc expression_temporary_1
+adc expression_temporary_0
+sta expression_temporary_0
+sta expression_temporary_1
+sta expression_temporary_2
+adc expression_temporary_2
+adc expression_temporary_1
+adc expression_temporary_0
+sta expression_temporary_0
+sta expression_temporary_1
+sta expression_temporary_2
+adc expression_temporary_2
+adc expression_temporary_1
+adc expression_temporary_0
+sta expression_temporary_0
+adc expression_temporary_0
+sta expression_temporary_0
+adc expression_temporary_0
+sta expression_temporary_0
+sta expression_temporary_1
+adc expression_temporary_1
+cmp expression_temporary_0
+sta expression_temporary_0
+sta expression_temporary_1
+adc expression_temporary_1
+adc expression_temporary_0
+sta expression_temporary_0
+sta expression_temporary_1
+adc expression_temporary_1
+adc expression_temporary_0
+sta expression_temporary_0
+adc expression_temporary_0
+sta expression_temporary_0
+sta expression_temporary_1
+adc expression_temporary_1
+adc expression_temporary_0
+sta expression_temporary_0
+adc expression_temporary_0

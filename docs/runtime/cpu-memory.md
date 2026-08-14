@@ -11,7 +11,8 @@ and are never treated as additional storage.
 | Range | Size | Owner | Purpose |
 | --- | ---: | --- | --- |
 | `$0000-$000F` | 16 bytes | Runtime | Mandatory Zero Page runtime reservation |
-| `$0010-$001F` | 16 bytes | Compiler | Mandatory expression and cached for-limit temporaries |
+| from `$0010` | 0 to 16 bytes combined | Compiler | Maximum-live expression temporaries followed by cached `for` limits |
+| through `$001F` | remaining bytes | Free | Recovered temporary capacity visible to the allocator |
 | `$0020-$007F` | 96 bytes | Reserved | Stable space for future explicit Zero Page declarations |
 | `$0080-$00FF` | 128 bytes | User | Optional automatic global-variable promotion |
 | `$0100-$01FF` | 256 bytes | Reserved | 6502 hardware stack |
@@ -25,15 +26,37 @@ and are never treated as additional storage.
 | after the optional tile shadow | 0 to 23 bytes | Runtime | Conditionally selected background queue, flags, and helper state |
 | from `$0200` without sprites, otherwise `$0300` | up to 1,536 or 1,280 bytes | User/free | Non-promoted globals and all procedure parameters |
 
-The Zero Page partitions are fixed and non-overlapping. Runtime and compiler
-allocations are mandatory. They never borrow from optional promotion space.
+The Zero Page policy windows are fixed and non-overlapping. Runtime symbols,
+measured expression slots, and compiler caches are mandatory when used. They
+never borrow from optional promotion space.
 The runtime owns `runtime_frame_counter` at `$0000` and
 `runtime_frame_ready` at `$0001`. The update loop owns
 `runtime_last_processed_frame` at `$0002`. Controller current, previous, and
 poll-guard state occupy `$0003-$0008`. These runtime bytes cannot overlap
-compiler storage. The compiler places reusable expression slots and cached
-`for` limits in `$0010-$001F`. Needing more than 16 temporary bytes is a
-compilation error.
+compiler storage. Within `$0010-$001F`, the compiler first places exactly the
+maximum number of simultaneously live expression slots and then cached `for`
+limits. The unused suffix is allocator-visible free Zero Page. Needing more
+than 16 combined expression/cache bytes is a compilation error.
+
+Expression slots use deterministic names (`expression_temporary_0`,
+`expression_temporary_1`, and so on). Lowering explicitly acquires the lowest
+free slot, keeps it leased while its value is needed, and releases it for later
+expressions. Reservation is based on the whole program's measured peak, not
+AST depth or expression count. A program with no such lifetime reserves zero
+expression bytes. Cached `for_limit_*` values remain a separate accounting
+category even though they share the same bounded Zero Page policy window.
+
+Variable array and record-array writes continue to preserve their calculated
+index on the 6502 hardware stack while evaluating the right-hand side. Those
+stack bytes are hardware-stack use, not expression-temporary reservation.
+Procedure and builtin arguments are evaluated in their established order and
+reuse the scoped pool only after earlier expression leases end.
+
+Call scopes preserve all caller-owned leases. Any nested expression-producing
+call must acquire a different slot until its caller releases the active value.
+Current builtins already use this rule. Future function lowering must extend
+the same compile-time call-scope analysis across the function call graph;
+Functions and runtime stack frames are not implemented here.
 
 General sprite operations conditionally link the page-aligned 256-byte OAM
 shadow at `$0200-$02FF`. They reserve `runtime_sprite_logical_y` at
@@ -107,8 +130,8 @@ remains the clearest implementation of confirmed random tile reads. Metatile
 maps, modified-tile dictionaries, and compact read caches are deferred because
 they would add lookup cost or runtime complexity.
 
-VBlank callback validation rejects any reachable operation that uses those
-shared compiler temporaries. The interrupt path therefore uses runtime-owned
+VBlank callback validation rejects any reachable operation that uses shared
+compiler expression slots or caches. The interrupt path therefore uses runtime-owned
 Zero Page state plus callback variables, never main-context expression or
 cached-loop storage.
 
@@ -142,16 +165,19 @@ absolute addressing.
 ## Generated memory map
 
 For an output named `build/zero_page.nes`, the compiler writes
-`build/zero_page.map`. The report separates mandatory reservations from
-optional promotion and identifies every user symbol as `Zero Page` or
-`Regular RAM`.
+`build/zero_page.map`. The report separates maximum-live expression
+reservation, compiler caches, policy reservation, recovered Zero Page,
+optional promotion, and hardware reservation. It identifies every user symbol
+as `Zero Page` or `Regular RAM`.
 
 An excerpt for the focused example is:
 
 ```text
 Start  End    Size  Owner     Region
 $0000  $000F    16  Runtime   Zero Page runtime
-$0010  $001F    16  Compiler  Zero Page temporaries (1 used, 15 reserved)
+$0010  ----      0  Compiler  Expression temporaries
+$0010  $0010     1  Compiler  Compiler caches
+$0011  $001F    15  Free      Recovered temporary Zero Page
 $0020  $007F    96  Reserved  Future explicit Zero Page
 $0080  $00FF   128  User      Automatic Zero Page variables (2 used, 126 available)
 $0100  $01FF   256  Reserved  6502 hardware stack
@@ -160,7 +186,9 @@ $0200  $0200     1  User      Regular user variables
 $0201  $07FF  1535  Free      General free RAM
 ```
 
-The generated `.cfg`, Assembly segments, and `.map` report all use the same
+The map also prints `Expression temporary reservation: 0 bytes` and
+`Other compiler caches: 1 byte` for this example. The generated `.cfg`,
+Assembly segments, and `.map` report all use the same
 validated layout object, so their address calculations cannot drift.
 
 The runtime-symbol table also reports:

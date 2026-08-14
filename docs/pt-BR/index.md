@@ -56,6 +56,7 @@ O trabalho planejado é acompanhado separadamente no
 - [Implementação e medições de arrays (0.5.8)](compiler/arrays-0.5.8.md)
 - [Implementação e medições de enumerações (0.5.9)](compiler/enumerations-0.5.9.md)
 - [Implementação e medições de records (0.5.10)](compiler/records-0.5.10.md)
+- [Alocação de temporários de expressão (0.5.11)](compiler/expression-temporaries-0.5.11.md)
 - [Mapa de cobertura de testes semânticos](compiler/test-coverage-map.md)
 - [Recursos não suportados](reference/unsupported-features.md)
 - [Diagnósticos do compilador](reference/diagnostics/index.md)

@@ -1,5 +1,9 @@
 # Milestone 0.5.5: Compiler Architecture and Code Generation Audit
 
+> Historical baseline: milestone 0.5.11 replaced the fixed AST-depth model
+> identified here with exact maximum-live scoped allocation. See
+> [Expression Temporary Allocation (0.5.11)](expression-temporaries-0.5.11.md).
+
 English | [Português (Brasil)](../pt-BR/compiler/optimization-audit-0.5.5.md)
 
 This document establishes the official architecture, code generation, and resource consumption baseline for the **NES Pascal** compiler as of milestone **0.5.5**.

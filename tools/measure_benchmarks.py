@@ -54,7 +54,10 @@ from nes_pascal.ast import (
 )
 from nes_pascal.builtins import BuiltinId
 from nes_pascal.backend_ca65 import generate
-from nes_pascal.codegen_analysis import can_use_direct_rhs_operand
+from nes_pascal.codegen_analysis import (
+    analyze_program_temporaries,
+    expression_temporary_requirement,
+)
 from nes_pascal.memory_layout import (
     DEFAULT_MEMORY_LAYOUT_SETTINGS,
     MemoryLayoutSettings,
@@ -162,47 +165,38 @@ def get_expression_metrics(val: ResolvedValue) -> tuple[int, int]:
     """Compute (tree_depth, max_simultaneous_live_temporaries) for an expression.
 
     - tree_depth: height of the expression tree (0 for leaf literals/variables).
-    - live_temporaries: number of simultaneous expression_temporary_X required during lowering.
-      Under current backend ca65 lowering:
-      Right operand is evaluated first into temp_D, then left operand is evaluated.
-      For simple leaves (e.g. A + B), 1 temporary (temp_0) is used while A is loaded.
+    - live_temporaries: scoped maximum-live expression slots required by the
+      same lifetime model used by backend emission. Direct operands use zero;
+      complex right operands are evaluated before their result slot is leased.
     """
     if isinstance(val, (ResolvedBinaryExpression, ResolvedComparisonExpression)):
-        d_l, t_l = get_expression_metrics(val.left)
-        d_r, t_r = get_expression_metrics(val.right)
+        d_l, _ = get_expression_metrics(val.left)
+        d_r, _ = get_expression_metrics(val.right)
         tree_depth = 1 + max(d_l, d_r)
-        if can_use_direct_rhs_operand(val.left, val.right):
-            return tree_depth, t_l
-        # Right evaluated first, then stored in temp_D while left is evaluated:
-        live_temps = max(t_r, 1 + t_l)
-        return tree_depth, live_temps
+        return tree_depth, expression_temporary_requirement(val)
     if isinstance(val, ResolvedBooleanBinaryExpression):
-        d_l, t_l = get_expression_metrics(val.left)
-        d_r, t_r = get_expression_metrics(val.right)
-        return 1 + max(d_l, d_r), max(t_l, t_r)
+        d_l, _ = get_expression_metrics(val.left)
+        d_r, _ = get_expression_metrics(val.right)
+        return 1 + max(d_l, d_r), expression_temporary_requirement(val)
     if isinstance(val, (ResolvedBooleanNotExpression, ResolvedUnaryExpression)):
-        d, t = get_expression_metrics(val.operand)
-        return 1 + d, t
+        d, _ = get_expression_metrics(val.operand)
+        return 1 + d, expression_temporary_requirement(val)
     if isinstance(val, ResolvedBuiltinCall):
         metrics = [get_expression_metrics(argument) for argument in val.arguments]
         if not metrics:
             return 0, 0
         depth = max(item[0] for item in metrics)
-        temporaries = max(item[1] for item in metrics)
         if val.builtin is BuiltinId.GET_TILE:
-            return 1 + depth, max(
-                metrics[0][1],
-                1 + metrics[1][1],
-            )
-        return depth, temporaries
+            return 1 + depth, expression_temporary_requirement(val)
+        return depth, expression_temporary_requirement(val)
     if isinstance(val, ResolvedArrayElement):
-        depth, temporaries = get_expression_metrics(val.index)
-        return 1 + depth, temporaries
+        depth, _ = get_expression_metrics(val.index)
+        return 1 + depth, expression_temporary_requirement(val)
     if isinstance(val, ResolvedRecordField):
         if val.index is None:
             return 0, 0
-        depth, temporaries = get_expression_metrics(val.index)
-        return 1 + depth, temporaries
+        depth, _ = get_expression_metrics(val.index)
+        return 1 + depth, expression_temporary_requirement(val)
     return 0, 0
 
 
@@ -269,7 +263,8 @@ def collect_program_metrics(program: ResolvedProgram) -> tuple[int, int]:
     all_stmts = list(program.statements)
     for proc in program.procedures:
         all_stmts.extend(proc.body)
-    return collect_statement_metrics(tuple(all_stmts))
+    depth, _ = collect_statement_metrics(tuple(all_stmts))
+    return depth, analyze_program_temporaries(program).expression_temporaries
 
 
 @dataclass
@@ -337,8 +332,8 @@ class MemoryAccounting:
     """Explicit ownership and availability totals within the NES 2 KiB RAM."""
 
     zp_runtime_symbol_bytes: int
-    zp_temporary_reserved_bytes: int
-    zp_temporary_required_bytes: int
+    zp_expression_temporary_reserved_bytes: int
+    zp_compiler_cache_bytes: int
     zp_promoted_user_bytes: int
     zp_benchmark_allocated_or_reserved_bytes: int
     zp_policy_reserved_unavailable_bytes: int
@@ -355,6 +350,73 @@ class MemoryAccounting:
     total_committed_or_reserved_address_space_bytes: int
 
 
+LEGACY_FIXED_TEMPORARY_WINDOW_BYTES = 16
+
+
+@dataclass(frozen=True)
+class TemporaryBaselineComparison:
+    """0.5.5 fixed-window values compared with the current exact layout."""
+
+    legacy_expression_temporary_reservation_bytes: int
+    actual_max_live_expression_temporaries: int
+    expression_temporary_reservation_bytes: int
+    compiler_cache_bytes: int
+    expression_reservation_reduction_bytes: int
+    net_zero_page_saved_bytes: int
+    legacy_zp_allocated_or_reserved_bytes: int
+    current_zp_allocated_or_reserved_bytes: int
+    legacy_zp_allocator_visible_free_bytes: int
+    current_zp_allocator_visible_free_bytes: int
+
+
+def compare_legacy_temporary_accounting(
+    memory: MemoryAccounting,
+    max_live_temporaries: int,
+) -> TemporaryBaselineComparison:
+    """Reconstruct the measured legacy fixed-window accounting exactly."""
+
+    assert (
+        max_live_temporaries
+        == memory.zp_expression_temporary_reserved_bytes
+    )
+    current_compiler_storage = (
+        memory.zp_expression_temporary_reserved_bytes
+        + memory.zp_compiler_cache_bytes
+    )
+    net_saved = LEGACY_FIXED_TEMPORARY_WINDOW_BYTES - current_compiler_storage
+    legacy_allocated = (
+        memory.zp_benchmark_allocated_or_reserved_bytes + net_saved
+    )
+    legacy_free = memory.zp_allocator_visible_free_bytes - net_saved
+    assert legacy_allocated + legacy_free == (
+        memory.zp_benchmark_allocated_or_reserved_bytes
+        + memory.zp_allocator_visible_free_bytes
+    )
+    return TemporaryBaselineComparison(
+        legacy_expression_temporary_reservation_bytes=(
+            LEGACY_FIXED_TEMPORARY_WINDOW_BYTES
+        ),
+        actual_max_live_expression_temporaries=max_live_temporaries,
+        expression_temporary_reservation_bytes=(
+            memory.zp_expression_temporary_reserved_bytes
+        ),
+        compiler_cache_bytes=memory.zp_compiler_cache_bytes,
+        expression_reservation_reduction_bytes=(
+            LEGACY_FIXED_TEMPORARY_WINDOW_BYTES
+            - memory.zp_expression_temporary_reserved_bytes
+        ),
+        net_zero_page_saved_bytes=net_saved,
+        legacy_zp_allocated_or_reserved_bytes=legacy_allocated,
+        current_zp_allocated_or_reserved_bytes=(
+            memory.zp_benchmark_allocated_or_reserved_bytes
+        ),
+        legacy_zp_allocator_visible_free_bytes=legacy_free,
+        current_zp_allocator_visible_free_bytes=(
+            memory.zp_allocator_visible_free_bytes
+        ),
+    )
+
+
 def measure_memory_accounting(layout: ProgramMemoryLayout) -> MemoryAccounting:
     """Measure allocated, policy-reserved, hardware-reserved, and free RAM."""
 
@@ -363,17 +425,20 @@ def measure_memory_accounting(layout: ProgramMemoryLayout) -> MemoryAccounting:
         for symbol in layout.runtime_symbols
         if symbol.region_name == layout.zero_page_runtime.name
     )
-    zp_temporary_reserved = layout.temporary_storage.size
-    zp_temporary_required = layout.temporary_bytes_used
+    zp_expression_temporary_reserved = layout.expression_temporary_bytes
+    zp_compiler_caches = layout.compiler_cache_bytes
     zp_promoted = layout.promoted_bytes_used
     zp_benchmark_allocated_or_reserved = (
-        zp_runtime + zp_temporary_reserved + zp_promoted
+        zp_runtime
+        + zp_expression_temporary_reserved
+        + zp_compiler_caches
+        + zp_promoted
     )
 
     # The current policy keeps the unused tail of the fixed runtime partition
     # and the future explicit-ZP partition unavailable to the normal allocator.
-    # Unused temporary bytes are already included in the benchmark reservation
-    # above, while unused automatic-promotion bytes remain allocator-visible.
+    # Recovered temporary capacity and unused automatic-promotion bytes remain
+    # allocator-visible; compiler caches are allocated, not expression temps.
     zp_policy_reserved_unavailable = (
         layout.zero_page_runtime.size
         - zp_runtime
@@ -382,6 +447,7 @@ def measure_memory_accounting(layout: ProgramMemoryLayout) -> MemoryAccounting:
     zp_allocator_visible_free = (
         layout.zero_page_automatic.size
         - zp_promoted
+        + layout.zero_page_recovered.size
         + layout.zero_page_unallocated.size
     )
 
@@ -428,8 +494,10 @@ def measure_memory_accounting(layout: ProgramMemoryLayout) -> MemoryAccounting:
 
     return MemoryAccounting(
         zp_runtime_symbol_bytes=zp_runtime,
-        zp_temporary_reserved_bytes=zp_temporary_reserved,
-        zp_temporary_required_bytes=zp_temporary_required,
+        zp_expression_temporary_reserved_bytes=(
+            zp_expression_temporary_reserved
+        ),
+        zp_compiler_cache_bytes=zp_compiler_caches,
         zp_promoted_user_bytes=zp_promoted,
         zp_benchmark_allocated_or_reserved_bytes=(
             zp_benchmark_allocated_or_reserved
@@ -759,18 +827,19 @@ def run_all_benchmarks() -> list[BenchmarkMetrics]:
 
 def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
     lines: list[str] = [
-        "# NES Pascal Compiler Benchmark Results (0.5.5 Corpus + 0.5.8 Arrays + 0.5.9 Enumerations + 0.5.10 Records)",
+        "# NES Pascal Compiler Benchmark Results (through 0.5.11 Expression Temporaries)",
         "",
         "## 1. CPU RAM Accounting",
         "",
-        "| Benchmark | ZP Runtime Symbols | ZP Temp Reserved | ZP Temp Required | ZP Promoted | ZP Benchmark Alloc./Reserved | ZP Policy Reserved | ZP Allocator Free | Regular Runtime/User | OAM Shadow | Non-ZP Allocated | Stack Reserved | Regular Allocator Free | Total Allocator Free | Compiler/Runtime/User Alloc./Reserved | Total Committed/Reserved |",
+        "| Benchmark | ZP Runtime Symbols | Expression Temp Reserved | Other Compiler Caches | ZP Promoted | ZP Benchmark Alloc./Reserved | ZP Policy Reserved | ZP Allocator Free | Regular Runtime/User | OAM Shadow | Non-ZP Allocated | Stack Reserved | Regular Allocator Free | Total Allocator Free | Compiler/Runtime/User Alloc./Reserved | Total Committed/Reserved |",
         "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
     ]
     for m in metrics_list:
         memory = m.memory
         lines.append(
             f"| `{m.spec.name}` | {memory.zp_runtime_symbol_bytes} B | "
-            f"{memory.zp_temporary_reserved_bytes} B | {memory.zp_temporary_required_bytes} B | "
+            f"{memory.zp_expression_temporary_reserved_bytes} B | "
+            f"{memory.zp_compiler_cache_bytes} B | "
             f"{memory.zp_promoted_user_bytes} B | {memory.zp_benchmark_allocated_or_reserved_bytes} B | "
             f"{memory.zp_policy_reserved_unavailable_bytes} B | {memory.zp_allocator_visible_free_bytes} B | "
             f"{memory.regular_runtime_user_allocated_bytes} B | {memory.oam_shadow_allocated_bytes} B | "
@@ -781,13 +850,41 @@ def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
         )
     lines.extend([
         "",
-        "Definitions: `ZP Benchmark Alloc./Reserved` includes the fixed compiler temporary "
-        "reservation; `ZP Temp Required` reports the bytes backed by generated temporary "
-        "symbols. `ZP Policy Reserved` is unavailable by memory policy but is not program "
+        "Definitions: `Expression Temp Reserved` equals the measured maximum live "
+        "expression slots. `Other Compiler Caches` currently contains cached for-loop "
+        "limits. `ZP Policy Reserved` is unavailable by memory policy but is not program "
         "consumption. `Total Committed/Reserved` includes compiler/runtime/user storage, "
         "hardware stack reservation, and policy-reserved Zero Page.",
         "",
-        "## 2. Code and Expression Metrics",
+        "## 2. Expression-Temporary Baseline Comparison",
+        "",
+        "| Benchmark | Legacy Fixed Temp Window | Actual Max Live | New Expression Reservation | Other Compiler Caches | Expression Reservation Reduction | Net ZP Saved | Legacy ZP Alloc./Reserved | New ZP Alloc./Reserved | Legacy ZP Free | New ZP Free |",
+        "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
+    ])
+    for m in metrics_list:
+        comparison = compare_legacy_temporary_accounting(
+            m.memory, m.max_live_temporaries
+        )
+        lines.append(
+            f"| `{m.spec.name}` | "
+            f"{comparison.legacy_expression_temporary_reservation_bytes} B | "
+            f"{comparison.actual_max_live_expression_temporaries} | "
+            f"{comparison.expression_temporary_reservation_bytes} B | "
+            f"{comparison.compiler_cache_bytes} B | "
+            f"{comparison.expression_reservation_reduction_bytes} B | "
+            f"{comparison.net_zero_page_saved_bytes} B | "
+            f"{comparison.legacy_zp_allocated_or_reserved_bytes} B | "
+            f"{comparison.current_zp_allocated_or_reserved_bytes} B | "
+            f"{comparison.legacy_zp_allocator_visible_free_bytes} B | "
+            f"{comparison.current_zp_allocator_visible_free_bytes} B |"
+        )
+    lines.extend([
+        "",
+        "The legacy 16-byte window also held loop caches. Therefore `Expression "
+        "Reservation Reduction` isolates the expression-policy change, while `Net ZP "
+        "Saved` subtracts compiler caches that remain required.",
+        "",
+        "## 3. Code and Expression Metrics",
         "",
         "| Benchmark | Category | PRG Code | PRG Occupied | Tree Depth | Max Live Temps | Instructions | Estimated Static Base Cycles |",
         "| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |",
@@ -805,7 +902,7 @@ def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
         "instruction is counted once at its base cost, branches are treated as not taken, "
         "and dynamic loop counts, page crossing, interrupts, and DMA are excluded.",
         "",
-        "## 3. Runtime Feature Selection",
+        "## 4. Runtime Feature Selection",
         "",
         "| Benchmark | Registry runtime features |",
         "| :--- | :--- |",
@@ -815,7 +912,7 @@ def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
         lines.append(f"| `{m.spec.name}` | {features} |")
     lines.extend([
         "",
-        "## 4. Inefficient Assembly Pattern Frequency",
+        "## 5. Inefficient Assembly Pattern Frequency",
         "",
         "| Benchmark | Redundant Temp Stores | Boolean Materializations ($00/$01) | Redundant CMP #$00 | STA->LDA Roundtrips | Total Instructions |",
         "| :--- | :---: | :---: | :---: | :---: | :---: |",

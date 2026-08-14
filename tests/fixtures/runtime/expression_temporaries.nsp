@@ -1,0 +1,70 @@
+program ExpressionTemporariesRuntime;
+
+type
+    Enemy = record
+        X: byte;
+        Y: byte;
+    end;
+
+var
+    Values: array[$00..$03] of byte;
+    Indexes: array[$00..$03] of byte;
+    Enemies: array[$00..$03] of Enemy;
+    I: byte;
+    J: byte;
+    K: byte;
+    L: byte;
+    OneTemporary: byte;
+    TwoTemporaries: byte;
+    DeepTemporaries: byte;
+    ReusedTemporaries: byte;
+    NestedIndexResult: byte;
+    RecordResult: byte;
+    ProcedureFirst: byte;
+    ProcedureSecond: byte;
+    ComparisonResult: boolean;
+
+procedure Capture(First: byte; Second: byte);
+begin
+    ProcedureFirst := First;
+    ProcedureSecond := Second;
+end;
+
+begin
+    Values[$00] := $F0;
+    Values[$01] := $20;
+    Values[$02] := $05;
+    Values[$03] := $02;
+    Indexes[$00] := $03;
+    Indexes[$01] := $00;
+    Indexes[$02] := $03;
+    Indexes[$03] := $01;
+    Enemies[$00].X := $80;
+    Enemies[$01].Y := $11;
+    I := $00;
+    J := $01;
+    K := $02;
+    L := $03;
+
+    OneTemporary := Values[I] + Values[J];
+    TwoTemporaries := (Values[I] + Values[J]) + Values[K];
+    DeepTemporaries := ((Values[I] + Values[J]) + Values[K]) + Values[L];
+    ReusedTemporaries := ((Values[I] + Values[J]) + Values[K]) + Values[L];
+    NestedIndexResult := Values[Indexes[I]];
+    RecordResult := Enemies[I].X + Enemies[J].Y;
+    ComparisonResult :=
+        (Values[I] + Values[J]) > (Values[K] + Values[L]);
+    Values[Indexes[K]] := (Values[I] + Values[J]) + Values[K];
+    Enemies[Indexes[I]].X := TwoTemporaries;
+    Capture(
+        (Values[I] + Values[J]) + Values[K],
+        Values[I] + Values[J]
+    );
+
+    nes.set_background_color($0F);
+    nes.run;
+    nes.set_scroll(
+        (Values[I] + Values[J]) + Values[K],
+        Values[I] + Values[J]
+    );
+end.

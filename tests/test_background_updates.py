@@ -268,11 +268,11 @@ end.
         self.assertEqual(accounting.regular_runtime_user_allocated_bytes, 26)
         self.assertEqual(accounting.oam_shadow_allocated_bytes, 0)
         self.assertEqual(accounting.regular_allocator_visible_free_bytes, 1510)
-        self.assertEqual(accounting.zp_allocator_visible_free_bytes, 128)
-        self.assertEqual(accounting.total_allocator_visible_free_bytes, 1638)
+        self.assertEqual(accounting.zp_allocator_visible_free_bytes, 144)
+        self.assertEqual(accounting.total_allocator_visible_free_bytes, 1654)
         self.assertEqual(
             accounting.total_committed_or_reserved_address_space_bytes,
-            410,
+            394,
         )
         assembly = generate(program, layout)
         self.assertNotIn("runtime_background_shadow", assembly)

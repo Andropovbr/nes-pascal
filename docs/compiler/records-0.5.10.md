@@ -1,5 +1,9 @@
 # Record Implementation and Measurements (0.5.10)
 
+> Historical note: fixed-pool figures below record the 0.5.10 state. Milestone
+> [0.5.11](expression-temporaries-0.5.11.md) now reserves zero expression bytes
+> for this benchmark and recovers the complete 16-byte legacy window.
+
 English | [Português (Brasil)](../pt-BR/compiler/records-0.5.10.md)
 
 Milestone 0.5.10 adds nominal, fixed-layout records as compiler metadata and

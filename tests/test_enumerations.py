@@ -289,7 +289,10 @@ class EnumerationMemoryAndBackendTests(unittest.TestCase):
         self.assertEqual(metrics.estimated_static_base_cycles, 408)
         self.assertEqual(metrics.max_expression_tree_depth, 1)
         self.assertEqual(metrics.max_live_temporaries, 0)
-        self.assertEqual(metrics.memory.zp_temporary_required_bytes, 0)
+        self.assertEqual(
+            metrics.memory.zp_expression_temporary_reserved_bytes, 0
+        )
+        self.assertEqual(metrics.memory.zp_compiler_cache_bytes, 0)
         self.assertEqual(metrics.memory.regular_user_bytes, 2)
         self.assertEqual(metrics.memory.zp_promoted_user_bytes, 1)
         self.assertEqual(metrics.runtime_features, ())
