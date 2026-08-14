@@ -41,7 +41,7 @@ the range reserved for their category.
 | [E3012](semantic.md) | Semantic Analysis | For control variable modification |
 | [E3013](semantic.md) | Semantic Analysis | Unknown procedure |
 | [E3014](semantic.md) | Semantic Analysis | Recursive callable cycle |
-| [E3015](semantic.md) | Semantic Analysis | Runtime command inside procedure |
+| [E3015](semantic.md) | Semantic Analysis | Runtime command inside callable |
 | [E3016](semantic.md) | Semantic Analysis | Incorrect procedure argument count |
 | [E3017](semantic.md) | Semantic Analysis | Frame wait before runtime start |
 | [E3018](semantic.md) | Semantic Analysis | Unknown callback procedure |

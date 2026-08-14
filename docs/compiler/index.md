@@ -59,6 +59,10 @@ written, with explicit historical notes added where relevant.
 - [Functions implementation and ABI](functions-0.5.12.md) — implementation report.
 - [Milestone 0.5.12 — Functions: completeness and quality audit](milestone-0.5.12-audit.md) — independent milestone audit.
 
+## Cross-cutting audits
+
+- [Diagnostic catalog and error-message consistency audit](diagnostic-consistency-audit.md) — cross-cutting QA audit of the diagnostic catalog, coverage, message quality, precedence, and EN/PT-BR parity.
+
 For durable, non-milestone compiler material, see the
 [Semantic test coverage map](test-coverage-map.md) and the
 [Reference](../reference/index.md) section.
