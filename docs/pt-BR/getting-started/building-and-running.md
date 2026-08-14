@@ -39,6 +39,7 @@ python -m nes_pascal.cli examples/palette_support.nsp -o build/palette_support.n
 python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
 python -m nes_pascal.cli examples/background_updates.nsp -o build/background_updates.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
 python -m nes_pascal.cli examples/scrolling_ppu_state.nsp -o build/scrolling_ppu_state.nes --mirroring horizontal
+python -m nes_pascal.cli examples/gameplay_full_stack.nsp -o build/gameplay_full_stack.nes --chr assets/game.chr --nametable assets/nametable_loading.nam --metasprite assets/player_consolidated.json
 ```
 
 Os exemplos demonstram:
@@ -110,6 +111,9 @@ Os exemplos demonstram:
   com shadow confirmado, rejeição de estouro de tiles e atributos, cancelamento
   de pendências, limpeza explícita de estouro e uma atualização de atributos
   brutos após a inicialização do runtime.
+- `gameplay_full_stack.nsp`: o exemplo full-stack que combina carregamento de
+  background, entrada de controle, paletas, um jogador metasprite em movimento
+  com animação e pressão combinada de RAM em um único programa.
 
 As constantes `PlayerMinimumX`, `PlayerMaximumX`, `PlayerMinimumY` e
 `PlayerMaximumY` do exemplo do jogador são específicas do asset incluído, e não
