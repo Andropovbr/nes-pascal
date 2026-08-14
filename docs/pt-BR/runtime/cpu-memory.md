@@ -24,7 +24,8 @@ e nunca são tratados como armazenamento adicional.
 | após blocos anteriores de runtime | 0 ou 41 bytes | Runtime | Shadow de paleta e flags atômicas de dirty, alocado apenas para chamadas de paleta em runtime |
 | após blocos anteriores de runtime | 0 ou 960 bytes | Runtime | Shadow de tiles confirmados, incluído apenas por `nes.get_tile` |
 | após o shadow opcional de tiles | 0 a 23 bytes | Runtime | Estado condicionalmente selecionado de fila de fundo, flags e helpers |
-| de `$0200` sem sprites, senão `$0300` | até 1.536 ou 1.280 bytes | User/free | Variáveis globais não promovidas e todos os parâmetros de procedimentos |
+| após os dados comuns de runtime | um byte por função | Compiler | Armazenamento estático do resultado de cada função |
+| após os resultados do compilador | RAM comum restante | User/free | Globais não promovidas e parâmetros de procedimentos/funções |
 
 As janelas da política da Zero Page são fixas e não se sobrepõem. Símbolos de
 runtime, slots de expressão medidos e caches do compilador são obrigatórios quando
@@ -49,14 +50,17 @@ uma categoria contábil separada.
 Escritas com índice variável em arrays e arrays de records continuam preservando o
 índice calculado na pilha de hardware do 6502 durante a avaliação do lado direito.
 Esses bytes da pilha não contam como reserva de temporários de expressão. Argumentos
-de procedimentos e builtins mantêm sua ordem de avaliação e reutilizam o pool apenas
+de procedimentos, funções e builtins mantêm sua ordem de avaliação e reutilizam o pool apenas
 depois que aluguéis anteriores terminam.
 
 Escopos de chamada preservam todos os slots pertencentes ao chamador. Uma chamada
 aninhada que produza expressão deve adquirir outro slot até o chamador liberar o
-valor ativo. Os builtins atuais já seguem essa regra. A futura geração de Functions
-deverá estender a mesma análise pelo grafo de chamadas; Functions e frames de pilha
-de runtime não são implementados aqui.
+valor ativo. A análise aplica essa regra ao grafo acíclico completo. Argumentos
+anteriores também recebem slots quando um argumento posterior pode chamar uma
+função e sobrescrever parâmetros estáticos. Cada função tem um byte de resultado
+em RAM comum e retorna em `A`; não há frame de runtime nem área fixa global de
+retorno. Cada `JSR` ativo usa apenas seu endereço de retorno normal de dois bytes
+na pilha de hardware, reportado pela métrica de profundidade de chamadas.
 
 Operações gerais de sprites incluem condicionalmente o shadow de OAM de 256 bytes
 alinhado a página em `$0200-$02FF`. Elas reservam `runtime_sprite_logical_y` em
@@ -88,6 +92,11 @@ Programas sem operações individuais de sprites, metasprites ou OAM omitem o s�
 OAM, segmento no Assembly, região no linker, código de DMA e estado de sprites. Sua
 alocação comum de runtime e usuário inicia em `$0200`, disponibilizando essa página de
 256 bytes em vez de reservá-la implicitamente.
+
+Bytes de resultado de funções começam imediatamente após os dados comuns de
+runtime e antes do armazenamento comum do usuário. Eles aparecem no segmento
+`FUNCTION_RESULTS` e em `Compiler Symbols` no mapa. Um programa sem funções
+omite a região, o segmento, os símbolos e o código.
 
 Programas com chamadas de paleta em runtime reservam um shadow de paleta de 32 bytes,
 quatro flags de paleta de fundo, quatro flags de paleta de sprites, uma flag de cor
@@ -139,7 +148,7 @@ ainda não está implementada.
 
 A promoção é opcional e conservadora:
 
-1. Apenas variáveis globais são candidatas. Parâmetros de procedimentos sempre utilizam RAM comum.
+1. Apenas variáveis globais são candidatas. Parâmetros de procedimentos e funções sempre utilizam RAM comum.
 2. O compilador conta as operações estáticas do código-fonte que leem ou escrevem em cada global.
    Ele não estima iterações de laços ou frequência de chamadas de procedimentos.
 3. Uma variável global torna-se elegível após pelo menos três referências no código-fonte.

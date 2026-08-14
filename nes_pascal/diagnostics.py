@@ -76,6 +76,11 @@ class DiagnosticCode(StrEnum):
     INVALID_METASPRITE_ANIMATION = "E3056"
     INVALID_BUILTIN_CONTEXT = "E3057"
     INVALID_BUILTIN_ARGUMENT_COUNT = "E3058"
+    UNKNOWN_FUNCTION = "E3059"
+    FUNCTION_ARGUMENT_COUNT = "E3060"
+    FUNCTION_USED_AS_STATEMENT = "E3061"
+    PROCEDURE_USED_AS_EXPRESSION = "E3062"
+    UNDEFINED_FUNCTION_RESULT = "E3063"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -101,6 +106,7 @@ class DiagnosticCode(StrEnum):
     RECURSIVE_RECORD_DEFINITION = "E4023"
     RECORD_LAYOUT_OVERFLOW = "E4024"
     INVALID_RECORD_USAGE = "E4025"
+    UNSUPPORTED_FUNCTION_RETURN_TYPE = "E4026"
     MISSING_TOOLCHAIN = "E5001"
     TOOLCHAIN_FAILURE = "E5002"
     USER_RAM_EXHAUSTED = "E5003"
@@ -186,10 +192,10 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
         DiagnosticCategory.SEMANTIC, "Unknown procedure"
     ),
     DiagnosticCode.RECURSIVE_PROCEDURE_CALL: DiagnosticDefinition(
-        DiagnosticCategory.SEMANTIC, "Recursive procedure call"
+        DiagnosticCategory.SEMANTIC, "Recursive callable cycle"
     ),
     DiagnosticCode.PROCEDURE_RUNTIME_COMMAND: DiagnosticDefinition(
-        DiagnosticCategory.SEMANTIC, "Runtime command inside procedure"
+        DiagnosticCategory.SEMANTIC, "Runtime command inside callable"
     ),
     DiagnosticCode.PROCEDURE_ARGUMENT_COUNT: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Incorrect procedure argument count"
@@ -326,6 +332,21 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     DiagnosticCode.INVALID_BUILTIN_ARGUMENT_COUNT: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Invalid builtin argument count"
     ),
+    DiagnosticCode.UNKNOWN_FUNCTION: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Unknown function"
+    ),
+    DiagnosticCode.FUNCTION_ARGUMENT_COUNT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Incorrect function argument count"
+    ),
+    DiagnosticCode.FUNCTION_USED_AS_STATEMENT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Function used as statement"
+    ),
+    DiagnosticCode.PROCEDURE_USED_AS_EXPRESSION: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Procedure used as expression"
+    ),
+    DiagnosticCode.UNDEFINED_FUNCTION_RESULT: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Undefined function result"
+    ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"
     ),
@@ -400,6 +421,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INVALID_RECORD_USAGE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Invalid record usage"
+    ),
+    DiagnosticCode.UNSUPPORTED_FUNCTION_RETURN_TYPE: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Unsupported function return type"
     ),
     DiagnosticCode.MISSING_TOOLCHAIN: DiagnosticDefinition(
         DiagnosticCategory.CODE_GENERATION, "Missing toolchain"

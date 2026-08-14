@@ -1,0 +1,9 @@
+program RecursiveFunction;
+function Loop: byte;
+begin
+    Loop := Loop();
+end;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+end.

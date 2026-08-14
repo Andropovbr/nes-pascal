@@ -318,3 +318,10 @@ Type-system diagnostics use the E4000-E4999 range.
 - **Trigger:** Compile
   `tests/fixtures/diagnostics/invalid_record_usage.nsp`.
 - **Suggested fix:** Read, assign, or compare the individual typed fields.
+
+## E4026 - Unsupported function return type
+
+- **Category:** Type System
+- **Explanation:** User functions currently return only `byte` or `boolean`; arrays, records, enums, and NES-specific handle types are not supported return values.
+- **Trigger:** Compile `tests/fixtures/diagnostics/unsupported_function_return_type.nsp`.
+- **Suggested fix:** Return a `byte` or `boolean` and store aggregate or hardware state in explicitly declared variables.

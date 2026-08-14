@@ -93,6 +93,9 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_arrays_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("arrays")
 
+    def test_functions_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("functions")
+
     def test_enumerations_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("enumerations")
 
@@ -661,6 +664,15 @@ class MesenIntegrationTests(unittest.TestCase):
                 / "fixtures"
                 / "runtime"
                 / "expression_temporaries.nsp"
+            ),
+        )
+
+    def test_functions_preserve_nested_calls_order_and_short_circuiting(self) -> None:
+        self._run_mesen_test(
+            "functions",
+            "verify_functions.lua",
+            source_path=(
+                ROOT / "tests" / "fixtures" / "runtime" / "functions.nsp"
             ),
         )
 

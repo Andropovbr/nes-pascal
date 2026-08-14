@@ -1,0 +1,12 @@
+program FunctionArgumentCount;
+var
+    Value: byte;
+function Identity(Input: byte): byte;
+begin
+    Identity := Input;
+end;
+begin
+    Value := Identity();
+    nes.set_background_color($0F);
+    nes.run;
+end.

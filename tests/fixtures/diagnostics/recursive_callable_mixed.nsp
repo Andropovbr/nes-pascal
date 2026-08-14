@@ -1,0 +1,17 @@
+program RecursiveCallableMixed;
+var
+    Value: byte;
+procedure Step;
+begin
+    Value := Compute();
+end;
+function Compute: byte;
+begin
+    Step;
+    Compute := $01;
+end;
+begin
+    Value := $00;
+    nes.set_background_color($0F);
+    nes.run;
+end.

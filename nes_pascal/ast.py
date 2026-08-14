@@ -279,6 +279,13 @@ class BuiltinCall:
     position: SourcePosition
 
 
+@dataclass(frozen=True, slots=True)
+class FunctionCall:
+    name: str
+    arguments: tuple[ValueExpression, ...]
+    position: SourcePosition
+
+
 ValueExpression = (
     HexLiteral
     | BooleanLiteral
@@ -292,6 +299,7 @@ ValueExpression = (
     | BooleanNotExpression
     | BooleanBinaryExpression
     | BuiltinCall
+    | FunctionCall
 )
 
 
@@ -446,6 +454,16 @@ class ProcedureDeclaration:
 
 
 @dataclass(frozen=True, slots=True)
+class FunctionDeclaration:
+    name: str
+    body: tuple[Statement, ...]
+    position: SourcePosition
+    return_type: VariableType
+    return_type_position: SourcePosition
+    parameters: tuple[ProcedureParameter, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class Program:
     name: str
     enum_types: tuple[EnumTypeDeclaration, ...]
@@ -453,6 +471,7 @@ class Program:
     constants: tuple[ConstantDeclaration, ...]
     variables: tuple[VariableDeclaration, ...]
     procedures: tuple[ProcedureDeclaration, ...]
+    functions: tuple[FunctionDeclaration, ...]
     statements: tuple[Statement, ...]
     end_position: SourcePosition | None = field(default=None, compare=False)
 
@@ -528,6 +547,14 @@ class ResolvedBuiltinCall:
     queued: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedFunctionCall:
+    name: str
+    label: str
+    arguments: tuple[ResolvedArgument, ...]
+    return_type: BuiltInType
+
+
 ResolvedValue = (
     ImmediateValue
     | VariableValue
@@ -539,12 +566,19 @@ ResolvedValue = (
     | ResolvedBooleanNotExpression
     | ResolvedBooleanBinaryExpression
     | ResolvedBuiltinCall
+    | ResolvedFunctionCall
 )
 
 
 @dataclass(frozen=True, slots=True)
 class ResolvedAssignment:
     target: ResolvedVariable
+    value: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedFunctionResultAssignment:
+    result: ResolvedVariable
     value: ResolvedValue
 
 
@@ -718,6 +752,7 @@ class OamReservation:
 
 ResolvedStatement = (
     ResolvedAssignment
+    | ResolvedFunctionResultAssignment
     | ResolvedArrayElementAssignment
     | ResolvedRecordFieldAssignment
     | ResolvedBuiltinCall
@@ -746,10 +781,21 @@ class ResolvedProcedure:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedFunction:
+    name: str
+    label: str
+    body: tuple[ResolvedStatement, ...]
+    return_type: BuiltInType
+    result: ResolvedVariable
+    parameters: tuple[ResolvedVariable, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedProgram:
     name: str
     variables: tuple[ResolvedVariable, ...]
     procedures: tuple[ResolvedProcedure, ...]
+    functions: tuple[ResolvedFunction, ...]
     statements: tuple[ResolvedStatement, ...]
     oam_reservations: tuple[OamReservation, ...] = ()
     metasprite_assets: tuple[MetaspriteAsset, ...] = ()

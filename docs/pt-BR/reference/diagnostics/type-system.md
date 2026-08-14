@@ -311,3 +311,10 @@ Diagnósticos do sistema de tipos utilizam o intervalo E4000-E4999.
   `tests/fixtures/diagnostics/invalid_record_usage.nsp`.
 - **Correção sugerida:** Leia, atribua ou compare os campos tipados
   individualmente.
+
+## E4026 - Tipo de retorno de função não suportado
+
+- **Categoria:** Sistema de Tipos
+- **Explicação:** Funções de usuário retornam apenas `byte` ou `boolean`; arrays, records, enums e handles específicos do NES não são retornos suportados.
+- **Gatilho:** Compile `tests/fixtures/diagnostics/unsupported_function_return_type.nsp`.
+- **Correção sugerida:** Retorne `byte` ou `boolean` e mantenha agregados ou estado de hardware em variáveis declaradas explicitamente.

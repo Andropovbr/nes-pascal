@@ -19,6 +19,7 @@ compatible with Pascal or Free Pascal.
 - [Loops](loops.md)
 - [Increment and decrement](increment-and-decrement.md)
 - [Procedures](procedures.md)
+- [Functions](functions.md)
 
 The implemented built-in commands are documented separately under
 [NES Runtime](../runtime/index.md). See

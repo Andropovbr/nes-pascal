@@ -1,0 +1,9 @@
+program UnsupportedFunctionReturn;
+function SpriteResult: sprite;
+begin
+    SpriteResult := $00;
+end;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+end.

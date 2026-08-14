@@ -19,6 +19,7 @@ com Pascal ou Free Pascal.
 - [Laços de repetição](loops.md)
 - [Incremento e decremento](increment-and-decrement.md)
 - [Procedimentos](procedures.md)
+- [Funções](functions.md)
 
 Os comandos embutidos implementados estão documentados separadamente em
 [Runtime do NES](../runtime/index.md). Consulte

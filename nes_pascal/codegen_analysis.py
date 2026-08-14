@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, is_dataclass
 from typing import Iterator
 
 from .ast import (
@@ -18,6 +18,8 @@ from .ast import (
     ResolvedComparisonExpression,
     ResolvedDecrementStatement,
     ResolvedForStatement,
+    ResolvedFunctionCall,
+    ResolvedFunctionResultAssignment,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
     ResolvedProcedureCall,
@@ -67,9 +69,9 @@ class TemporaryPool:
 
     Slots are leased from the lowest available index. Active caller slots stay
     leased across ``call_scope`` boundaries, so nested expression-producing
-    calls can only receive non-aliasing slots. This is the compile-time rule
-    that future function lowering must preserve; no runtime frame is needed by
-    the current procedure-only language.
+    calls can only receive non-aliasing slots. Function lowering preserves this
+    compile-time rule, so the current non-recursive callable model needs no
+    runtime frame.
     """
 
     def __init__(self, capacity: int | None = None) -> None:
@@ -126,6 +128,8 @@ class TemporaryRequirements:
 
     expression_temporaries: int
     compiler_caches: int
+    callable_bases: tuple[tuple[str, int], ...] = ()
+    max_call_depth: int = 0
 
     @property
     def total_bytes(self) -> int:
@@ -155,6 +159,8 @@ def is_side_effect_free_value(value: ResolvedValue) -> bool:
             value.right
         )
     if isinstance(value, ResolvedBuiltinCall):
+        return False
+    if isinstance(value, ResolvedFunctionCall):
         return False
     return False
 
@@ -209,6 +215,20 @@ def analyze_expression_temporaries(
             for argument in value.arguments:
                 analyze_expression_temporaries(argument, pool)
         return
+    if isinstance(value, ResolvedFunctionCall):
+        leases: list[TemporarySlot] = []
+        try:
+            for index, argument in enumerate(value.arguments):
+                analyze_expression_temporaries(argument.value, pool)
+                if any(
+                    value_contains_function_call(later.value)
+                    for later in value.arguments[index + 1 :]
+                ):
+                    leases.append(pool.acquire())
+        finally:
+            for lease in reversed(leases):
+                lease.release()
+        return
     if isinstance(value, ResolvedArrayElement):
         analyze_expression_temporaries(value.index, pool)
         return
@@ -228,13 +248,8 @@ def expression_temporary_requirement(value: ResolvedValue) -> int:
 def analyze_program_temporaries(program: ResolvedProgram) -> TemporaryRequirements:
     """Calculate exact expression-pool demand and independent loop caches."""
 
-    pool = TemporaryPool()
-    for statement in program.statements:
-        _analyze_statement_temporaries(statement, pool)
-    for procedure in program.procedures:
-        for statement in procedure.body:
-            _analyze_statement_temporaries(statement, pool)
-    pool.assert_all_released()
+    analyzer = _ProgramTemporaryAnalyzer(program)
+    analyzer.analyze()
 
     compiler_caches = sum(
         _count_for_statements(statement) for statement in program.statements
@@ -242,70 +257,156 @@ def analyze_program_temporaries(program: ResolvedProgram) -> TemporaryRequiremen
         _count_for_statements(statement)
         for procedure in program.procedures
         for statement in procedure.body
+    ) + sum(
+        _count_for_statements(statement)
+        for function in program.functions
+        for statement in function.body
     )
-    return TemporaryRequirements(pool.max_live, compiler_caches)
+    return TemporaryRequirements(
+        analyzer.pool.max_live,
+        compiler_caches,
+        tuple(sorted(analyzer.callable_bases.items())),
+        analyzer.max_call_depth,
+    )
 
 
-def _analyze_statement_temporaries(
-    statement: ResolvedStatement,
-    pool: TemporaryPool,
-) -> None:
-    if isinstance(statement, ResolvedRecordFieldAssignment):
-        if statement.index is not None:
-            analyze_expression_temporaries(statement.index, pool)
-        analyze_expression_temporaries(statement.value, pool)
-        return
-    if isinstance(statement, ResolvedArrayElementAssignment):
-        analyze_expression_temporaries(statement.index, pool)
-        analyze_expression_temporaries(statement.value, pool)
-        return
-    if isinstance(statement, ResolvedAssignment):
-        analyze_expression_temporaries(statement.value, pool)
-        return
-    if isinstance(statement, ResolvedBuiltinCall):
-        with pool.call_scope():
-            for argument in statement.arguments:
-                analyze_expression_temporaries(argument, pool)
-        return
-    if isinstance(statement, (ResolvedIncrementStatement, ResolvedDecrementStatement)):
-        if statement.amount is None:
+def value_contains_function_call(value: ResolvedValue) -> bool:
+    """Return whether evaluating ``value`` can execute a user function."""
+
+    if isinstance(value, ResolvedFunctionCall):
+        return True
+    if not is_dataclass(value):
+        return False
+    for field in fields(value):
+        child = getattr(value, field.name)
+        if isinstance(child, tuple):
+            for item in child:
+                nested = getattr(item, "value", item)
+                if is_dataclass(nested) and value_contains_function_call(nested):
+                    return True
+        elif is_dataclass(child) and value_contains_function_call(child):
+            return True
+    return False
+
+
+class _ProgramTemporaryAnalyzer:
+    """Replay whole-program temporary lifetimes across the acyclic call graph."""
+
+    def __init__(self, program: ResolvedProgram) -> None:
+        self.program = program
+        self.pool = TemporaryPool()
+        self.callables = {
+            callable_.label: callable_
+            for callable_ in (*program.procedures, *program.functions)
+        }
+        self.callable_bases: dict[str, int] = {
+            label: 0 for label in self.callables
+        }
+        self.max_call_depth = 0
+
+    def analyze(self) -> None:
+        self._statements(self.program.statements, 0)
+        # Unreachable declarations are still emitted and must remain safe.
+        for callable_ in self.callables.values():
+            self._statements(callable_.body, 1)
+        self.pool.assert_all_released()
+
+    def _call(self, label: str, arguments: tuple[object, ...], depth: int) -> None:
+        leases: list[TemporarySlot] = []
+        try:
+            for index, argument in enumerate(arguments):
+                value = argument.value
+                self._value(value, depth)
+                if any(
+                    value_contains_function_call(later.value)
+                    for later in arguments[index + 1 :]
+                ):
+                    leases.append(self.pool.acquire())
+        finally:
+            for lease in reversed(leases):
+                lease.release()
+        self.callable_bases[label] = max(
+            self.callable_bases[label], self.pool.live_count
+        )
+        self.max_call_depth = max(self.max_call_depth, depth + 1)
+        self._statements(self.callables[label].body, depth + 1)
+
+    def _value(self, value: ResolvedValue, depth: int) -> None:
+        if isinstance(value, (ResolvedBinaryExpression, ResolvedComparisonExpression)):
+            if can_use_direct_rhs_operand(value.left, value.right):
+                self._value(value.left, depth)
+                return
+            self._value(value.right, depth)
+            with self.pool.acquire():
+                self._value(value.left, depth)
             return
-        if (
-            isinstance(statement, ResolvedDecrementStatement)
-            and not can_use_direct_rhs_operand(
-                VariableValue(statement.target), statement.amount
-            )
-        ):
-            analyze_expression_temporaries(statement.amount, pool)
-            with pool.acquire():
-                pass
+        if isinstance(value, (ResolvedUnaryExpression, ResolvedBooleanNotExpression)):
+            self._value(value.operand, depth)
             return
-        analyze_expression_temporaries(statement.amount, pool)
-        return
-    if isinstance(statement, ResolvedIfStatement):
-        analyze_expression_temporaries(statement.condition, pool)
-        for item in statement.then_branch:
-            _analyze_statement_temporaries(item, pool)
-        if statement.else_branch is not None:
-            for item in statement.else_branch:
-                _analyze_statement_temporaries(item, pool)
-        return
-    if isinstance(statement, (ResolvedWhileStatement, ResolvedRepeatStatement)):
-        analyze_expression_temporaries(statement.condition, pool)
-        for item in statement.body:
-            _analyze_statement_temporaries(item, pool)
-        return
-    if isinstance(statement, ResolvedForStatement):
-        analyze_expression_temporaries(statement.initial, pool)
-        analyze_expression_temporaries(statement.final, pool)
-        for item in statement.body:
-            _analyze_statement_temporaries(item, pool)
-        return
-    if isinstance(statement, ResolvedProcedureCall):
-        with pool.call_scope():
-            for argument in statement.arguments:
-                analyze_expression_temporaries(argument.value, pool)
+        if isinstance(value, ResolvedBooleanBinaryExpression):
+            self._value(value.left, depth)
+            self._value(value.right, depth)
+            return
+        if isinstance(value, ResolvedFunctionCall):
+            self._call(value.label, value.arguments, depth)
+            return
+        if isinstance(value, ResolvedBuiltinCall):
+            for argument in value.arguments:
+                self._value(argument, depth)
+            return
+        if isinstance(value, ResolvedArrayElement):
+            self._value(value.index, depth)
+            return
+        if isinstance(value, ResolvedRecordField) and value.index is not None:
+            self._value(value.index, depth)
 
+    def _statements(
+        self, statements: tuple[ResolvedStatement, ...], depth: int
+    ) -> None:
+        for statement in statements:
+            if isinstance(statement, ResolvedRecordFieldAssignment):
+                if statement.index is not None:
+                    self._value(statement.index, depth)
+                self._value(statement.value, depth)
+            elif isinstance(statement, ResolvedArrayElementAssignment):
+                self._value(statement.index, depth)
+                self._value(statement.value, depth)
+            elif isinstance(
+                statement,
+                (ResolvedAssignment, ResolvedFunctionResultAssignment),
+            ):
+                self._value(statement.value, depth)
+            elif isinstance(statement, ResolvedBuiltinCall):
+                for argument in statement.arguments:
+                    self._value(argument, depth)
+            elif isinstance(
+                statement, (ResolvedIncrementStatement, ResolvedDecrementStatement)
+            ):
+                if statement.amount is not None:
+                    if (
+                        isinstance(statement, ResolvedDecrementStatement)
+                        and not can_use_direct_rhs_operand(
+                            VariableValue(statement.target), statement.amount
+                        )
+                    ):
+                        self._value(statement.amount, depth)
+                        with self.pool.acquire():
+                            pass
+                    else:
+                        self._value(statement.amount, depth)
+            elif isinstance(statement, ResolvedIfStatement):
+                self._value(statement.condition, depth)
+                self._statements(statement.then_branch, depth)
+                self._statements(statement.else_branch or (), depth)
+            elif isinstance(statement, (ResolvedWhileStatement, ResolvedRepeatStatement)):
+                self._value(statement.condition, depth)
+                self._statements(statement.body, depth)
+            elif isinstance(statement, ResolvedForStatement):
+                self._value(statement.initial, depth)
+                self._value(statement.final, depth)
+                self._statements(statement.body, depth)
+            elif isinstance(statement, ResolvedProcedureCall):
+                self._call(statement.label, statement.arguments, depth)
 
 def _count_for_statements(statement: ResolvedStatement) -> int:
     if isinstance(statement, ResolvedForStatement):

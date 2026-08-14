@@ -1,0 +1,10 @@
+program UndefinedFunctionResult;
+function Maybe(Input: boolean): byte;
+begin
+    if Input then
+        Maybe := $01;
+end;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+end.

@@ -21,19 +21,21 @@ the supported language.
 - Equality and inequality require matching types; enums support only those two
   comparisons. Ordered comparisons are limited to `byte`.
 - Boolean expressions support only `not`, `and`, and `or`.
-- `case`, general functions, runtime strings, and inline Assembly are not
-  supported. Arrays are limited to fixed-size, one-dimensional global arrays
+- `case`, runtime strings, and inline Assembly are not supported. User
+  functions return only `byte` or `boolean` and use only `byte`/`boolean`
+  value parameters. Arrays are limited to fixed-size, one-dimensional global arrays
   of `byte`, `boolean`, or records; arrays of enum are not supported. Records
   are limited to named static layouts with `byte`, `boolean`, or enum fields;
   nested, anonymous, recursive, variant, packed, and whole-record operations
   are not supported. A small fixed set of built-in query expressions
   and the statically resolved `nes.sprite_create()` and
   `nes.metasprite_create(frame)` intrinsics are supported.
-- Procedure parameters are limited to `byte` and `boolean` values; enum
-  parameters are not yet supported. There are
-  no reference parameters, default values, return values, or general local
+- Procedure and function parameters are limited to `byte` and `boolean`
+  values; enum parameters are not yet supported. There are no reference
+  parameters, default values, aggregate return values, or general local
   variables.
-- Procedure calls may be nested but cannot be recursive.
+- Procedure and function calls may be nested. Direct, indirect, and mixed
+  recursion is not supported.
 - Dynamic memory and object orientation are not supported.
 
 ## Statement and execution limitations

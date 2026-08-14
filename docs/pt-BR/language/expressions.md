@@ -7,7 +7,8 @@
 A aritmética é definida apenas para valores de `byte`. Os operandos podem ser
 literais hexadecimais, constantes de `byte`, variáveis de `byte` previamente
 atribuídas, campos `byte` de [records](records.md) previamente atribuídos ou
-expressões aritméticas aninhadas.
+expressões aritméticas aninhadas. Uma [função](functions.md) que retorna `byte`
+pode aparecer em qualquer posição que aceite esse tipo.
 
 Operadores suportados:
 
@@ -85,6 +86,9 @@ As consultas de controle `nes.controller_down`, `nes.controller_pressed` e
 de controle em tempo de compilação e exatamente uma constante `nes.button_*`.
 Consulte [Entrada de controle](../runtime/controller-input.md) para a semântica
 de transição de quadros e a lista completa de botões.
+
+[Funções](functions.md) que retornam `boolean` também são expressões booleanas.
+Chamadas em operandos ignorados pelo curto-circuito não são executadas.
 
 ## Precedência
 

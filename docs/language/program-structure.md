@@ -10,7 +10,7 @@ A program contains:
 4. an optional `type` section;
 5. an optional `const` section;
 6. an optional `var` section;
-7. zero or more procedure declarations;
+7. zero or more procedure and function declarations;
 8. a block beginning with `begin`;
 9. a sequence of statements;
 10. the `end` keyword;
@@ -44,7 +44,8 @@ end.
 ```
 
 The declaration sections must appear in this order: `type`, `const`, then
-`var`. The main block contains
+`var`, followed by any interleaved [procedures](procedures.md) and
+[functions](functions.md). The main block contains
 the top-level initialization sequence and may continue with frame-synchronized
 main-thread logic after `nes.run`.
 

@@ -1,0 +1,72 @@
+program FunctionRuntime;
+
+var
+    Trace: byte;
+    Calls: byte;
+    NestedResult: byte;
+    OrderResult: byte;
+    ShortCircuitAnd: boolean;
+    ShortCircuitOr: boolean;
+    ComparisonResult: boolean;
+    ProcedureResult: byte;
+    WrapResult: byte;
+    ArgumentOrderResult: byte;
+    CallsAfterShortCircuit: byte;
+    DirectBoolean: boolean;
+
+function Mark(Value: byte): byte;
+begin
+    Trace := Trace + $01;
+    Mark := Value;
+end;
+
+function Add(Left: byte; Right: byte): byte;
+begin
+    Add := Left + Right;
+end;
+
+function Next: byte;
+begin
+    Trace := Trace + $01;
+    Next := Trace;
+end;
+
+function Flag: boolean;
+begin
+    Calls := Calls + $01;
+    Flag := true;
+end;
+
+function Wrap(Value: byte): byte;
+begin
+    Wrap := Value + $01;
+end;
+
+function Subtract(Left: byte; Right: byte): byte;
+begin
+    Subtract := Left - Right;
+end;
+
+procedure Store(Value: byte);
+begin
+    ProcedureResult := Value;
+end;
+
+begin
+    Trace := $00;
+    Calls := $00;
+    NestedResult := Add(Mark($11), Add(Mark($22), Mark($33)));
+    Trace := $00;
+    OrderResult := Next() - Next();
+    ShortCircuitAnd := false and Flag();
+    ShortCircuitOr := true or Flag();
+    CallsAfterShortCircuit := Calls;
+    DirectBoolean := Flag();
+    ComparisonResult := Mark($10) = Mark($10);
+    Store(Add(Mark($01), Mark($02)));
+    WrapResult := Wrap($FF);
+    Trace := $00;
+    ArgumentOrderResult := Subtract(Next(), Next());
+    nes.set_background_color($0F);
+    nes.run;
+end.

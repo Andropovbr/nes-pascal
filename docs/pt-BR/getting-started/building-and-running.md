@@ -23,6 +23,7 @@ python -m nes_pascal.cli examples/enumerations.nsp -o build/enumerations.nes
 python -m nes_pascal.cli examples/records.nsp -o build/records.nes
 python -m nes_pascal.cli examples/procedures.nsp -o build/procedures.nes
 python -m nes_pascal.cli examples/procedure_parameters.nsp -o build/procedure_parameters.nes
+python -m nes_pascal.cli examples/functions.nsp -o build/functions.nes
 python -m nes_pascal.cli examples/memory_layout.nsp -o build/memory_layout.nes
 python -m nes_pascal.cli examples/zero_page.nsp -o build/zero_page.nes
 python -m nes_pascal.cli examples/frame_synchronization.nsp -o build/frame_synchronization.nes
@@ -61,6 +62,8 @@ Os exemplos demonstram:
 - `procedure_parameters.nsp`: parâmetros de valor tipados, cópia de argumentos
   da esquerda para a direita, valores de parâmetros locais mutáveis e chamadas
   parametrizadas aninhadas;
+- `functions.nsp`: retornos tipados byte/Boolean, chamadas aninhadas,
+  atribuição do resultado, temporários seguros e retorno pelo acumulador;
 - `scrolling_ppu_state.nsp`: um par de rolagem (scroll) fixo diferente de zero,
   uma atualização de paleta e restauração para o par padrão `($00, $00)`;
 - `memory_layout.nsp`: variáveis globais, parâmetros de procedimentos, expressões

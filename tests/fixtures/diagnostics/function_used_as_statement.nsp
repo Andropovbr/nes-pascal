@@ -1,0 +1,10 @@
+program FunctionAsStatement;
+function Identity(Input: byte): byte;
+begin
+    Identity := Input;
+end;
+begin
+    nes.set_background_color($0F);
+    Identity($01);
+    nes.run;
+end.

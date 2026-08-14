@@ -1,0 +1,20 @@
+program FunctionTemporaryPressure;
+
+var
+    Result: byte;
+
+function Leaf(Left: byte; Right: byte): byte;
+begin
+    Leaf := Left - (Right + $01);
+end;
+
+function Middle(Left: byte; Right: byte): byte;
+begin
+    Middle := Leaf(Left, Right) - (Right + $01);
+end;
+
+begin
+    nes.set_background_color($0F);
+    Result := Middle($10, $02) - ($01 + $01);
+    nes.run;
+end.

@@ -18,6 +18,8 @@ from .ast import (
     ResolvedComparisonExpression,
     ResolvedDecrementStatement,
     ResolvedForStatement,
+    ResolvedFunctionCall,
+    ResolvedFunctionResultAssignment,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
     ResolvedBuiltinCall,
@@ -232,10 +234,13 @@ class ProgramMemoryLayout:
     hardware_stack: MemoryRange
     oam_shadow: MemoryRange
     runtime_data: MemoryRange
+    function_result_storage: MemoryRange
     user_capacity: MemoryRange
     runtime_symbols: tuple[MemorySymbol, ...]
     temporary_symbols: tuple[MemorySymbol, ...]
+    function_result_symbols: tuple[MemorySymbol, ...]
     user_symbols: tuple[MemorySymbol, ...]
+    temporary_requirements: TemporaryRequirements
 
     @property
     def user_variables(self) -> MemoryRange:
@@ -286,6 +291,7 @@ class ProgramMemoryLayout:
             self.hardware_stack,
             self.oam_shadow,
             self.runtime_data,
+            self.function_result_storage,
             self.user_variables,
             self.free_ram,
         )
@@ -441,6 +447,7 @@ def build_memory_layout(
         filename,
         oam_shadow_enabled=sprite_features.oam_shadow,
         temporary_storage_size=temporary_requirements.total_bytes,
+        function_result_storage_size=len(program.functions),
     )
     (
         physical_ram,
@@ -453,6 +460,7 @@ def build_memory_layout(
         hardware_stack,
         oam_shadow,
         runtime_data,
+        function_result_storage,
         user_capacity,
     ) = regions
 
@@ -991,6 +999,20 @@ def build_memory_layout(
         )
         for index, name in enumerate(temporary_names)
     )
+    function_result_symbols = tuple(
+        MemorySymbol(
+            function.result.label,
+            function_result_storage.start + index,
+            1,
+            SymbolKind.COMPILER,
+            function_result_storage.name,
+            f"static return storage for function {function.name}",
+            function.name,
+            function.return_type.value,
+            function.result.position,
+        )
+        for index, function in enumerate(program.functions)
+    )
 
     reference_counts = _global_variable_reference_counts(program)
     promoted_labels = {
@@ -1072,10 +1094,13 @@ def build_memory_layout(
         hardware_stack,
         oam_shadow,
         runtime_data,
+        function_result_storage,
         user_capacity,
         runtime_symbols,
         temporary_symbols,
+        function_result_symbols,
         tuple(user_symbols),
+        temporary_requirements,
     )
     validate_segment_capacities(layout, source=source, filename=filename)
     return layout
@@ -1092,6 +1117,7 @@ def validate_segment_capacities(
     all_symbols = (
         *layout.runtime_symbols,
         *layout.temporary_symbols,
+        *layout.function_result_symbols,
         *layout.user_symbols,
     )
     checked_regions = (
@@ -1101,6 +1127,7 @@ def validate_segment_capacities(
         layout.zero_page_automatic,
         layout.oam_shadow,
         layout.runtime_data,
+        layout.function_result_storage,
         layout.user_capacity,
     )
     known_region_names = {region.name for region in checked_regions}
@@ -1180,6 +1207,10 @@ def generate_linker_config(layout: ProgramMemoryLayout) -> str:
             2,
             _linker_memory_line("ZP_TEMP_FREE", layout.zero_page_recovered),
         )
+    if layout.function_result_storage.size:
+        memory_lines.append(
+            _linker_memory_line("FUNC_RESULT", layout.function_result_storage)
+        )
     memory_lines.extend(
         [
             _linker_memory_line("USER", layout.user_capacity),
@@ -1202,6 +1233,10 @@ def generate_linker_config(layout: ProgramMemoryLayout) -> str:
         segment_lines.insert(
             3,
             "    OAM_SHADOW:          load = OAM,    type = bss;",
+        )
+    if layout.function_result_storage.size:
+        segment_lines.append(
+            "    FUNCTION_RESULTS:    load = FUNC_RESULT, type = bss;"
         )
     segment_lines.extend(
         [
@@ -1322,8 +1357,12 @@ def generate_memory_map(layout: ProgramMemoryLayout) -> str:
             "Address  Size  Assembly symbol       Purpose",
         ]
     )
-    if layout.temporary_symbols:
-        for symbol in layout.temporary_symbols:
+    compiler_symbols = (
+        *layout.temporary_symbols,
+        *layout.function_result_symbols,
+    )
+    if compiler_symbols:
+        for symbol in compiler_symbols:
             lines.append(
                 f"${symbol.address:04X}    {symbol.size:4}  "
                 f"{symbol.assembly_symbol:21} {symbol.purpose}"
@@ -1341,6 +1380,7 @@ def _validated_regions(
     *,
     oam_shadow_enabled: bool,
     temporary_storage_size: int,
+    function_result_storage_size: int,
 ) -> tuple[MemoryRange, ...]:
     if (
         settings.mapper_number != 0
@@ -1495,12 +1535,18 @@ def _validated_regions(
         settings.runtime_data_size,
         RegionKind.RUNTIME,
     )
-    user_start = runtime.start + runtime.size
+    function_results = MemoryRange(
+        "Function result storage",
+        runtime.start + runtime.size,
+        function_result_storage_size,
+        RegionKind.COMPILER,
+    )
+    user_start = function_results.start + function_results.size
     physical_end = physical.end
     assert physical_end is not None
     if user_start > physical_end + 1:
         _invalid_layout(
-            "Runtime data extends beyond physical RAM at $07FF.",
+        "Runtime and function-result data extend beyond physical RAM at $07FF.",
             source,
             filename,
         )
@@ -1521,6 +1567,7 @@ def _validated_regions(
         stack,
         oam,
         runtime,
+        function_results,
         user,
     )
 
@@ -1593,6 +1640,16 @@ def _user_variables(
         for procedure in program.procedures
         for parameter in procedure.parameters
     )
+    variables.extend(
+        (
+            f"{function.name}.{parameter.name}",
+            parameter,
+            f"value parameter for {function.name}",
+            False,
+        )
+        for function in program.functions
+        for parameter in function.parameters
+    )
     return tuple(variables)
 
 
@@ -1606,6 +1663,11 @@ def _global_variable_reference_counts(program: ResolvedProgram) -> dict[str, int
             statement
             for procedure in program.procedures
             for statement in procedure.body
+        ),
+        *(
+            statement
+            for function in program.functions
+            for statement in function.body
         ),
     )
     for statement in statements:
@@ -1640,6 +1702,8 @@ def collect_runtime_features(
     visit(program.statements)
     for procedure in program.procedures:
         visit(procedure.body)
+    for function in program.functions:
+        visit(function.body)
     return frozenset(features)
 
 
@@ -1700,8 +1764,12 @@ def _count_statement_variable_references(
         _count_variable(statement.target, counts)
         _count_value_variable_references(statement.index, counts)
         _count_value_variable_references(statement.value, counts)
-    elif isinstance(statement, ResolvedAssignment):
-        _count_variable(statement.target, counts)
+    elif isinstance(
+        statement, (ResolvedAssignment, ResolvedFunctionResultAssignment)
+    ):
+        target = getattr(statement, "target", getattr(statement, "result", None))
+        assert target is not None
+        _count_variable(target, counts)
         _count_value_variable_references(statement.value, counts)
     elif isinstance(statement, ResolvedBuiltinCall):
         for value in statement.arguments:
@@ -1753,6 +1821,9 @@ def _count_value_variable_references(
     elif isinstance(value, ResolvedBuiltinCall):
         for argument in value.arguments:
             _count_value_variable_references(argument, counts)
+    elif isinstance(value, ResolvedFunctionCall):
+        for argument in value.arguments:
+            _count_value_variable_references(argument.value, counts)
     elif isinstance(
         value,
         (

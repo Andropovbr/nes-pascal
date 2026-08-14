@@ -1,12 +1,15 @@
 from pathlib import Path
+import shutil
 import unittest
 
 from nes_pascal.memory_layout import build_memory_layout
 from nes_pascal.parser import parse
 from nes_pascal.semantic import analyze
 from tools.measure_benchmarks import (
+    BENCHMARKS,
     compare_legacy_temporary_accounting,
     format_markdown_report,
+    measure_benchmark,
     measure_memory_accounting,
 )
 
@@ -65,6 +68,43 @@ class BenchmarkTemporaryAccountingTests(unittest.TestCase):
         self.assertIn("Net ZP Saved", source)
         self.assertNotIn("RAM Total", source)
         self.assertTrue(callable(format_markdown_report))
+
+    def test_function_results_are_explicit_regular_compiler_storage(self) -> None:
+        layout = layout_for_example("functions")
+        memory = measure_memory_accounting(layout)
+
+        self.assertEqual(memory.regular_compiler_bytes, 3)
+        self.assertEqual(layout.function_result_storage.size, 3)
+        self.assertEqual(
+            memory.non_zp_allocated_bytes,
+            memory.regular_runtime_user_allocated_bytes
+            + memory.regular_compiler_bytes
+            + memory.oam_shadow_allocated_bytes,
+        )
+        self.assertEqual(
+            memory.total_committed_or_reserved_address_space_bytes
+            + memory.total_allocator_visible_free_bytes,
+            2048,
+        )
+
+    @unittest.skipUnless(
+        shutil.which("ca65") is not None and shutil.which("ld65") is not None,
+        "functions benchmark measurement requires ca65 and ld65",
+    )
+    def test_functions_benchmark_metrics_are_stable(self) -> None:
+        specification = next(
+            item for item in BENCHMARKS if item.name == "functions"
+        )
+        metrics = measure_benchmark(specification)
+
+        self.assertEqual(metrics.prg_code_bytes, 365)
+        self.assertEqual(metrics.prg_total_used_bytes, 371)
+        self.assertEqual(metrics.max_expression_tree_depth, 2)
+        self.assertEqual(metrics.max_live_temporaries, 1)
+        self.assertEqual(metrics.max_call_depth, 2)
+        self.assertEqual(metrics.max_call_stack_bytes, 4)
+        self.assertEqual(metrics.pattern_stats.total_instructions, 158)
+        self.assertEqual(metrics.estimated_static_base_cycles, 560)
 
 
 if __name__ == "__main__":

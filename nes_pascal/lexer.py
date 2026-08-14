@@ -12,6 +12,7 @@ class TokenKind(Enum):
     CONST = auto()
     VAR = auto()
     PROCEDURE = auto()
+    FUNCTION = auto()
     BEGIN = auto()
     END = auto()
     IF = auto()
@@ -64,6 +65,7 @@ KEYWORDS = {
     "const": TokenKind.CONST,
     "var": TokenKind.VAR,
     "procedure": TokenKind.PROCEDURE,
+    "function": TokenKind.FUNCTION,
     "begin": TokenKind.BEGIN,
     "end": TokenKind.END,
     "if": TokenKind.IF,

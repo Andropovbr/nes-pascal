@@ -8,8 +8,8 @@ NTSC NROM-256 ROM.
 The compiler currently supports explicitly typed constants and global
 variables, exact-type assignments, one-byte arithmetic, comparisons,
 short-circuit Boolean expressions, structured conditionals and loops,
-increment and decrement operations, and acyclic procedures with `byte` and
-`boolean` value parameters. User-defined nominal enumerations provide
+increment and decrement operations, acyclic procedures, and typed functions
+with `byte`/`boolean` value parameters and returns. User-defined nominal enumerations provide
 byte-sized game-state values with exact-type assignment and equality rules.
 Named records group byte, Boolean, and enum fields into nominal fixed layouts.
 Fixed global arrays provide contiguous static storage for `byte`, `boolean`,
