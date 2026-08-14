@@ -350,6 +350,7 @@ class RecordMemoryAndBackendTests(unittest.TestCase):
                 "zp_policy_reserved_unavailable_bytes": 103,
                 "zp_allocator_visible_free_bytes": 142,
                 "regular_runtime_bytes": 4,
+                "regular_compiler_bytes": 0,
                 "regular_user_bytes": 21,
                 "regular_runtime_user_allocated_bytes": 25,
                 "oam_shadow_allocated_bytes": 0,

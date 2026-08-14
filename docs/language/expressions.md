@@ -7,7 +7,8 @@ English | [Português (Brasil)](../pt-BR/language/expressions.md)
 Arithmetic is defined only for `byte` values. Operands may be hexadecimal
 literals, `byte` constants, previously assigned `byte` variables, `byte`
 fields selected from previously assigned [records](records.md), or nested
-arithmetic expressions.
+arithmetic expressions. A `byte` [function call](functions.md) may appear
+anywhere a `byte` operand is accepted.
 
 Supported operators:
 
@@ -84,6 +85,9 @@ The controller queries `nes.controller_down`, `nes.controller_pressed`, and
 compile-time controller index and exactly one `nes.button_*` constant. See
 [Controller input](../runtime/controller-input.md) for frame-transition
 semantics and the complete button list.
+
+User [functions](functions.md) that return `boolean` are also boolean
+expressions. Calls in a skipped short-circuit operand do not execute.
 
 ## Precedence
 

@@ -24,6 +24,7 @@ python -m nes_pascal.cli examples/enumerations.nsp -o build/enumerations.nes
 python -m nes_pascal.cli examples/records.nsp -o build/records.nes
 python -m nes_pascal.cli examples/procedures.nsp -o build/procedures.nes
 python -m nes_pascal.cli examples/procedure_parameters.nsp -o build/procedure_parameters.nes
+python -m nes_pascal.cli examples/functions.nsp -o build/functions.nes
 python -m nes_pascal.cli examples/memory_layout.nsp -o build/memory_layout.nes
 python -m nes_pascal.cli examples/zero_page.nsp -o build/zero_page.nes
 python -m nes_pascal.cli examples/frame_synchronization.nsp -o build/frame_synchronization.nes
@@ -59,6 +60,8 @@ The examples demonstrate:
   state, `JSR`/`RTS`, and a conditional inside a procedure;
 - `procedure_parameters.nsp`: typed value parameters, left-to-right argument
   copies, mutable local parameter values, and nested parameterized calls;
+- `functions.nsp`: typed byte/Boolean returns, nested calls, result assignment,
+  call-safe temporaries, and the accumulator return ABI;
 - `scrolling_ppu_state.nsp`: one fixed nonzero scroll pair, a palette update,
   and restoration to the default `($00, $00)` pair;
 - `memory_layout.nsp`: globals, procedure parameters, expressions, and a

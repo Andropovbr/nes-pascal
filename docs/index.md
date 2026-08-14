@@ -35,6 +35,7 @@ Planned work is tracked separately in the
 - [Loops](language/loops.md)
 - [Increment and decrement](language/increment-and-decrement.md)
 - [Procedures](language/procedures.md)
+- [Functions](language/functions.md)
 
 ## NES Runtime
 
@@ -57,6 +58,7 @@ Planned work is tracked separately in the
 - [Enumeration implementation and measurements (0.5.9)](compiler/enumerations-0.5.9.md)
 - [Record implementation and measurements (0.5.10)](compiler/records-0.5.10.md)
 - [Expression temporary allocation (0.5.11)](compiler/expression-temporaries-0.5.11.md)
+- [Functions implementation and ABI (0.5.12)](compiler/functions-0.5.12.md)
 - [Semantic test coverage map](compiler/test-coverage-map.md)
 - [Unsupported features](reference/unsupported-features.md)
 - [Compiler diagnostics](reference/diagnostics/index.md)

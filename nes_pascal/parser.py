@@ -27,6 +27,8 @@ from .ast import (
     EnumTypeDeclaration,
     ForDirection,
     ForStatement,
+    FunctionCall,
+    FunctionDeclaration,
     HexLiteral,
     IfStatement,
     IncrementStatement,
@@ -74,6 +76,8 @@ class Parser:
         self.variable_names: set[str] = set()
         self.variable_types: dict[str, VariableType] = {}
         self.parameter_names: set[str] = set()
+        self.procedure_names: set[str] = set()
+        self.function_names: set[str] = set()
 
     def parse(self) -> Program:
         self._expect(TokenKind.PROGRAM, "Expected 'program' at the start of the file.")
@@ -90,7 +94,7 @@ class Parser:
         self.variable_types = {
             declaration.name.lower(): declaration.type for declaration in variables
         }
-        procedures = self._parse_procedures()
+        procedures, functions = self._parse_callable_declarations()
         self._expect(TokenKind.BEGIN, "Expected 'begin' to start the program block.")
 
         statements: list[Statement] = []
@@ -116,6 +120,7 @@ class Parser:
             tuple(constants),
             tuple(variables),
             tuple(procedures),
+            tuple(functions),
             tuple(statements),
             SourcePosition(end_token.line, end_token.column),
         )
@@ -368,25 +373,38 @@ class Parser:
         )
         raise AssertionError("unreachable")
 
-    def _parse_procedures(self) -> list[ProcedureDeclaration]:
-        declarations: list[ProcedureDeclaration] = []
-        while self._check(TokenKind.PROCEDURE):
-            procedure_token = self._expect(
-                TokenKind.PROCEDURE,
-                "Expected 'procedure'.",
-            )
+    def _parse_callable_declarations(
+        self,
+    ) -> tuple[list[ProcedureDeclaration], list[FunctionDeclaration]]:
+        procedures: list[ProcedureDeclaration] = []
+        functions: list[FunctionDeclaration] = []
+        while self._check(TokenKind.PROCEDURE) or self._check(TokenKind.FUNCTION):
+            is_function = self._check(TokenKind.FUNCTION)
+            declaration_token = self._current()
+            self.position += 1
+            kind = "function" if is_function else "procedure"
             name = self._expect(
                 TokenKind.IDENTIFIER,
-                "Expected a procedure name after 'procedure'.",
+                f"Expected a {kind} name after '{kind}'.",
             )
-            parameters = self._parse_procedure_parameters()
+            (
+                self.function_names if is_function else self.procedure_names
+            ).add(name.text.lower())
+            parameters = self._parse_callable_parameters(kind)
+            return_type = None
+            return_type_position = None
+            if is_function:
+                self._expect(TokenKind.COLON, "Expected ':' before the function return type.")
+                type_token = self._current()
+                return_type = self._parse_variable_type(allow_named=True)
+                return_type_position = SourcePosition(type_token.line, type_token.column)
             self._expect(
                 TokenKind.SEMICOLON,
-                "Expected ';' after the procedure declaration.",
+                f"Expected ';' after the {kind} declaration.",
             )
             self._expect(
                 TokenKind.BEGIN,
-                "Expected 'begin' to start the procedure body.",
+                f"Expected 'begin' to start the {kind} body.",
             )
             body: list[Statement] = []
             self.parameter_names = {
@@ -397,30 +415,41 @@ class Parser:
                     self._error(
                         self._current(),
                         DiagnosticCode.INVALID_SYNTAX,
-                        "Reached the end of the file before the procedure ended.",
-                        "Finish the procedure with 'end;'.",
+                        f"Reached the end of the file before the {kind} ended.",
+                        f"Finish the {kind} with 'end;'.",
                     )
                 body.append(self._parse_statement())
             self.parameter_names = set()
             self._expect(
                 TokenKind.END,
-                "Expected 'end' after the procedure body.",
+                f"Expected 'end' after the {kind} body.",
             )
             self._expect(
                 TokenKind.SEMICOLON,
-                "Expected ';' after the procedure declaration.",
+                f"Expected ';' after the {kind} declaration.",
             )
-            declarations.append(
-                ProcedureDeclaration(
+            if is_function:
+                assert return_type is not None and return_type_position is not None
+                functions.append(
+                    FunctionDeclaration(
+                        name.text,
+                        tuple(body),
+                        SourcePosition(declaration_token.line, declaration_token.column),
+                        return_type,
+                        return_type_position,
+                        tuple(parameters),
+                    )
+                )
+            else:
+                procedures.append(ProcedureDeclaration(
                     name.text,
                     tuple(body),
-                    SourcePosition(procedure_token.line, procedure_token.column),
+                    SourcePosition(declaration_token.line, declaration_token.column),
                     tuple(parameters),
-                )
-            )
-        return declarations
+                ))
+        return procedures, functions
 
-    def _parse_procedure_parameters(self) -> list[ProcedureParameter]:
+    def _parse_callable_parameters(self, callable_kind: str) -> list[ProcedureParameter]:
         if not self._match(TokenKind.LEFT_PAREN):
             return []
         if self._check(TokenKind.RIGHT_PAREN):
@@ -428,7 +457,7 @@ class Parser:
                 self._current(),
                 DiagnosticCode.INVALID_SYNTAX,
                 "A parameter list cannot be empty.",
-                "Omit the parentheses for a parameterless procedure.",
+                f"Omit the parentheses for a parameterless {callable_kind}.",
             )
 
         parameters: list[ProcedureParameter] = []
@@ -447,7 +476,7 @@ class Parser:
                     type_token,
                     DiagnosticCode.UNSUPPORTED_PARAMETER_TYPE,
                     f"Enumeration type {type_token.text} is not supported for "
-                    "procedure parameters.",
+                    f"{callable_kind} parameters.",
                     "Use byte or boolean for a value parameter.",
                 )
             declared_type = self._parse_builtin_type()
@@ -655,6 +684,18 @@ class Parser:
         arguments: list[ValueExpression] = []
         if self._match(TokenKind.LEFT_PAREN):
             if self._check(TokenKind.RIGHT_PAREN):
+                if name.text.lower() in self.function_names:
+                    self.position += 1
+                    if consume_terminator:
+                        self._expect(
+                            TokenKind.SEMICOLON,
+                            "Expected ';' after the function call.",
+                        )
+                    return ProcedureCall(
+                        name.text,
+                        SourcePosition(name.line, name.column),
+                        (),
+                    )
                 self._error(
                     self._current(),
                     DiagnosticCode.INVALID_SYNTAX,
@@ -1019,6 +1060,18 @@ class Parser:
             return self._parse_literal("value")
         if self._match(TokenKind.IDENTIFIER):
             position = SourcePosition(token.line, token.column)
+            if self._match(TokenKind.LEFT_PAREN):
+                arguments: list[ValueExpression] = []
+                if not self._check(TokenKind.RIGHT_PAREN):
+                    while True:
+                        arguments.append(self._parse_expression())
+                        if not self._match(TokenKind.COMMA):
+                            break
+                self._expect(
+                    TokenKind.RIGHT_PAREN,
+                    "Expected ')' after the function arguments.",
+                )
+                return FunctionCall(token.text, tuple(arguments), position)
             index = None
             if self._match(TokenKind.LEFT_BRACKET):
                 index = self._parse_expression()

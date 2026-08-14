@@ -2,7 +2,7 @@
 
 English | [Português (Brasil)](../pt-BR/compiler/test-coverage-map.md)
 
-This document provides a comprehensive semantic coverage map across all 30 implemented subsystems in NES Pascal. It catalogs the current automated test protection across compiler phases, diagnostics, static assembly goldens, toolchain builds, Mesen emulator runtime verification, benchmark corpus measurement, and documentation/examples.
+This document provides a comprehensive semantic coverage map across all 31 implemented subsystems in NES Pascal. It catalogs the current automated test protection across compiler phases, diagnostics, static assembly goldens, toolchain builds, Mesen emulator runtime verification, benchmark corpus measurement, and documentation/examples.
 
 ---
 
@@ -46,6 +46,7 @@ The matrix uses semantic verification tiers:
 | 28 | **Arrays** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Fixed 1D, indexed access, boundaries |
 | 29 | **Records** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Nominal fixed layouts, typed fields, record arrays |
 | 30 | **Expression temporary allocation** | N/A | N/A | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Scoped maximum-live pool, cache separation, exhaustion |
+| 31 | **Functions** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Typed returns, definite result, acyclic nested calls, call-safe temporaries |
 
 ---
 
@@ -71,7 +72,7 @@ The matrix uses semantic verification tiers:
 * `zero_page` / `memory_layout` (pure layout benchmarks, although all benchmarks report memory layouts)
 
 ### 5. Which examples are not exercised by toolchain or runtime tests?
-* **None.** Every single example program in `examples/` (`minimal.nsp`, `arithmetic.nsp`, `boolean_expressions.nsp`, `conditionals.nsp`, `loops.nsp`, `counting.nsp`, `procedures.nsp`, `procedure_parameters.nsp`, `controller_input.nsp`, `sprite_support.nsp`, `metasprite_player.nsp`, `sprite_animation.nsp`, `palette_support.nsp`, `background_updates.nsp`, `frame_callbacks.nsp`, `frame_synchronization.nsp`, `gameplay_full_stack.nsp`, `nametable_loading.nsp`, `scrolling_ppu_state.nsp`, `slow_update_callback.nsp`, `zero_page.nsp`, `memory_layout.nsp`, `metasprite_clipping.nsp`, `arrays.nsp`, `enumerations.nsp`, `records.nsp`, `chr_asset.nsp`) is actively compiled, assembled, and validated in `tests/test_integration.py` and/or `tools/measure_benchmarks.py`.
+* **None.** Every single example program in `examples/` (`minimal.nsp`, `arithmetic.nsp`, `boolean_expressions.nsp`, `conditionals.nsp`, `loops.nsp`, `counting.nsp`, `procedures.nsp`, `procedure_parameters.nsp`, `controller_input.nsp`, `sprite_support.nsp`, `metasprite_player.nsp`, `sprite_animation.nsp`, `palette_support.nsp`, `background_updates.nsp`, `frame_callbacks.nsp`, `frame_synchronization.nsp`, `gameplay_full_stack.nsp`, `nametable_loading.nsp`, `scrolling_ppu_state.nsp`, `slow_update_callback.nsp`, `zero_page.nsp`, `memory_layout.nsp`, `metasprite_clipping.nsp`, `arrays.nsp`, `enumerations.nsp`, `records.nsp`, `functions.nsp`, `chr_asset.nsp`) is actively compiled, assembled, and validated in `tests/test_integration.py` and/or `tools/measure_benchmarks.py`.
 
 ### 6. Which goldens protect broad output but lack focused assertions?
 * `tests/golden/minimal.asm`, `tests/golden/memory_layout.asm`, `tests/golden/zero_page.asm`, and `tests/golden/frame_synchronization.asm` capture complete generated assembly files.

@@ -309,11 +309,11 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 - **Suggested fix:** Declare the procedure before the main program block or
   correct the call's spelling.
 
-## E3014 - Recursive procedure call
+## E3014 - Recursive callable cycle
 
 - **Category:** Semantic Analysis
-- **Explanation:** The calling convention supports nested acyclic calls but
-  does not support direct or indirect recursion.
+- **Explanation:** The calling convention supports nested acyclic procedure
+  and function calls but does not support direct, indirect, or mixed recursion.
 - **Trigger:**
 
   ```pascal
@@ -334,12 +334,13 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 - **Suggested fix:** Remove the recursive call cycle and express the repeated
   work with a supported loop.
 
-## E3015 - Runtime command inside procedure
+## E3015 - Runtime command inside callable
 
 - **Category:** Semantic Analysis
 - **Explanation:** `nes.run` belongs to the main initialization sequence and
   `nes.wait_frame` depends on the main block's known runtime phase. Palette
-  calls are allowed in procedures and publish changes for VBlank.
+  calls are allowed in procedures and functions and publish changes for
+  VBlank. The restriction applies equally to both callable kinds.
 - **Trigger:**
 
   ```pascal
@@ -879,3 +880,38 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 - **Expected compiler output:** `E3058` reports the expected and provided
   argument counts.
 - **Suggested fix:** Pass exactly the arguments documented for the builtin.
+
+## E3059 - Unknown function
+
+- **Category:** Semantic Analysis
+- **Explanation:** A value expression calls a function name that is not declared.
+- **Trigger:** Compile `tests/fixtures/diagnostics/unknown_function.nsp`.
+- **Suggested fix:** Declare the function before the main block and call it with parentheses.
+
+## E3060 - Incorrect function argument count
+
+- **Category:** Semantic Analysis
+- **Explanation:** A function call does not provide exactly one value for each declared parameter.
+- **Trigger:** Compile `tests/fixtures/diagnostics/function_argument_count.nsp`.
+- **Suggested fix:** Pass exactly the declared arguments, including `()` for a parameterless call.
+
+## E3061 - Function used as statement
+
+- **Category:** Semantic Analysis
+- **Explanation:** A function produces a value and cannot be discarded as a standalone statement.
+- **Trigger:** Compile `tests/fixtures/diagnostics/function_used_as_statement.nsp`.
+- **Suggested fix:** Use the call inside a type-compatible expression or assignment.
+
+## E3062 - Procedure used as expression
+
+- **Category:** Semantic Analysis
+- **Explanation:** A procedure has no return value and cannot appear where an expression is required.
+- **Trigger:** Compile `tests/fixtures/diagnostics/procedure_used_as_expression.nsp`.
+- **Suggested fix:** Call a function that returns the required type.
+
+## E3063 - Undefined function result
+
+- **Category:** Semantic Analysis
+- **Explanation:** A function result is read before assignment or is not assigned on every path through the body.
+- **Trigger:** Compile `tests/fixtures/diagnostics/undefined_function_result.nsp`.
+- **Suggested fix:** Assign the function name on every path before the function ends or before reading it.

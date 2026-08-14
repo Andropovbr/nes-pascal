@@ -1,0 +1,11 @@
+program WrongByteFunctionResult;
+
+function Value: byte;
+begin
+    Value := true;
+end;
+
+begin
+    nes.set_background_color($0F);
+    nes.run;
+end.

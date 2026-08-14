@@ -1,5 +1,8 @@
 # Expression Temporary Allocation (0.5.11)
 
+> Milestone [0.5.12](functions-0.5.12.md) now extends this scoped model across
+> the complete acyclic procedure/function call graph.
+
 English | [Português (Brasil)](../pt-BR/compiler/expression-temporaries-0.5.11.md)
 
 Milestone 0.5.11 replaces the unconditional 16-byte, AST-depth expression

@@ -35,6 +35,8 @@ from nes_pascal.ast import (
     ResolvedBuiltinCall,
     ResolvedComparisonExpression,
     ResolvedForStatement,
+    ResolvedFunctionCall,
+    ResolvedFunctionResultAssignment,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
     ResolvedDecrementStatement,
@@ -151,6 +153,11 @@ BENCHMARKS: tuple[BenchmarkSpec, ...] = (
         "examples/records.nsp",
     ),
     BenchmarkSpec(
+        "functions",
+        "Typed Functions",
+        "examples/functions.nsp",
+    ),
+    BenchmarkSpec(
         "gameplay_full_stack",
         "Full-Stack Gameplay (Combined RAM Pressure)",
         "examples/gameplay_full_stack.nsp",
@@ -189,6 +196,12 @@ def get_expression_metrics(val: ResolvedValue) -> tuple[int, int]:
         if val.builtin is BuiltinId.GET_TILE:
             return 1 + depth, expression_temporary_requirement(val)
         return depth, expression_temporary_requirement(val)
+    if isinstance(val, ResolvedFunctionCall):
+        metrics = [
+            get_expression_metrics(argument.value) for argument in val.arguments
+        ]
+        depth = max((item[0] for item in metrics), default=0)
+        return 1 + depth, expression_temporary_requirement(val)
     if isinstance(val, ResolvedArrayElement):
         depth, _ = get_expression_metrics(val.index)
         return 1 + depth, expression_temporary_requirement(val)
@@ -217,7 +230,7 @@ def collect_statement_metrics(stmts: tuple[ResolvedStatement, ...]) -> tuple[int
             value_depth, value_temporaries = get_expression_metrics(s.value)
             max_d = max(max_d, index_depth, value_depth)
             max_t = max(max_t, index_temporaries, value_temporaries)
-        elif isinstance(s, ResolvedAssignment):
+        elif isinstance(s, (ResolvedAssignment, ResolvedFunctionResultAssignment)):
             d, t = get_expression_metrics(s.value)
             max_d, max_t = max(max_d, d), max(max_t, t)
         elif isinstance(s, ResolvedBuiltinCall):
@@ -263,6 +276,8 @@ def collect_program_metrics(program: ResolvedProgram) -> tuple[int, int]:
     all_stmts = list(program.statements)
     for proc in program.procedures:
         all_stmts.extend(proc.body)
+    for function in program.functions:
+        all_stmts.extend(function.body)
     depth, _ = collect_statement_metrics(tuple(all_stmts))
     return depth, analyze_program_temporaries(program).expression_temporaries
 
@@ -321,6 +336,8 @@ class BenchmarkMetrics:
     assembly_line_count: int
     pattern_stats: AssemblyPatternStats
     estimated_static_base_cycles: int
+    max_call_depth: int
+    max_call_stack_bytes: int
     runtime_features: tuple[str, ...]
     emitted_runtime_symbols: list[str] = field(default_factory=list)
     emitted_runtime_routines: list[str] = field(default_factory=list)
@@ -339,6 +356,7 @@ class MemoryAccounting:
     zp_policy_reserved_unavailable_bytes: int
     zp_allocator_visible_free_bytes: int
     regular_runtime_bytes: int
+    regular_compiler_bytes: int
     regular_user_bytes: int
     regular_runtime_user_allocated_bytes: int
     oam_shadow_allocated_bytes: int
@@ -456,10 +474,13 @@ def measure_memory_accounting(layout: ProgramMemoryLayout) -> MemoryAccounting:
         for symbol in layout.runtime_symbols
         if symbol.region_name == layout.runtime_data.name
     )
+    regular_compiler = sum(
+        symbol.size for symbol in layout.function_result_symbols
+    )
     regular_user = sum(symbol.size for symbol in layout.regular_user_symbols)
     regular_runtime_user = regular_runtime + regular_user
     oam_shadow = layout.oam_shadow.size
-    non_zp_allocated = regular_runtime_user + oam_shadow
+    non_zp_allocated = regular_runtime_user + regular_compiler + oam_shadow
     stack_reserved = layout.hardware_stack.size
     regular_allocator_visible_free = layout.free_ram.size
     total_allocator_visible_free = (
@@ -482,6 +503,7 @@ def measure_memory_accounting(layout: ProgramMemoryLayout) -> MemoryAccounting:
     ), "Zero Page accounting must reconcile to 256 bytes"
     assert (
         regular_runtime_user
+        + regular_compiler
         + oam_shadow
         + stack_reserved
         + regular_allocator_visible_free
@@ -505,6 +527,7 @@ def measure_memory_accounting(layout: ProgramMemoryLayout) -> MemoryAccounting:
         zp_policy_reserved_unavailable_bytes=zp_policy_reserved_unavailable,
         zp_allocator_visible_free_bytes=zp_allocator_visible_free,
         regular_runtime_bytes=regular_runtime,
+        regular_compiler_bytes=regular_compiler,
         regular_user_bytes=regular_user,
         regular_runtime_user_allocated_bytes=regular_runtime_user,
         oam_shadow_allocated_bytes=oam_shadow,
@@ -673,6 +696,7 @@ def estimate_static_base_cycles(
         for symbol in (
             *layout.runtime_symbols,
             *layout.temporary_symbols,
+            *layout.function_result_symbols,
             *layout.user_symbols,
         )
     }
@@ -795,7 +819,12 @@ def measure_benchmark(spec: BenchmarkSpec) -> BenchmarkMetrics:
         sorted(feature.name for feature in collect_runtime_features(resolved))
     )
 
-    all_symbols = (*layout.runtime_symbols, *layout.temporary_symbols, *layout.user_symbols)
+    all_symbols = (
+        *layout.runtime_symbols,
+        *layout.temporary_symbols,
+        *layout.function_result_symbols,
+        *layout.user_symbols,
+    )
     ram_breakdown = {s.assembly_symbol: s.size for s in all_symbols}
 
     return BenchmarkMetrics(
@@ -810,6 +839,8 @@ def measure_benchmark(spec: BenchmarkSpec) -> BenchmarkMetrics:
         assembly_line_count=len(assembly.splitlines()),
         pattern_stats=patterns,
         estimated_static_base_cycles=estimated_static_base_cycles,
+        max_call_depth=layout.temporary_requirements.max_call_depth,
+        max_call_stack_bytes=layout.temporary_requirements.max_call_depth * 2,
         runtime_features=runtime_features,
         emitted_runtime_symbols=symbols,
         emitted_runtime_routines=routines,
@@ -827,12 +858,12 @@ def run_all_benchmarks() -> list[BenchmarkMetrics]:
 
 def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
     lines: list[str] = [
-        "# NES Pascal Compiler Benchmark Results (through 0.5.11 Expression Temporaries)",
+        "# NES Pascal Compiler Benchmark Results (through 0.5.12 Functions)",
         "",
         "## 1. CPU RAM Accounting",
         "",
-        "| Benchmark | ZP Runtime Symbols | Expression Temp Reserved | Other Compiler Caches | ZP Promoted | ZP Benchmark Alloc./Reserved | ZP Policy Reserved | ZP Allocator Free | Regular Runtime/User | OAM Shadow | Non-ZP Allocated | Stack Reserved | Regular Allocator Free | Total Allocator Free | Compiler/Runtime/User Alloc./Reserved | Total Committed/Reserved |",
-        "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
+        "| Benchmark | ZP Runtime Symbols | Expression Temp Reserved | Other Compiler Caches | ZP Promoted | ZP Benchmark Alloc./Reserved | ZP Policy Reserved | ZP Allocator Free | Regular Runtime/User | Function Results | OAM Shadow | Non-ZP Allocated | Stack Reserved | Regular Allocator Free | Total Allocator Free | Compiler/Runtime/User Alloc./Reserved | Total Committed/Reserved |",
+        "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
     ]
     for m in metrics_list:
         memory = m.memory
@@ -842,7 +873,9 @@ def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
             f"{memory.zp_compiler_cache_bytes} B | "
             f"{memory.zp_promoted_user_bytes} B | {memory.zp_benchmark_allocated_or_reserved_bytes} B | "
             f"{memory.zp_policy_reserved_unavailable_bytes} B | {memory.zp_allocator_visible_free_bytes} B | "
-            f"{memory.regular_runtime_user_allocated_bytes} B | {memory.oam_shadow_allocated_bytes} B | "
+            f"{memory.regular_runtime_user_allocated_bytes} B | "
+            f"{memory.regular_compiler_bytes} B | "
+            f"{memory.oam_shadow_allocated_bytes} B | "
             f"{memory.non_zp_allocated_bytes} B | {memory.hardware_stack_reserved_bytes} B | "
             f"{memory.regular_allocator_visible_free_bytes} B | {memory.total_allocator_visible_free_bytes} B | "
             f"{memory.compiler_runtime_user_allocated_or_reserved_bytes} B | "
@@ -853,7 +886,8 @@ def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
         "Definitions: `Expression Temp Reserved` equals the measured maximum live "
         "expression slots. `Other Compiler Caches` currently contains cached for-loop "
         "limits. `ZP Policy Reserved` is unavailable by memory policy but is not program "
-        "consumption. `Total Committed/Reserved` includes compiler/runtime/user storage, "
+        "consumption. `Function Results` is explicit regular compiler RAM. "
+        "`Total Committed/Reserved` includes compiler/runtime/user storage, "
         "hardware stack reservation, and policy-reserved Zero Page.",
         "",
         "## 2. Expression-Temporary Baseline Comparison",
@@ -886,14 +920,15 @@ def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
         "",
         "## 3. Code and Expression Metrics",
         "",
-        "| Benchmark | Category | PRG Code | PRG Occupied | Tree Depth | Max Live Temps | Instructions | Estimated Static Base Cycles |",
-        "| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |",
+        "| Benchmark | Category | PRG Code | PRG Occupied | Tree Depth | Max Live Temps | Max Call Depth | JSR Stack Peak | Instructions | Estimated Static Base Cycles |",
+        "| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
     ])
     for m in metrics_list:
         lines.append(
             f"| `{m.spec.name}` | {m.spec.category} | {m.prg_code_bytes} B | "
             f"{m.prg_total_used_bytes} B | {m.max_expression_tree_depth} | "
-            f"{m.max_live_temporaries} | {m.pattern_stats.total_instructions} | "
+            f"{m.max_live_temporaries} | {m.max_call_depth} | "
+            f"{m.max_call_stack_bytes} B | {m.pattern_stats.total_instructions} | "
             f"{m.estimated_static_base_cycles} |"
         )
     lines.extend([
@@ -901,6 +936,8 @@ def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
         "`Estimated Static Base Cycles` is a deterministic corpus estimate: each emitted "
         "instruction is counted once at its base cost, branches are treated as not taken, "
         "and dynamic loop counts, page crossing, interrupts, and DMA are excluded.",
+        "`Max Call Depth` counts nested source procedure/function calls; `JSR Stack Peak` "
+        "is its two-byte return-address cost and excludes runtime/NMI helper calls.",
         "",
         "## 4. Runtime Feature Selection",
         "",

@@ -40,7 +40,7 @@ devem utilizar o intervalo reservado para a sua categoria.
 | [E3011](semantic.md) | Semantic Analysis | Comando de runtime dentro de laço |
 | [E3012](semantic.md) | Semantic Analysis | Modificação da variável de controle do for |
 | [E3013](semantic.md) | Semantic Analysis | Procedimento desconhecido |
-| [E3014](semantic.md) | Semantic Analysis | Chamada recursiva de procedimento |
+| [E3014](semantic.md) | Semantic Analysis | Ciclo recursivo entre rotinas |
 | [E3015](semantic.md) | Semantic Analysis | Comando de runtime dentro de procedimento |
 | [E3016](semantic.md) | Semantic Analysis | Contagem incorreta de argumentos de procedimento |
 | [E3017](semantic.md) | Semantic Analysis | Espera de quadro antes do início do runtime |
@@ -85,6 +85,11 @@ devem utilizar o intervalo reservado para a sua categoria.
 | [E3056](semantic.md) | Semantic Analysis | Animação de metasprite inválida |
 | [E3057](semantic.md) | Semantic Analysis | Contexto de builtin inválido |
 | [E3058](semantic.md) | Semantic Analysis | Contagem inválida de argumentos de builtin |
+| [E3059](semantic.md) | Semantic Analysis | Função desconhecida |
+| [E3060](semantic.md) | Semantic Analysis | Contagem incorreta de argumentos de função |
+| [E3061](semantic.md) | Semantic Analysis | Função usada como instrução |
+| [E3062](semantic.md) | Semantic Analysis | Procedimento usado como expressão |
+| [E3063](semantic.md) | Semantic Analysis | Resultado de função indefinido |
 | [E4001](type-system.md) | Type System | Tipo desconhecido |
 | [E4002](type-system.md) | Type System | Valor inválido para `nes_color` |
 | [E4003](type-system.md) | Type System | Valor inválido para `byte` |
@@ -110,6 +115,7 @@ devem utilizar o intervalo reservado para a sua categoria.
 | [E4023](type-system.md) | Type System | Definição recursiva de record |
 | [E4024](type-system.md) | Type System | Layout ou offset indexado de record inválido |
 | [E4025](type-system.md) | Type System | Uso inválido de record |
+| [E4026](type-system.md) | Type System | Tipo de retorno de função não suportado |
 | [E5001](code-generation.md) | Code Generation | Toolchain ausente |
 | [E5002](code-generation.md) | Code Generation | Falha no toolchain |
 | [E5003](code-generation.md) | Code Generation | RAM do usuário esgotada |

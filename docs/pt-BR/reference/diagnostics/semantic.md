@@ -304,11 +304,11 @@ Diagnósticos de análise semântica utilizam o intervalo E3000-E3999.
 - **Correção sugerida:** Declare o procedimento antes do bloco principal do programa ou
   corrija a grafia da chamada.
 
-## E3014 - Chamada recursiva de procedimento
+## E3014 - Ciclo recursivo entre rotinas
 
 - **Categoria:** Semantic Analysis
-- **Explicação:** A convenção de chamada suporta chamadas aninhadas acíclicas, mas não
-  suporta recursão direta ou indireta.
+- **Explicação:** A convenção de chamada suporta procedimentos e funções
+  aninhados de forma acíclica, mas não suporta recursão direta, indireta ou mista.
 - **Gatilho:**
 
   ```pascal
@@ -329,12 +329,13 @@ Diagnósticos de análise semântica utilizam o intervalo E3000-E3999.
 - **Correção sugerida:** Remova o ciclo de chamadas recursivas e expresse o trabalho
   repetido com um laço suportado.
 
-## E3015 - Comando de runtime dentro de procedimento
+## E3015 - Comando de runtime dentro de rotina
 
 - **Categoria:** Semantic Analysis
 - **Explicação:** `nes.run` pertence à sequência principal de inicialização e `nes.wait_frame`
   depende da fase conhecida de runtime do bloco principal. Chamadas de paleta são permitidas
-  em procedimentos e publicam alterações para o VBlank.
+  em procedimentos e funções e publicam alterações para o VBlank. A restrição vale para
+  ambos os tipos de rotina.
 - **Gatilho:**
 
   ```pascal
@@ -799,3 +800,38 @@ Diagnósticos de análise semântica utilizam o intervalo E3000-E3999.
 - **Gatilho:** Compilar `tests/fixtures/diagnostics/invalid_builtin_argument_count.nsp`.
 - **Saída esperada do compilador:** `E3058` reporta as contagens esperada e fornecida de argumentos.
 - **Correção sugerida:** Passe exatamente os argumentos documentados para o builtin.
+
+## E3059 - Função desconhecida
+
+- **Categoria:** Análise Semântica
+- **Explicação:** Uma expressão chama um nome de função que não foi declarado.
+- **Gatilho:** Compile `tests/fixtures/diagnostics/unknown_function.nsp`.
+- **Correção sugerida:** Declare a função antes do bloco principal e chame-a com parênteses.
+
+## E3060 - Contagem incorreta de argumentos de função
+
+- **Categoria:** Análise Semântica
+- **Explicação:** Uma chamada não fornece exatamente um valor para cada parâmetro declarado.
+- **Gatilho:** Compile `tests/fixtures/diagnostics/function_argument_count.nsp`.
+- **Correção sugerida:** Passe exatamente os argumentos declarados, incluindo `()` em chamadas sem parâmetros.
+
+## E3061 - Função usada como instrução
+
+- **Categoria:** Análise Semântica
+- **Explicação:** Uma função produz um valor e não pode ser descartada como instrução isolada.
+- **Gatilho:** Compile `tests/fixtures/diagnostics/function_used_as_statement.nsp`.
+- **Correção sugerida:** Use a chamada em uma expressão ou atribuição de tipo compatível.
+
+## E3062 - Procedimento usado como expressão
+
+- **Categoria:** Análise Semântica
+- **Explicação:** Um procedimento não possui retorno e não pode aparecer onde uma expressão é necessária.
+- **Gatilho:** Compile `tests/fixtures/diagnostics/procedure_used_as_expression.nsp`.
+- **Correção sugerida:** Chame uma função que retorne o tipo necessário.
+
+## E3063 - Resultado de função indefinido
+
+- **Categoria:** Análise Semântica
+- **Explicação:** O resultado é lido antes de ser atribuído ou não recebe valor em todos os caminhos do corpo.
+- **Gatilho:** Compile `tests/fixtures/diagnostics/undefined_function_result.nsp`.
+- **Correção sugerida:** Atribua o nome da função em todos os caminhos antes do fim ou antes da leitura.

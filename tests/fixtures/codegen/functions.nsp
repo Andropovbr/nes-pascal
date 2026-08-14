@@ -1,0 +1,31 @@
+program FunctionCodegen;
+
+var
+    Result: byte;
+    Match: boolean;
+    Compared: boolean;
+    Combined: boolean;
+
+function Identity(Value: byte): byte;
+begin
+    Identity := Value;
+end;
+
+function Add(Left: byte; Right: byte): byte;
+begin
+    Add := Left + Right;
+end;
+
+function Equal(Left: byte; Right: byte): boolean;
+begin
+    Equal := Left = Right;
+end;
+
+begin
+    nes.set_background_color($0F);
+    Result := Add(Identity($10), Add(Identity($02), Identity($03)));
+    Match := Equal(Result, $15);
+    Compared := Identity($10) = Identity($10);
+    Combined := Equal($01, $01) and Equal($02, $02);
+    nes.run;
+end.

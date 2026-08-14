@@ -40,7 +40,7 @@ the range reserved for their category.
 | [E3011](semantic.md) | Semantic Analysis | Runtime command inside loop |
 | [E3012](semantic.md) | Semantic Analysis | For control variable modification |
 | [E3013](semantic.md) | Semantic Analysis | Unknown procedure |
-| [E3014](semantic.md) | Semantic Analysis | Recursive procedure call |
+| [E3014](semantic.md) | Semantic Analysis | Recursive callable cycle |
 | [E3015](semantic.md) | Semantic Analysis | Runtime command inside procedure |
 | [E3016](semantic.md) | Semantic Analysis | Incorrect procedure argument count |
 | [E3017](semantic.md) | Semantic Analysis | Frame wait before runtime start |
@@ -85,6 +85,11 @@ the range reserved for their category.
 | [E3056](semantic.md) | Semantic Analysis | Invalid metasprite animation |
 | [E3057](semantic.md) | Semantic Analysis | Invalid builtin context |
 | [E3058](semantic.md) | Semantic Analysis | Invalid builtin argument count |
+| [E3059](semantic.md) | Semantic Analysis | Unknown function |
+| [E3060](semantic.md) | Semantic Analysis | Incorrect function argument count |
+| [E3061](semantic.md) | Semantic Analysis | Function used as statement |
+| [E3062](semantic.md) | Semantic Analysis | Procedure used as expression |
+| [E3063](semantic.md) | Semantic Analysis | Undefined function result |
 | [E4001](type-system.md) | Type System | Unknown type |
 | [E4002](type-system.md) | Type System | Invalid `nes_color` value |
 | [E4003](type-system.md) | Type System | Invalid `byte` value |
@@ -110,6 +115,7 @@ the range reserved for their category.
 | [E4023](type-system.md) | Type System | Recursive record definition |
 | [E4024](type-system.md) | Type System | Invalid record layout or indexed offset |
 | [E4025](type-system.md) | Type System | Invalid record usage |
+| [E4026](type-system.md) | Type System | Unsupported function return type |
 | [E5001](code-generation.md) | Code Generation | Missing toolchain |
 | [E5002](code-generation.md) | Code Generation | Toolchain failure |
 | [E5003](code-generation.md) | Code Generation | User RAM exhausted |

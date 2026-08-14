@@ -24,7 +24,8 @@ and are never treated as additional storage.
 | after earlier runtime blocks | 0 or 41 bytes | Runtime | Palette shadow and atomic dirty flags, allocated only for runtime palette calls |
 | after earlier runtime blocks | 0 or 960 bytes | Runtime | Confirmed tile shadow, linked only by `nes.get_tile` |
 | after the optional tile shadow | 0 to 23 bytes | Runtime | Conditionally selected background queue, flags, and helper state |
-| from `$0200` without sprites, otherwise `$0300` | up to 1,536 or 1,280 bytes | User/free | Non-promoted globals and all procedure parameters |
+| after regular runtime data | one byte per function | Compiler | Static function-result backing storage |
+| after compiler result storage | remaining regular RAM | User/free | Non-promoted globals and all procedure/function parameters |
 
 The Zero Page policy windows are fixed and non-overlapping. Runtime symbols,
 measured expression slots, and compiler caches are mandatory when used. They
@@ -49,14 +50,17 @@ category even though they share the same bounded Zero Page policy window.
 Variable array and record-array writes continue to preserve their calculated
 index on the 6502 hardware stack while evaluating the right-hand side. Those
 stack bytes are hardware-stack use, not expression-temporary reservation.
-Procedure and builtin arguments are evaluated in their established order and
+Procedure, function, and builtin arguments are evaluated in their established order and
 reuse the scoped pool only after earlier expression leases end.
 
 Call scopes preserve all caller-owned leases. Any nested expression-producing
 call must acquire a different slot until its caller releases the active value.
-Current builtins already use this rule. Future function lowering must extend
-the same compile-time call-scope analysis across the function call graph;
-Functions and runtime stack frames are not implemented here.
+Function analysis applies this rule across the complete acyclic call graph.
+Earlier argument values also receive temporary slots when a later argument can
+call a function and overwrite static parameter storage. Each function has one
+regular-RAM result byte and returns its value in `A`; no runtime stack frame or
+fixed return area is reserved. Each active `JSR` uses only its normal two-byte
+hardware-stack return address, reported by the benchmark call-depth metric.
 
 General sprite operations conditionally link the page-aligned 256-byte OAM
 shadow at `$0200-$02FF`. They reserve `runtime_sprite_logical_y` at
@@ -88,6 +92,11 @@ Programs without individual sprite, metasprite, or OAM operations omit the OAM s
 segment, linker region, DMA code, and sprite state. Their regular runtime and
 user allocation starts at `$0200`, making that 256-byte page available instead
 of reserving it implicitly.
+
+Function result bytes start immediately after all conditionally selected
+regular runtime data and before regular user storage. They appear in the
+`FUNCTION_RESULTS` linker segment and under `Compiler Symbols` in the generated
+map. A program without functions omits the region, segment, symbols, and code.
 
 Programs with runtime palette calls reserve a 32-byte palette shadow, four
 background-palette flags, four sprite-palette flags, one universal-color flag,
@@ -143,7 +152,7 @@ is not implemented yet.
 
 Promotion is optional and conservative:
 
-1. Only global variables are candidates. Procedure parameters always use
+1. Only global variables are candidates. Procedure and function parameters always use
    regular RAM.
 2. The compiler counts static source operations that read or write each
    global. It does not estimate loop iterations or procedure call frequency.

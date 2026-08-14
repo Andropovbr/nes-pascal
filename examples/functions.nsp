@@ -1,0 +1,34 @@
+program Functions;
+
+var
+    Score: byte;
+    Ready: boolean;
+
+function Add(Left: byte; Right: byte): byte;
+begin
+    Add := Left + Right;
+end;
+
+function Double(Value: byte): byte;
+begin
+    Double := Add(Value, Value);
+end;
+
+function AtLeast(Value: byte; Minimum: byte): boolean;
+begin
+    AtLeast := Value >= Minimum;
+end;
+
+procedure StoreScore(Value: byte);
+begin
+    Score := Value;
+end;
+
+begin
+    nes.set_background_color($0F);
+    StoreScore(Add($03, Double($04)));
+    Ready := AtLeast(Score, $0B);
+    if AtLeast(Score, $0B) then
+        nes.set_background_color($19);
+    nes.run;
+end.

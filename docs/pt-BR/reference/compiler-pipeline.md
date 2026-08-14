@@ -22,8 +22,9 @@ O pipeline do compilador é deliberadamente separado:
 
 - `lexer.py` produz tokens com informações de linha e coluna;
 - `parser.py` valida a gramática e constrói a AST analisada em `ast.py`;
-- `semantic.py` valida declarações, resolve referências e chamadas de procedimento,
-  verifica tipos exatos, aplica atribuição definitiva interprocedural e valida
+- `semantic.py` valida declarações, resolve referências e chamadas de
+  procedimento/função, verifica tipos e resultados, rejeita ciclos recursivos,
+  aplica atribuição definitiva interprocedural e valida
   intrínsecos de controles e o grafo completo de chamadas de callbacks de VBlank.
   Ele também constrói a posse compartilhada determinística de OAM por slot antes de
   resolver expressões estáticas de `nes.sprite_create()` e `nes.metasprite_create(frame)`;
@@ -32,12 +33,15 @@ O pipeline do compilador é deliberadamente separado:
 - `metasprite_assets.py` valida metadados de animação versão 2 do PNG2CHR Studio, consome
   suas coordenadas de componentes com sinal já relativas à origem sem uma segunda subtração,
   e retém a geometria do quadro mais metadados de sequência simbólica, duração e repetição;
+- `codegen_analysis.py` calcula tempos de vida de expressões, bases de
+  temporários seguras entre chamadas, profundidade e caches do compilador;
 - `memory_layout.py` gerencia intervalos de RAM física, alocação, verificações de limites
   e sobreposição, armazenamento obrigatório na Zero Page, promoção opcional conservadora,
   fallback em RAM comum, geração de configuração do ld65 e o mapa de memória legível por humanos;
 - `backend_ca65.py` gera Assembly legível e comentado a partir de valores resolvidos utilizando
   os símbolos de runtime, temporários e do usuário já alocados, e emite cópias de argumentos
-  da esquerda para a direita antes de chamadas de procedimentos. Ele também gerencia a
+  da esquerda para a direita antes de chamadas de procedimentos/funções e
+  retorna funções em `A`. Ele também gerencia a
   transferência de nametable na inicialização, o tratador mínimo de NMI, a transição segura
   de runtime no VBlank, a sequência de espera do contador de quadros, o estado persistente do
   último quadro processado, o leitor serial isolado de controles, a consulta protegida de

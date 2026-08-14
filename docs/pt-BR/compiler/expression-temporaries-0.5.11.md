@@ -1,5 +1,8 @@
 # Alocação de Temporários de Expressão (0.5.11)
 
+> O milestone [0.5.12](../../language/functions.md) agora estende esse modelo
+> ao grafo acíclico completo de procedimentos e funções.
+
 [English](../../compiler/expression-temporaries-0.5.11.md) | Português (Brasil)
 
 O milestone 0.5.11 substitui o modelo incondicional de 16 bytes baseado na

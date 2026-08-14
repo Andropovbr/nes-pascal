@@ -26,6 +26,8 @@ from .ast import (
     EnumType,
     EnumTypeDeclaration,
     ForStatement,
+    FunctionCall,
+    FunctionDeclaration,
     HexLiteral,
     IfStatement,
     ImmediateValue,
@@ -62,6 +64,9 @@ from .ast import (
     ResolvedContinueStatement,
     ResolvedDecrementStatement,
     ResolvedForStatement,
+    ResolvedFunction,
+    ResolvedFunctionCall,
+    ResolvedFunctionResultAssignment,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
     ResolvedImportMetasprite,
@@ -172,6 +177,22 @@ class ProcedureSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class FunctionSymbol:
+    declaration: FunctionDeclaration
+    label: str
+    parameters: tuple[ResolvedVariable, ...]
+    return_type: BuiltInType
+    result: ResolvedVariable
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionSummary:
+    required_variables: frozenset[str]
+    assigned_variables: frozenset[str]
+    function: ResolvedFunction
+
+
+@dataclass(frozen=True, slots=True)
 class SpriteAllocationPlan:
     """Static OAM ownership shared by individual hardware-sprite features."""
 
@@ -192,6 +213,10 @@ class SemanticAnalyzer:
         self.filename = filename
         self.required_variables: set[str] | None = None
         self.procedure_summaries: dict[str, ProcedureSummary] = {}
+        self.function_summaries: dict[str, FunctionSummary] = {}
+        self.procedure_symbols: dict[str, ProcedureSymbol] = {}
+        self.function_symbols: dict[str, FunctionSymbol] = {}
+        self.current_function_result: ResolvedVariable | None = None
         self.callback_registrations: dict[
             CallbackKind, CallbackRegistration
         ] = {}
@@ -366,6 +391,45 @@ class SemanticAnalyzer:
             )
             declared_names.add(normalized_name)
 
+        functions: dict[str, FunctionSymbol] = {}
+        for declaration in program.functions:
+            normalized_name = declaration.name.lower()
+            self._ensure_unique_name(
+                declaration.name,
+                declaration.position,
+                declared_names,
+            )
+            resolved_return_type = self._resolve_variable_type(
+                declaration.return_type,
+                record_types,
+            )
+            if resolved_return_type not in (
+                BuiltInType.BYTE,
+                BuiltInType.BOOLEAN,
+            ):
+                self._error(
+                    declaration.return_type_position,
+                    DiagnosticCode.UNSUPPORTED_FUNCTION_RETURN_TYPE,
+                    f"Type {resolved_return_type.value} is not supported as a "
+                    "function return type.",
+                    "Use byte or boolean as the function return type.",
+                    len(resolved_return_type.value),
+                )
+            result = ResolvedVariable(
+                declaration.name,
+                resolved_return_type,
+                f"function_result_{declaration.name}",
+                declaration.position,
+            )
+            functions[normalized_name] = FunctionSymbol(
+                declaration,
+                f"function_{declaration.name}",
+                (),
+                resolved_return_type,
+                result,
+            )
+            declared_names.add(normalized_name)
+
         for declaration in program.procedures:
             normalized_name = declaration.name.lower()
             parameter_names: set[str] = set()
@@ -404,31 +468,87 @@ class SemanticAnalyzer:
                 tuple(resolved_parameters),
             )
 
+        for declaration in program.functions:
+            normalized_name = declaration.name.lower()
+            parameter_names: set[str] = set()
+            resolved_parameters: list[ResolvedVariable] = []
+            for parameter in declaration.parameters:
+                if parameter.type not in (
+                    BuiltInType.BYTE,
+                    BuiltInType.BOOLEAN,
+                ):
+                    self._error(
+                        parameter.type_position or parameter.position,
+                        DiagnosticCode.UNSUPPORTED_PARAMETER_TYPE,
+                        f"Type {parameter.type.value} is not supported for "
+                        "function parameters.",
+                        "Use byte or boolean for a value parameter.",
+                        len(parameter.type.value),
+                    )
+                self._ensure_unique_name(
+                    parameter.name,
+                    parameter.position,
+                    declared_names | parameter_names,
+                )
+                parameter_names.add(parameter.name.lower())
+                resolved_parameters.append(
+                    ResolvedVariable(
+                        parameter.name,
+                        parameter.type,
+                        f"parameter_{declaration.name}_{parameter.name}",
+                        parameter.position,
+                    )
+                )
+            symbol = functions[normalized_name]
+            functions[normalized_name] = FunctionSymbol(
+                symbol.declaration,
+                symbol.label,
+                tuple(resolved_parameters),
+                symbol.return_type,
+                symbol.result,
+            )
+
+        self.procedure_symbols = procedures
+        self.function_symbols = functions
+
         self._validate_callback_registrations(program, procedures)
 
-        procedure_order = self._procedure_resolution_order(
-            program.procedures,
+        callable_order = self._callable_resolution_order(
+            program,
             procedures,
-        )
-        self._validate_known_procedure_calls(
-            program.statements,
-            procedures,
+            functions,
         )
         self._validate_vblank_callback(procedures)
         resolved_procedures: dict[str, ResolvedProcedure] = {}
-        for normalized_name in procedure_order:
-            symbol = procedures[normalized_name]
+        resolved_functions: dict[str, ResolvedFunction] = {}
+        for normalized_name in callable_order:
             self.required_variables = set()
-            procedure_variables = dict(variables)
-            procedure_variables.update(
-                (parameter.name.lower(), parameter)
-                for parameter in symbol.parameters
-            )
+            if normalized_name in procedures:
+                symbol = procedures[normalized_name]
+                callable_variables = dict(variables)
+                callable_variables.update(
+                    (parameter.name.lower(), parameter)
+                    for parameter in symbol.parameters
+                )
+                self.current_function_result = None
+                declaration = symbol.declaration
+                parameters = symbol.parameters
+            else:
+                function_symbol = functions[normalized_name]
+                callable_variables = dict(variables)
+                callable_variables.update(
+                    (parameter.name.lower(), parameter)
+                    for parameter in function_symbol.parameters
+                )
+                callable_variables[normalized_name] = function_symbol.result
+                self.current_function_result = function_symbol.result
+                declaration = function_symbol.declaration
+                parameters = function_symbol.parameters
             body, assigned_variables = self._resolve_statements(
-                symbol.declaration.body,
+                declaration.body,
                 constants,
-                procedure_variables,
-                {parameter.name.lower() for parameter in symbol.parameters},
+                callable_variables,
+                {parameter.name.lower() for parameter in parameters},
                 inside_conditional=False,
                 loop_depth=0,
                 protected_control_variables=frozenset(),
@@ -436,23 +556,52 @@ class SemanticAnalyzer:
                 runtime_started=True,
             )
             required_variables = frozenset(self.required_variables)
-            resolved_procedure = ResolvedProcedure(
-                symbol.declaration.name,
-                symbol.label,
-                body,
-                symbol.parameters,
+            assigned_globals = frozenset(
+                (assigned_variables | required_variables) & variables.keys()
             )
-            self.procedure_summaries[normalized_name] = ProcedureSummary(
-                required_variables,
-                frozenset(
-                    (assigned_variables | required_variables)
-                    & variables.keys()
-                ),
-                resolved_procedure,
-            )
-            resolved_procedures[normalized_name] = resolved_procedure
+            if normalized_name in procedures:
+                symbol = procedures[normalized_name]
+                resolved_procedure = ResolvedProcedure(
+                    symbol.declaration.name,
+                    symbol.label,
+                    body,
+                    symbol.parameters,
+                )
+                self.procedure_summaries[normalized_name] = ProcedureSummary(
+                    required_variables,
+                    assigned_globals,
+                    resolved_procedure,
+                )
+                resolved_procedures[normalized_name] = resolved_procedure
+            else:
+                symbol = functions[normalized_name]
+                if normalized_name not in assigned_variables:
+                    self._error(
+                        symbol.declaration.position,
+                        DiagnosticCode.UNDEFINED_FUNCTION_RESULT,
+                        f"Function {symbol.declaration.name} does not assign its "
+                        "result on every path.",
+                        f"Assign {symbol.declaration.name} in every branch before "
+                        "the function ends.",
+                        len(symbol.declaration.name),
+                    )
+                resolved_function = ResolvedFunction(
+                    symbol.declaration.name,
+                    symbol.label,
+                    body,
+                    symbol.return_type,
+                    symbol.result,
+                    symbol.parameters,
+                )
+                self.function_summaries[normalized_name] = FunctionSummary(
+                    required_variables,
+                    assigned_globals,
+                    resolved_function,
+                )
+                resolved_functions[normalized_name] = resolved_function
 
         self.required_variables = None
+        self.current_function_result = None
         resolved_statements, final_assignments = self._resolve_statements(
             program.statements,
             constants,
@@ -490,6 +639,10 @@ class SemanticAnalyzer:
             tuple(
                 resolved_procedures[declaration.name.lower()]
                 for declaration in program.procedures
+            ),
+            tuple(
+                resolved_functions[declaration.name.lower()]
+                for declaration in program.functions
             ),
             resolved_statements,
             self.sprite_allocation_plan.reservations,
@@ -1438,6 +1591,13 @@ class SemanticAnalyzer:
                     nested,
                     "Callback registration cannot appear inside a procedure.",
                 )
+        for declaration in program.functions:
+            nested = self._first_callback_registration(declaration.body)
+            if nested is not None:
+                self._invalid_callback_context(
+                    nested,
+                    "Callback registration cannot appear inside a function.",
+                )
 
         for statement in program.statements:
             if isinstance(statement, CallbackRegistration):
@@ -1722,6 +1882,8 @@ class SemanticAnalyzer:
         validate(root)
 
     def _vblank_expression_is_safe(self, value: ValueExpression) -> bool:
+        if isinstance(value, FunctionCall):
+            return False
         if (
             isinstance(value, BuiltinCall)
             and _parsed_builtin_id(value)
@@ -1799,7 +1961,7 @@ class SemanticAnalyzer:
             return self._first_controller_query(
                 value.left
             ) or self._first_controller_query(value.right)
-        if isinstance(value, BuiltinCall):
+        if isinstance(value, (BuiltinCall, FunctionCall)):
             for argument in value.arguments:
                 found = self._first_controller_query(argument)
                 if found is not None:
@@ -1862,40 +2024,73 @@ class SemanticAnalyzer:
         assert isinstance(statement, ContinueStatement)
         return "continue"
 
-    def _procedure_resolution_order(
+    def _callable_resolution_order(
         self,
-        declarations: tuple[ProcedureDeclaration, ...],
+        program: Program,
         procedures: dict[str, ProcedureSymbol],
+        functions: dict[str, FunctionSymbol],
     ) -> list[str]:
-        calls_by_procedure: dict[str, tuple[ProcedureCall, ...]] = {}
+        declarations = sorted(
+            (*program.procedures, *program.functions),
+            key=lambda declaration: (
+                declaration.position.line,
+                declaration.position.column,
+            ),
+        )
+        calls_by_callable: dict[
+            str, tuple[ProcedureCall | FunctionCall, ...]
+        ] = {}
         for declaration in declarations:
             normalized_name = declaration.name.lower()
-            calls = tuple(self._procedure_calls(declaration.body))
-            self._validate_known_procedure_calls(
-                declaration.body,
-                procedures,
-            )
-            calls_by_procedure[normalized_name] = calls
+            calls = tuple(self._callable_calls(declaration.body))
+            self._validate_known_calls(calls, procedures, functions)
+            calls_by_callable[normalized_name] = calls
+        self._validate_known_calls(
+            tuple(self._callable_calls(program.statements)),
+            procedures,
+            functions,
+        )
 
         states: dict[str, int] = {}
         order: list[str] = []
+        path: list[str] = []
 
         def visit(normalized_name: str) -> None:
             states[normalized_name] = 1
-            for call in calls_by_procedure[normalized_name]:
+            path.append(normalized_name)
+            for call in calls_by_callable[normalized_name]:
                 callee_name = call.name.lower()
                 callee_state = states.get(callee_name, 0)
                 if callee_state == 1:
+                    cycle_start = path.index(callee_name)
+                    cycle = (*path[cycle_start:], callee_name)
+                    procedure_only = all(name in procedures for name in cycle)
+                    display_names = [
+                        procedures[name].declaration.name
+                        if name in procedures
+                        else functions[name].declaration.name
+                        for name in cycle
+                    ]
                     self._error(
                         call.position,
                         DiagnosticCode.RECURSIVE_PROCEDURE_CALL,
-                        f"Recursive procedure call involving "
-                        f"{call.name} is not supported.",
-                        "Remove the direct or indirect recursive call.",
+                        (
+                            f"Recursive procedure call involving {call.name} "
+                            "is not supported."
+                            if procedure_only
+                            else "Recursive callable cycle is not supported: "
+                            f"{' -> '.join(display_names)}."
+                        ),
+                        (
+                            "Remove the direct or indirect recursive call."
+                            if procedure_only
+                            else "Remove the direct, indirect, or mixed recursive call."
+                        ),
                         len(call.name),
                     )
                 if callee_state == 0:
                     visit(callee_name)
+            path.pop()
             states[normalized_name] = 2
             order.append(normalized_name)
 
@@ -1905,42 +2100,59 @@ class SemanticAnalyzer:
                 visit(normalized_name)
         return order
 
-    def _validate_known_procedure_calls(
+    def _validate_known_calls(
         self,
-        statements: tuple[Statement, ...],
+        calls: tuple[ProcedureCall | FunctionCall, ...],
         procedures: dict[str, ProcedureSymbol],
+        functions: dict[str, FunctionSymbol],
     ) -> None:
-        for call in self._procedure_calls(statements):
-            if call.name.lower() in procedures:
+        for call in calls:
+            normalized_name = call.name.lower()
+            if isinstance(call, ProcedureCall):
+                if normalized_name in procedures:
+                    continue
+                if normalized_name in functions:
+                    self._error(
+                        call.position,
+                        DiagnosticCode.FUNCTION_USED_AS_STATEMENT,
+                        f"Function {call.name} cannot be used as a statement.",
+                        "Use the function call as part of a value expression.",
+                        len(call.name),
+                    )
+                self._error(
+                    call.position,
+                    DiagnosticCode.UNKNOWN_PROCEDURE,
+                    f"Unknown procedure: {call.name}.",
+                    "Declare the procedure before the main program block.",
+                    len(call.name),
+                )
+            if normalized_name in functions:
                 continue
+            if normalized_name in procedures:
+                self._error(
+                    call.position,
+                    DiagnosticCode.PROCEDURE_USED_AS_EXPRESSION,
+                    f"Procedure {call.name} does not produce a value.",
+                    "Call a function where an expression value is required.",
+                    len(call.name),
+                )
             self._error(
                 call.position,
-                DiagnosticCode.UNKNOWN_PROCEDURE,
-                f"Unknown procedure: {call.name}.",
-                "Declare the procedure before the main program block.",
+                DiagnosticCode.UNKNOWN_FUNCTION,
+                f"Unknown function: {call.name}.",
+                "Declare the function before the main program block.",
                 len(call.name),
             )
 
-    def _procedure_calls(
+    def _callable_calls(
         self,
         statements: tuple[Statement, ...],
-    ) -> list[ProcedureCall]:
-        calls: list[ProcedureCall] = []
-        for statement in statements:
-            if isinstance(statement, ProcedureCall):
-                calls.append(statement)
-            elif isinstance(statement, IfStatement):
-                calls.extend(self._procedure_calls(statement.then_branch))
-                if statement.else_branch is not None:
-                    calls.extend(
-                        self._procedure_calls(statement.else_branch)
-                    )
-            elif isinstance(
-                statement,
-                (WhileStatement, RepeatStatement, ForStatement),
-            ):
-                calls.extend(self._procedure_calls(statement.body))
-        return calls
+    ) -> list[ProcedureCall | FunctionCall]:
+        return [
+            node
+            for node in self._walk_ast_nodes(statements)
+            if isinstance(node, (ProcedureCall, FunctionCall))
+        ]
 
     def _procedure_runtime_command_error(
         self,
@@ -1948,10 +2160,13 @@ class SemanticAnalyzer:
         command: str,
     ) -> None:
         assert position is not None
+        callable_kind = (
+            "function" if self.current_function_result is not None else "procedure"
+        )
         self._error(
             position,
             DiagnosticCode.PROCEDURE_RUNTIME_COMMAND,
-            f"{command} cannot appear inside a procedure.",
+            f"{command} cannot appear inside a {callable_kind}.",
             "Move the NES runtime command to the main program block.",
             len(command),
         )
@@ -2405,7 +2620,7 @@ class SemanticAnalyzer:
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
         assigned_variables: set[str],
-    ) -> ResolvedAssignment:
+    ) -> ResolvedAssignment | ResolvedFunctionResultAssignment:
         normalized_target = assignment.target.lower()
         target = variables.get(normalized_target)
         if target is None:
@@ -2446,6 +2661,8 @@ class SemanticAnalyzer:
             assigned_variables,
             assignment_target=target,
         )
+        if target is self.current_function_result:
+            return ResolvedFunctionResultAssignment(target, value)
         return ResolvedAssignment(target, value)
 
     def _resolve_array_assignment(
@@ -2701,6 +2918,15 @@ class SemanticAnalyzer:
         assigned_variables: set[str],
         assignment_target: ResolvedVariable | None = None,
     ) -> ResolvedValue:
+        if isinstance(expression, FunctionCall):
+            return self._resolve_function_call(
+                expression,
+                expected_type,
+                constants,
+                variables,
+                assigned_variables,
+                assignment_target,
+            )
         if isinstance(expression, RecordFieldExpression):
             return self._resolve_record_field_value(
                 expression,
@@ -2833,6 +3059,14 @@ class SemanticAnalyzer:
             assignment_target,
         )
         if normalized_name not in assigned_variables:
+            if variable is self.current_function_result:
+                self._error(
+                    expression.position,
+                    DiagnosticCode.UNDEFINED_FUNCTION_RESULT,
+                    f"Function result {variable.name} is read before it is assigned.",
+                    f"Assign {variable.name} before reading its result value.",
+                    len(variable.name),
+                )
             if self.required_variables is not None:
                 self.required_variables.add(normalized_name)
                 assigned_variables.add(normalized_name)
@@ -2845,6 +3079,71 @@ class SemanticAnalyzer:
                     len(expression.name),
                 )
         return VariableValue(variable)
+
+    def _resolve_function_call(
+        self,
+        call: FunctionCall,
+        expected_type: ScalarType,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+        assignment_target: ResolvedVariable | None,
+    ) -> ResolvedFunctionCall:
+        summary = self.function_summaries[call.name.lower()]
+        function = summary.function
+        self._require_expression_result_type(
+            call.position,
+            function.return_type,
+            expected_type,
+            f"Function {function.name} result",
+            assignment_target,
+        )
+        if len(call.arguments) != len(function.parameters):
+            expected_count = len(function.parameters)
+            actual_count = len(call.arguments)
+            self._error(
+                call.position,
+                DiagnosticCode.FUNCTION_ARGUMENT_COUNT,
+                f"Function {call.name} expects {expected_count} argument(s), "
+                f"but {actual_count} were provided.",
+                f"Pass exactly {expected_count} argument(s) to {call.name}.",
+                len(call.name),
+            )
+        resolved_arguments = tuple(
+            ResolvedArgument(
+                parameter,
+                self._resolve_value(
+                    argument,
+                    parameter.type,
+                    constants,
+                    variables,
+                    assigned_variables,
+                ),
+            )
+            for argument, parameter in zip(call.arguments, function.parameters)
+        )
+        missing_variables = summary.required_variables - assigned_variables
+        if missing_variables and self.required_variables is None:
+            normalized_variable = sorted(missing_variables)[0]
+            variable = variables[normalized_variable]
+            self._error(
+                call.position,
+                DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT,
+                f"Function {call.name} requires variable {variable.name} to be "
+                "assigned before the call.",
+                f"Assign {variable.name} before calling {call.name}.",
+                len(call.name),
+            )
+        if self.required_variables is not None:
+            self.required_variables.update(missing_variables)
+        assigned_variables.update(missing_variables)
+        assigned_variables.update(summary.assigned_variables)
+        return ResolvedFunctionCall(
+            function.name,
+            function.label,
+            resolved_arguments,
+            function.return_type,
+        )
 
     def _resolve_array_element(
         self,
@@ -3325,15 +3624,15 @@ class SemanticAnalyzer:
             )
             return ResolvedUnaryExpression(expression.operator, operand)
 
-        left = self._resolve_value(
-            expression.left,
+        right = self._resolve_value(
+            expression.right,
             BuiltInType.BYTE,
             constants,
             variables,
             assigned_variables,
         )
-        right = self._resolve_value(
-            expression.right,
+        left = self._resolve_value(
+            expression.left,
             BuiltInType.BYTE,
             constants,
             variables,
@@ -3374,12 +3673,17 @@ class SemanticAnalyzer:
             variables,
             assigned_variables,
         )
+        # The right operand is conditionally evaluated at runtime. Resolve it
+        # against the state established by the left operand, but do not let
+        # assignments performed only by a right-side function call become
+        # definite after the short-circuit expression.
+        right_assignments = set(assigned_variables)
         right = self._resolve_value(
             expression.right,
             BuiltInType.BOOLEAN,
             constants,
             variables,
-            assigned_variables,
+            right_assignments,
         )
         return ResolvedBooleanBinaryExpression(left, expression.operator, right)
 
@@ -3477,15 +3781,15 @@ class SemanticAnalyzer:
                 )
             operand_type = left_type or right_type or BuiltInType.BYTE
 
-        left = self._resolve_value(
-            expression.left,
+        right = self._resolve_value(
+            expression.right,
             operand_type,
             constants,
             variables,
             assigned_variables,
         )
-        right = self._resolve_value(
-            expression.right,
+        left = self._resolve_value(
+            expression.left,
             operand_type,
             constants,
             variables,
@@ -3525,6 +3829,9 @@ class SemanticAnalyzer:
             descriptor = builtin_by_name(expression.name)
             assert descriptor is not None
             return descriptor.return_type
+        if isinstance(expression, FunctionCall):
+            symbol = self.function_symbols.get(expression.name.lower())
+            return symbol.return_type if symbol is not None else None
         if isinstance(
             expression,
             (

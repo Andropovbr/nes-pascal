@@ -74,6 +74,11 @@ apenas na nova seção de diagnósticos.
 | E3056 | Semantic Analysis | [Diagnósticos semânticos](reference/diagnostics/semantic.md) |
 | E3057 | Semantic Analysis | [Diagnósticos semânticos](reference/diagnostics/semantic.md) |
 | E3058 | Semantic Analysis | [Diagnósticos semânticos](reference/diagnostics/semantic.md) |
+| E3059 | Semantic Analysis | [Diagnósticos semânticos](reference/diagnostics/semantic.md) |
+| E3060 | Semantic Analysis | [Diagnósticos semânticos](reference/diagnostics/semantic.md) |
+| E3061 | Semantic Analysis | [Diagnósticos semânticos](reference/diagnostics/semantic.md) |
+| E3062 | Semantic Analysis | [Diagnósticos semânticos](reference/diagnostics/semantic.md) |
+| E3063 | Semantic Analysis | [Diagnósticos semânticos](reference/diagnostics/semantic.md) |
 | E4001 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E4002 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E4003 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
@@ -99,6 +104,7 @@ apenas na nova seção de diagnósticos.
 | E4023 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E4024 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E4025 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4026 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E5001 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |
 | E5002 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |
 | E5003 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |

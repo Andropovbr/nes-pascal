@@ -35,6 +35,7 @@ O trabalho planejado é acompanhado separadamente no
 - [Laços de repetição](language/loops.md)
 - [Incremento e decremento](language/increment-and-decrement.md)
 - [Procedimentos](language/procedures.md)
+- [Funções](language/functions.md)
 
 ## Runtime do NES
 

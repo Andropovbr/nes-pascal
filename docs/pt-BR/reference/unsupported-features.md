@@ -21,8 +21,9 @@ parte da linguagem suportada.
 - Igualdade e desigualdade exigem tipos correspondentes; enumerações suportam apenas
   essas duas comparações. Comparações ordenadas são limitadas a `byte`.
 - Expressões booleanas suportam apenas `not`, `and` e `or`.
-- `case`, funções gerais, strings em tempo de execução e Assembly inline não
-  são suportados. Arrays são limitados a arrays globais unidimensionais de
+- `case`, strings em tempo de execução e Assembly inline não são suportados.
+  Funções de usuário retornam somente `byte` ou `boolean` e recebem apenas
+  parâmetros por valor desses tipos. Arrays são limitados a arrays globais unidimensionais de
   tamanho fixo com elementos `byte`, `boolean` ou records; arrays de enum não
   são suportados. Records são limitados a layouts estáticos nomeados com campos
   `byte`, `boolean` ou enum; records aninhados, anônimos, recursivos, variantes,
@@ -30,10 +31,11 @@ parte da linguagem suportada.
   Um pequeno conjunto fixo de expressões de consulta embutidas e os
   intrínsecos estaticamente resolvidos `nes.sprite_create()` e `nes.metasprite_create(frame)`
   são suportados.
-- Parâmetros de procedimentos são limitados a valores `byte` e `boolean`; parâmetros
-  enum ainda não são suportados. Não há parâmetros
-  por referência, valores padrão, valores de retorno ou variáveis locais gerais.
-- Chamadas de procedimentos podem ser aninhadas, mas não podem ser recursivas.
+- Parâmetros de procedimentos e funções são limitados a `byte` e `boolean`;
+  parâmetros enum ainda não são suportados. Não há parâmetros por referência,
+  valores padrão, retornos agregados ou variáveis locais gerais.
+- Chamadas de procedimentos e funções podem ser aninhadas. Recursão direta,
+  indireta ou mista não é suportada.
 - Memória dinâmica e orientação a objetos não são suportadas.
 
 ## Limitações de instruções e execução

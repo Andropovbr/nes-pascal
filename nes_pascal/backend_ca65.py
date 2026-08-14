@@ -10,6 +10,7 @@ from .ast import (
     ImmediateValue,
     ResolvedArrayElement,
     ResolvedArrayElementAssignment,
+    ResolvedArgument,
     ResolvedLoadBackground,
     ResolvedImportMetasprite,
     ResolvedAssignment,
@@ -23,6 +24,9 @@ from .ast import (
     ResolvedContinueStatement,
     ResolvedDecrementStatement,
     ResolvedForStatement,
+    ResolvedFunction,
+    ResolvedFunctionCall,
+    ResolvedFunctionResultAssignment,
     ResolvedIfStatement,
     ResolvedIncrementStatement,
     ResolvedProgram,
@@ -48,7 +52,12 @@ from .builtins import (
     PaletteKind,
     builtin_by_id,
 )
-from .codegen_analysis import TemporaryPool, can_use_direct_rhs_operand
+from .codegen_analysis import (
+    TemporaryPool,
+    TemporarySlot,
+    can_use_direct_rhs_operand,
+    value_contains_function_call,
+)
 from .memory_layout import (
     BackgroundRuntimeFeatures,
     ProgramMemoryLayout,
@@ -127,6 +136,11 @@ def generate(
         for symbol in layout.runtime_symbols
         if symbol.region_name == layout.runtime_data.name
     ] or ["    ; no scalar regular-RAM runtime symbols required"]
+    function_result_lines = [
+        f"{symbol.assembly_symbol}: .res {symbol.size}"
+        f" ; ${symbol.address:04X}: {symbol.purpose}"
+        for symbol in layout.function_result_symbols
+    ]
     sprite_zero_enabled = any(
         symbol.assembly_symbol == "runtime_sprite_zero_ready"
         for symbol in layout.runtime_symbols
@@ -189,6 +203,19 @@ def generate(
         background_shadow_enabled,
         ppu_state_enabled,
         sprite_zero_enabled and not custom_sprite_palette_initialized,
+        dict(layout.temporary_requirements.callable_bases),
+    )
+    function_lines = _generate_functions(
+        program.functions,
+        label_counter,
+        temporary_pool,
+        for_counter,
+        palette_runtime_enabled,
+        background_queue_enabled,
+        background_shadow_enabled,
+        ppu_state_enabled,
+        sprite_zero_enabled and not custom_sprite_palette_initialized,
+        dict(layout.temporary_requirements.callable_bases),
     )
     temporary_pool.assert_all_released()
     assert temporary_pool.max_live == layout.expression_temporary_bytes, (
@@ -202,11 +229,24 @@ def generate(
     promoted_user_storage = "\n".join(promoted_user_lines)
     regular_user_storage = "\n".join(regular_user_lines)
     runtime_data_storage = "\n".join(runtime_data_lines)
+    function_result_storage = (
+        '.segment "FUNCTION_RESULTS"\n'
+        "; Compiler: one regular-RAM result byte per function\n"
+        + "\n".join(function_result_lines)
+        + "\n"
+        if function_result_lines
+        else ""
+    )
     statements = "\n".join(statement_lines)
     procedures = (
         "\n\n; Source: procedure declarations\n"
         + "\n".join(procedure_lines)
         if procedure_lines
+        else ""
+    )
+    functions = (
+        "\n\n; Source: function declarations\n" + "\n".join(function_lines)
+        if function_lines
         else ""
     )
     background_storage = (
@@ -437,7 +477,7 @@ def generate(
 ; Runtime: regular-RAM state kept separate from user variables
 {runtime_data_storage}
 
-.segment "USER_VARIABLES"
+{function_result_storage}.segment "USER_VARIABLES"
 ; Source: non-promoted variables and all parameters in regular CPU RAM
 {regular_user_storage}
 
@@ -537,7 +577,7 @@ runtime_read_controller_ports:
     dex
     bne @read_controller_bits
     rts{runtime_routines}
-{procedures}{metasprite_storage}{background_storage}
+{procedures}{functions}{metasprite_storage}{background_storage}
 
 .segment "VECTORS"
     .word NMI
@@ -632,6 +672,15 @@ def _generate_statements(
                         f"    sta {statement.target.label},x",
                     ]
                 )
+        elif isinstance(statement, ResolvedFunctionResultAssignment):
+            statement_lines.extend(
+                [
+                    "",
+                    f"; Source: {statement.result.name} := value (function result)",
+                    *_load_value(statement.value, label_counter, temporary_pool),
+                    f"    sta {statement.result.label}",
+                ]
+            )
         elif isinstance(statement, ResolvedAssignment):
             statement_lines.extend(
                 [
@@ -909,14 +958,11 @@ def _generate_statements(
             )
         elif isinstance(statement, ResolvedProcedureCall):
             statement_lines.extend(["", f"; Source: {statement.name}"])
-            for index, argument in enumerate(statement.arguments, start=1):
-                statement_lines.extend(
-                    [
-                        f"    ; argument {index}: {argument.parameter.name}",
-                        *_load_value(argument.value, label_counter, temporary_pool),
-                        f"    sta {argument.parameter.label}",
-                    ]
+            statement_lines.extend(
+                _generate_call_arguments(
+                    statement.arguments, label_counter, temporary_pool
                 )
+            )
             statement_lines.append(f"    jsr {statement.label}")
         elif isinstance(statement, ResolvedCallbackRegistration):
             statement_lines.extend(
@@ -2753,30 +2799,127 @@ def _generate_procedures(
     background_shadow_enabled: bool,
     ppu_state_enabled: bool,
     default_sprite_palette_enabled: bool,
+    callable_bases: dict[str, int],
 ) -> list[str]:
     lines: list[str] = []
     for procedure in procedures:
+        base_slots = [
+            temporary_pool.acquire()
+            for _ in range(callable_bases.get(procedure.label, 0))
+        ]
+        try:
+            body_lines = _generate_statements(
+                procedure.body,
+                label_counter,
+                temporary_pool,
+                (),
+                for_counter,
+                palette_runtime_enabled,
+                background_queue_enabled,
+                background_shadow_enabled,
+                ppu_state_enabled,
+                default_sprite_palette_enabled,
+            )
+        finally:
+            for slot in reversed(base_slots):
+                slot.release()
         if lines:
             lines.append("")
         lines.extend(
             [
                 f"; Procedure: {procedure.name}",
                 f"{procedure.label}:",
-                *_generate_statements(
-                    procedure.body,
-                    label_counter,
-                    temporary_pool,
-                    (),
-                    for_counter,
-                    palette_runtime_enabled,
-                    background_queue_enabled,
-                    background_shadow_enabled,
-                    ppu_state_enabled,
-                    default_sprite_palette_enabled,
-                ),
+                *body_lines,
                 "    rts",
             ]
         )
+    return lines
+
+
+def _generate_functions(
+    functions: tuple[ResolvedFunction, ...],
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+    for_counter: list[int],
+    palette_runtime_enabled: bool,
+    background_queue_enabled: bool,
+    background_shadow_enabled: bool,
+    ppu_state_enabled: bool,
+    default_sprite_palette_enabled: bool,
+    callable_bases: dict[str, int],
+) -> list[str]:
+    lines: list[str] = []
+    for function in functions:
+        base_slots = [
+            temporary_pool.acquire()
+            for _ in range(callable_bases.get(function.label, 0))
+        ]
+        try:
+            body_lines = _generate_statements(
+                function.body,
+                label_counter,
+                temporary_pool,
+                (),
+                for_counter,
+                palette_runtime_enabled,
+                background_queue_enabled,
+                background_shadow_enabled,
+                ppu_state_enabled,
+                default_sprite_palette_enabled,
+            )
+        finally:
+            for slot in reversed(base_slots):
+                slot.release()
+        if lines:
+            lines.append("")
+        lines.extend(
+            [
+                f"; Function: {function.name}",
+                f"{function.label}:",
+                *body_lines,
+                f"    lda {function.result.label} ; return value in A",
+                "    rts",
+            ]
+        )
+    return lines
+
+
+def _generate_call_arguments(
+    arguments: tuple[ResolvedArgument, ...],
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+) -> list[str]:
+    """Evaluate arguments left-to-right without exposing static-slot aliasing."""
+
+    lines: list[str] = []
+    preserved: list[tuple[ResolvedArgument, TemporarySlot]] = []
+    try:
+        for index, argument in enumerate(arguments, start=1):
+            lines.extend(
+                [
+                    f"    ; argument {index}: {argument.parameter.name}",
+                    *_load_value(argument.value, label_counter, temporary_pool),
+                ]
+            )
+            if any(
+                value_contains_function_call(later.value)
+                for later in arguments[index:]
+            ):
+                slot = temporary_pool.acquire()
+                preserved.append((argument, slot))
+                lines.append(f"    sta {slot.name} ; preserve across later call")
+            else:
+                lines.append(f"    sta {argument.parameter.label}")
+        for argument, slot in preserved:
+            lines.extend(
+                [
+                    f"    lda {slot.name}",
+                    f"    sta {argument.parameter.label}",
+                ]
+            )
+    finally:
+        for _, slot in reversed(preserved):
+            slot.release()
     return lines
 
 
@@ -2844,6 +2987,8 @@ def _load_value(
     label_counter: list[int],
     temporary_pool: TemporaryPool,
 ) -> list[str]:
+    if isinstance(value, ResolvedFunctionCall):
+        return _load_function_call(value, label_counter, temporary_pool)
     if isinstance(value, ResolvedBuiltinCall):
         return _load_builtin_value(value, label_counter, temporary_pool)
     if isinstance(value, ImmediateValue):
@@ -2876,6 +3021,21 @@ def _load_value(
         return _load_boolean_not_expression(value, label_counter, temporary_pool)
     assert isinstance(value, ResolvedBooleanBinaryExpression)
     return _load_boolean_binary_expression(value, label_counter, temporary_pool)
+
+
+def _load_function_call(
+    value: ResolvedFunctionCall,
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+) -> list[str]:
+    with temporary_pool.call_scope():
+        return [
+            f"    ; Function call: {value.name}",
+            *_generate_call_arguments(
+                value.arguments, label_counter, temporary_pool
+            ),
+            f"    jsr {value.label}       ; result returned in A",
+        ]
 
 
 _CONTROLLER_BUTTON_NAMES = {
@@ -3323,6 +3483,8 @@ def _zero_flag_is_valid(value: ResolvedValue) -> bool:
         (ImmediateValue, VariableValue, ResolvedArrayElement, ResolvedRecordField),
     ):
         return True
+    if isinstance(value, ResolvedFunctionCall):
+        return value.return_type is BuiltInType.BOOLEAN
     if isinstance(
         value,
         (
