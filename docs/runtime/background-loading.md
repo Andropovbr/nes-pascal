@@ -31,10 +31,15 @@ The first 960 bytes are the row-major 32-by-30 tile indexes for PPU addresses
 
 ## Separate tile and attribute files
 
-The same bytes may be configured separately:
+The same bytes may be configured separately. The repository ships no separate
+tile/attribute files (the bundled `examples/nametable_loading.nsp` example uses
+the combined `--nametable` form above), so the split form is shown below with
+explicit placeholder paths:
 
 ```text
-python -m nes_pascal.cli game.nsp -o build/game.nes --nametable-tiles assets/screen.tiles --nametable-attributes assets/screen.attributes
+# Illustrative example: replace the placeholder paths with your own
+# 960-byte tile map and 64-byte attribute table.
+python -m nes_pascal.cli <your-program>.nsp -o build/<your-program>.nes --nametable-tiles <your-tile-map>.tiles --nametable-attributes <your-attribute-table>.attributes
 ```
 
 The tile file must contain exactly 960 bytes and the attribute file exactly 64

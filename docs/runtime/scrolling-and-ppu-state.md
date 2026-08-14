@@ -38,7 +38,7 @@ The compiler defaults to horizontal nametable mirroring, preserving existing
 program behavior. Select vertical mirroring at compile time with:
 
 ```text
-python -m nes_pascal.cli game.nsp -o build/game.nes --mirroring vertical
+python -m nes_pascal.cli examples/scrolling_ppu_state.nsp -o build/scrolling_ppu_state.nes --mirroring vertical
 ```
 
 `horizontal` and `vertical` set iNES header flag 6 bit 0 to `0` and `1`,

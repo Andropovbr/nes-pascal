@@ -176,30 +176,30 @@ comuns mantêm o endereçamento absoluto.
 
 ## Mapa de memória gerado
 
-Para uma saída chamada `build/zero_page.nes`, o compilador grava `build/zero_page.map`.
-O relatório separa a reserva de expressão no pico, caches do compilador, reserva por
-política, Zero Page recuperada, promoção opcional e reserva de hardware. Ele
-identifica cada símbolo do usuário como `Zero Page` ou `Regular RAM`.
+Compilar o exemplo focado `examples/zero_page.nsp` em `build/zero_page.nes`
+grava `build/zero_page.map`. O relatório separa a reserva de expressão no pico,
+caches do compilador, reserva por política, Zero Page recuperada, promoção
+opcional e reserva de hardware. Ele identifica cada símbolo do usuário como
+`Zero Page` ou `Regular RAM`.
 
-Um trecho para o exemplo focado é:
+Um trecho da tabela de regiões gerada é:
 
 ```text
 Start  End    Size  Owner     Region
 $0000  $000F    16  Runtime   Zero Page runtime
 $0010  ----      0  Compiler  Expression temporaries
-$0010  $0010     1  Compiler  Compiler caches
-$0011  $001F    15  Free      Recovered temporary Zero Page
+$0010  $001F    16  Free      Recovered temporary Zero Page
 $0020  $007F    96  Reserved  Future explicit Zero Page
 $0080  $00FF   128  User      Automatic Zero Page variables (2 used, 126 available)
 $0100  $01FF   256  Reserved  6502 hardware stack
-$0200  ----      0  Runtime   Runtime data
-$0200  $0200     1  User      Regular user variables
-$0201  $07FF  1535  Free      General free RAM
+$0200  $0203     4  Runtime   Runtime data
+$0204  $0204     1  User      Regular user variables
+$0205  $07FF  1531  Free      General free RAM
 ```
 
-O mapa também imprime `Expression temporary reservation: 0 bytes` e
-`Other compiler caches: 1 byte` neste exemplo. O `.cfg` gerado, os segmentos no
-Assembly e o relatório `.map` utilizam todos o mesmo
+O mapa também imprime `Expression temporary reservation: 0 bytes (maximum
+simultaneously live)` e `Other compiler caches: 0 bytes` neste exemplo. O `.cfg`
+gerado, os segmentos no Assembly e o relatório `.map` utilizam todos o mesmo
 objeto de layout validado, de modo que seus cálculos de endereço não podem divergir.
 
 A tabela de símbolos de runtime também reporta:
