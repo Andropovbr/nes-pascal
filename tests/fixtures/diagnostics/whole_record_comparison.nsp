@@ -1,0 +1,19 @@
+program WholeRecordComparison;
+type
+    Position = record
+        X: byte;
+        Y: byte;
+    end;
+var
+    A: Position;
+    B: Position;
+begin
+    A.X := $10;
+    B.X := $20;
+    if A = B then
+        Result := $01
+    else
+        Result := $00;
+    nes.set_background_color($0F);
+    nes.run;
+end.

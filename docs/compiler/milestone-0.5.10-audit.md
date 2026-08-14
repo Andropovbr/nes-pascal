@@ -83,11 +83,11 @@ documented, and exercised by tests or fixtures.
 | Unsupported field type — array field | `E4022` | `tests/fixtures/diagnostics/unsupported_record_field_type.nsp` + `test_records.py` | Covered |
 | Unsupported field type — nested/unknown record field | `E4022` | no fixture | P3 gap |
 | Direct recursive record definition | `E4023` | `tests/fixtures/diagnostics/recursive_record_definition.nsp` + `test_records.py` | Covered |
-| Empty record | `E4024` | no fixture (probe-verified) | **P2 gap** |
-| Record exceeding 256 fields | `E4024` | no fixture (probe-verified) | **P2 gap** |
+| Empty record | `E4024` | `tests/fixtures/diagnostics/empty_record_definition.nsp` + `test_records.py` | **Resolved** |
+| Record exceeding 256 fields | `E4024` | `tests/fixtures/diagnostics/oversized_record_definition.nsp` + `test_records.py` | **Resolved** |
 | Variable record-array offset > `$FF` | `E4024` | `test_rejects_variable_scaled_offsets_beyond_one_byte` | Covered |
 | Whole-record assignment | `E4025` | `tests/fixtures/diagnostics/invalid_record_usage.nsp` + `test_records.py` | Covered |
-| Whole-record comparison | `E4025` | no fixture (probe-verified) | **P2 gap** |
+| Whole-record comparison | `E4025` | `tests/fixtures/diagnostics/whole_record_comparison.nsp` + `test_records.py` | **Resolved** |
 | Whole record used as scalar | `E4025` | no fixture (probe-verified) | P3 gap |
 | Unknown record type for a variable | `E4001` | `test_unknown_record_type_uses_the_existing_unknown_type_diagnostic` | Covered |
 | Unknown record identifier (read) | `E3005` | no dedicated fixture (generic identifier path) | P3 gap |
@@ -99,9 +99,11 @@ catalog, documented in `docs/DIAGNOSTICS.md` and
 `docs/reference/diagnostics/type-system.md`, and validated by
 `test_diagnostic_catalog.py`.
 
-Error paths implemented in code but never exercised by a test: empty record,
-record over 256 fields, whole-record comparison, whole record used as scalar,
-and record type used as a parameter type.
+Error paths implemented in code but never exercised by a test: whole record
+used as scalar, and record type used as a parameter type. The two previously
+unexercised P2 paths (empty record, record over 256 fields) and whole-record
+comparison are now covered by the fixtures added in the hardening task below
+(see [Resolved P2 findings](#resolved-p2-findings)).
 
 ---
 
@@ -112,7 +114,7 @@ and record type used as a parameter type.
 | Lexer | `TokenKind.RECORD` asserted via `tokenize("Entity = record X: byte; end;")` (`test_records.py`) | Covered |
 | Parser | Record structure test, malformed-declaration tests (`E2102`), type-section ordering probes, assignment/expression DOT handling (`parser.py`) | Covered |
 | AST | `RecordType`/`RecordField`/`RecordFieldExpression`/`RecordFieldAssignment` + resolved nodes; nominal-layout unit tests | Covered |
-| Semantic | 16 unit tests, 6 focused fixtures, type-strictness tests, definite assignment, VBlank safety hooks, `_expression_type_hint` for comparisons | Covered |
+| Semantic | 17 unit tests, 9 focused fixtures, type-strictness tests, definite assignment, VBlank safety hooks, `_expression_type_hint` for comparisons | Covered |
 | Memory layout | contiguous layout, record-array sizing, promotion exclusion, RAM exhaustion (`E5003`), temporary accounting, memory-map output | Covered |
 | Backend | golden assembly, power-of-two and non-power-of-two scaling, indexed-write evaluation order, direct RHS operands, `_zero_flag_is_valid` for field loads | Covered |
 | Runtime support | none required — no record runtime, descriptor, or helper emitted (asserted: `record_runtime`/`record_descriptor` absent; `runtime_features == ()`) | Covered |
@@ -214,16 +216,16 @@ EN and maintained PT-BR.
 
 `docs/compiler/test-coverage-map.md` (EN/PT-BR) adds subsystem 29 "Records"
 with Strong across all layers. This classification is defensible: focused tests,
-six diagnostic fixtures, a focused golden, a toolchain build test, a Mesen
+nine diagnostic fixtures, a focused golden, a toolchain build test, a Mesen
 runtime test, and a benchmark with exact metric assertions exist for every
-layer. No map correction is warranted. The known weaknesses are the P2/P3
+layer. No map correction is warranted. The remaining weaknesses are the P3
 fixture gaps in section 3, which do not change the layer classification.
 
 ---
 
 ## 11. Regression and interaction audit
 
-- Full suite (490 tests) passes, including all pre-existing language, backend,
+- Full suite (491 tests) passes, including all pre-existing language, backend,
   memory, and runtime tests — no regression in covered behavior.
 - Pre-existing benchmark metrics unchanged (verified against documented
   baselines) — no code-size, cycle, or memory regressions.
@@ -240,8 +242,8 @@ fixture gaps in section 3, which do not change the layer classification.
 | --- | --- |
 | P0 | None found. No correctness or semantic defect identified. |
 | P1 | None. All documented milestone requirements are implemented and have focused regression protection. |
-| P2-1 | No automated fixture/test for `E4024` empty-record and >256-field paths (only the variable-offset path is tested). Both are documented and probe-verified. |
-| P2-2 | No automated fixture/test for whole-record comparison (`E4025`); only whole-record assignment is fixture-tested. Behavior probe-verified. |
+| P2-1 | No automated fixture/test for `E4024` empty-record and >256-field paths (only the variable-offset path is tested). Both are documented and probe-verified. **Resolved by the hardening task (see below).** |
+| P2-2 | No automated fixture/test for whole-record comparison (`E4025`); only whole-record assignment is fixture-tested. Behavior probe-verified. **Resolved by the hardening task (see below).** |
 | P3-1 | Diagnostics reference index omitted `E4019`-`E4025` (EN + PT-BR). **Fixed during this audit.** |
 | P3-2 | `records-0.5.10.md` "486 automated tests" count is stale/unreproducible (current suite: 490). |
 | P3-3 | A declared record used as a procedure parameter type reports `E4001` "Unknown type: Rec", which is misleading; enum parameter types get a dedicated `E3007` at parse time. No test exists. |
@@ -250,9 +252,34 @@ fixture gaps in section 3, which do not change the layer classification.
 
 ---
 
+## Resolved P2 findings
+
+Follow-up hardening task `chore/records-p2-diagnostic-hardening` closed P2-1 and
+P2-2 with focused negative fixtures and assertions. No compiler, parser, AST,
+semantic, backend, runtime, memory-layout, or diagnostic-definition behavior
+changed; the fixtures and tests rely on the already-implemented checks.
+
+| P2 finding | Fixture | Expected code | Assertion |
+| --- | --- | --- | --- |
+| Empty record layout rule | `tests/fixtures/diagnostics/empty_record_definition.nsp` | `E4024` | Added to `test_record_diagnostic_fixtures_are_focused_and_stable` (rejection + code + single occurrence) and to `test_record_layout_and_usage_fixtures_target_the_intended_rule` (message "Record Empty must declare at least one field.") |
+| Record over 256 fields | `tests/fixtures/diagnostics/oversized_record_definition.nsp` (257 fields `F0`-`F256`) | `E4024` | Same assertions; message "Record Large exceeds the supported 256-byte layout." |
+| Whole-record comparison | `tests/fixtures/diagnostics/whole_record_comparison.nsp` (`if A = B then`) | `E4025` | Same assertions; message "Whole-record comparison is not supported for type Position." |
+
+- `oversized_record_definition.nsp` uses the smallest deterministic case that
+  exceeds the legal maximum (257 fields); the legal maximum (256 fields) and the
+  record-layout semantics are unchanged.
+- `whole_record_comparison.nsp` assigns both record fields before comparing so
+  the fixture reaches the whole-record-value restriction rather than an earlier
+  definite-assignment diagnostic.
+- The suite grew by one test method (17 Records tests now); full-suite count in
+  section 13 is updated accordingly.
+
+---
+
 ## 13. Local validation results
 
-- `python3 -m unittest discover -s tests`: **490 tests, OK** (0 skipped).
+- `python3 -m unittest discover -s tests`: **491 tests, OK** (0 skipped), after
+  the hardening task added one Records test method (490 before).
 - `make test-mesen` (`MesenIntegrationTests`): **27 tests, OK**, including
   `test_records_preserve_fixed_layout_and_scaled_indexing`.
 - `make validate` (test + benchmark + ROM): **OK**; `benchmark-report` generated
