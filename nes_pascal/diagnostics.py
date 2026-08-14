@@ -94,6 +94,13 @@ class DiagnosticCode(StrEnum):
     ENUM_TOO_MANY_MEMBERS = "E4016"
     INVALID_ENUM_COMPARISON = "E4017"
     UNKNOWN_ENUM_MEMBER = "E4018"
+    DUPLICATE_RECORD_FIELD = "E4019"
+    UNKNOWN_RECORD_FIELD = "E4020"
+    FIELD_ACCESS_ON_NON_RECORD = "E4021"
+    UNSUPPORTED_RECORD_FIELD_TYPE = "E4022"
+    RECURSIVE_RECORD_DEFINITION = "E4023"
+    RECORD_LAYOUT_OVERFLOW = "E4024"
+    INVALID_RECORD_USAGE = "E4025"
     MISSING_TOOLCHAIN = "E5001"
     TOOLCHAIN_FAILURE = "E5002"
     USER_RAM_EXHAUSTED = "E5003"
@@ -372,6 +379,27 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.UNKNOWN_ENUM_MEMBER: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown enumeration member"
+    ),
+    DiagnosticCode.DUPLICATE_RECORD_FIELD: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Duplicate record field"
+    ),
+    DiagnosticCode.UNKNOWN_RECORD_FIELD: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Unknown record field"
+    ),
+    DiagnosticCode.FIELD_ACCESS_ON_NON_RECORD: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Field access on non-record"
+    ),
+    DiagnosticCode.UNSUPPORTED_RECORD_FIELD_TYPE: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Unsupported record field type"
+    ),
+    DiagnosticCode.RECURSIVE_RECORD_DEFINITION: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Recursive record definition"
+    ),
+    DiagnosticCode.RECORD_LAYOUT_OVERFLOW: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Record layout overflow"
+    ),
+    DiagnosticCode.INVALID_RECORD_USAGE: DiagnosticDefinition(
+        DiagnosticCategory.TYPE_SYSTEM, "Invalid record usage"
     ),
     DiagnosticCode.MISSING_TOOLCHAIN: DiagnosticDefinition(
         DiagnosticCategory.CODE_GENERATION, "Missing toolchain"

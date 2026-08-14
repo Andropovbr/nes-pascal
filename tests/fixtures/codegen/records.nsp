@@ -1,0 +1,31 @@
+program RecordCodegen;
+type
+    EntityState = (Idle, Moving, Dead);
+    Entity = record
+        X: byte;
+        Y: byte;
+        Active: boolean;
+        State: EntityState;
+    end;
+var
+    Player: Entity;
+    Entities: array[$00..$03] of Entity;
+    Index: byte;
+    Counter: byte;
+begin
+    Index := $01;
+    Player.X := $20;
+    Player.Y := Player.X;
+    Player.Active := true;
+    Player.State := Moving;
+    if Player.Active then
+        Counter := Player.X;
+    if Player.State = Moving then
+        Counter := Player.Y;
+    Entities[$02].X := $40;
+    Counter := Entities[$02].X;
+    Entities[Index].Y := Counter;
+    Counter := Entities[Index].Y;
+    nes.set_background_color($0F);
+    nes.run;
+end.

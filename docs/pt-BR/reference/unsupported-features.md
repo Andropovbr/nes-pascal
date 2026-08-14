@@ -10,7 +10,8 @@ parte da linguagem suportada.
 ## Limitações da linguagem
 
 - `nes_color`, `byte`, `boolean`, `sprite` e `metasprite` são os tipos embutidos.
-  Declarações `type` definidas pelo usuário atualmente suportam apenas enumerações.
+  Declarações `type` definidas pelo usuário suportam enumerações nominais e
+  records de layout fixo.
 - Constantes não podem se referir a outras constantes, e inicializadores de constantes
   não podem conter expressões.
 - Inferência de tipos e conversões implícitas não são suportadas.
@@ -20,9 +21,12 @@ parte da linguagem suportada.
 - Igualdade e desigualdade exigem tipos correspondentes; enumerações suportam apenas
   essas duas comparações. Comparações ordenadas são limitadas a `byte`.
 - Expressões booleanas suportam apenas `not`, `and` e `or`.
-- `case`, records, funções gerais, strings em tempo de execução e Assembly inline
-  não são suportados. Arrays são limitados a arrays globais unidimensionais de
-  tamanho fixo com elementos `byte` ou `boolean`; arrays de enum não são suportados.
+- `case`, funções gerais, strings em tempo de execução e Assembly inline não
+  são suportados. Arrays são limitados a arrays globais unidimensionais de
+  tamanho fixo com elementos `byte`, `boolean` ou records; arrays de enum não
+  são suportados. Records são limitados a layouts estáticos nomeados com campos
+  `byte`, `boolean` ou enum; records aninhados, anônimos, recursivos, variantes,
+  compactados e operações com o record inteiro não são suportados.
   Um pequeno conjunto fixo de expressões de consulta embutidas e os
   intrínsecos estaticamente resolvidos `nes.sprite_create()` e `nes.metasprite_create(frame)`
   são suportados.

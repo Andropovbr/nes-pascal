@@ -92,6 +92,13 @@ apenas na nova seção de diagnósticos.
 | E4016 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E4017 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E4018 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4019 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4020 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4021 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4022 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4023 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4024 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
+| E4025 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E5001 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |
 | E5002 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |
 | E5003 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |

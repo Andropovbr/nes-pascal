@@ -17,12 +17,17 @@ The right-hand side may be:
 - a constant reference;
 - a previously assigned variable reference;
 - an enum member or previously assigned enum variable of the exact same enum type;
+- a typed field of a previously assigned record or record-array element;
 - a `byte` arithmetic expression;
 - a comparison or Boolean expression whose result is `boolean`.
 
 Both sides must have exactly the same type. There are no implicit conversions.
 Reading a variable before an earlier assignment is a compilation error.
 Constants cannot be assignment targets.
+
+An individual record field may be an assignment target and retains its exact
+declared type. Whole-record assignment is not supported; assign fields
+individually. See [Records](records.md).
 
 Value parameters are initialized local copies and may also be assignment
 targets inside their declaring procedure. Assigning a parameter does not

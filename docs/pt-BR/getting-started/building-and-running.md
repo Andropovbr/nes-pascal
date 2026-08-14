@@ -20,6 +20,7 @@ python -m nes_pascal.cli examples/loops.nsp -o build/loops.nes
 python -m nes_pascal.cli examples/counting.nsp -o build/counting.nes
 python -m nes_pascal.cli examples/arrays.nsp -o build/arrays.nes
 python -m nes_pascal.cli examples/enumerations.nsp -o build/enumerations.nes
+python -m nes_pascal.cli examples/records.nsp -o build/records.nes
 python -m nes_pascal.cli examples/procedures.nsp -o build/procedures.nes
 python -m nes_pascal.cli examples/procedure_parameters.nsp -o build/procedure_parameters.nes
 python -m nes_pascal.cli examples/memory_layout.nsp -o build/memory_layout.nes
@@ -52,6 +53,8 @@ Os exemplos demonstram:
   elementos booleanos;
 - `enumerations.nsp`: estados de jogo nominais, atribuições de membros,
   comparações de tipo exato e uma transição de estado determinística;
+- `records.nsp`: records de layout fixo, campos enum e booleanos, arrays de
+  records e indexação de campos por constantes e variáveis;
 - `procedures.nsp`: resolução antecipada (forward) de procedimentos, chamadas
   aninhadas, estado global compartilhado, `JSR`/`RTS` e uma condicional dentro
   de um procedimento;

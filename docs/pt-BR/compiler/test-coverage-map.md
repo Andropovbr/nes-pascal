@@ -2,7 +2,7 @@
 
 [English](../../compiler/test-coverage-map.md) | Português (Brasil)
 
-Este documento fornece um mapa abrangente de cobertura de testes semânticos em todos os 28 subsistemas implementados no NES Pascal. Ele cataloga o nível atual de proteção automatizada através das fases do compilador, diagnósticos, testes de golden assembly, builds na cadeia de ferramentas, verificação em runtime no emulador Mesen, medições do corpus de benchmark e documentação/exemplos.
+Este documento fornece um mapa abrangente de cobertura de testes semânticos em todos os 29 subsistemas implementados no NES Pascal. Ele cataloga o nível atual de proteção automatizada através das fases do compilador, diagnósticos, testes de golden assembly, builds na cadeia de ferramentas, verificação em runtime no emulador Mesen, medições do corpus de benchmark e documentação/exemplos.
 
 ---
 
@@ -44,6 +44,7 @@ A matriz adota os seguintes níveis de verificação semântica:
 | 26 | **Infraestrutura de builtins** | Forte | Forte | Forte | Forte | Forte | Parcial | Forte | Forte | Forte | Registro unificado e validação |
 | 27 | **Otimizações de codegen de baixo risco** | N/A | N/A | N/A | Forte | Forte | Forte | Forte | Forte | Forte | Operandos diretos, branch em flags |
 | 28 | **Arrays** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | 1D fixo, indexação, limites |
+| 29 | **Records** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Layouts fixos nominais, campos tipados, arrays de records |
 
 ---
 
@@ -69,20 +70,20 @@ A matriz adota os seguintes níveis de verificação semântica:
 * `zero_page` / `memory_layout` (benchmarks puros de layout, embora todos os benchmarks reportem métricas de memória)
 
 ### 5. Quais exemplos não são exercitados por testes de toolchain ou de runtime?
-* **Nenhum.** Todos os programas de exemplo em `examples/` (`minimal.nsp`, `arithmetic.nsp`, `boolean_expressions.nsp`, `conditionals.nsp`, `loops.nsp`, `counting.nsp`, `procedures.nsp`, `procedure_parameters.nsp`, `controller_input.nsp`, `sprite_support.nsp`, `metasprite_player.nsp`, `sprite_animation.nsp`, `palette_support.nsp`, `background_updates.nsp`, `frame_callbacks.nsp`, `frame_synchronization.nsp`, `gameplay_full_stack.nsp`, `nametable_loading.nsp`, `scrolling_ppu_state.nsp`, `slow_update_callback.nsp`, `zero_page.nsp`, `memory_layout.nsp`, `metasprite_clipping.nsp`, `arrays.nsp`, `chr_asset.nsp`) são compilados, montados e validados em `tests/test_integration.py` e/ou `tools/measure_benchmarks.py`.
+* **Nenhum.** Todos os programas de exemplo em `examples/` (`minimal.nsp`, `arithmetic.nsp`, `boolean_expressions.nsp`, `conditionals.nsp`, `loops.nsp`, `counting.nsp`, `procedures.nsp`, `procedure_parameters.nsp`, `controller_input.nsp`, `sprite_support.nsp`, `metasprite_player.nsp`, `sprite_animation.nsp`, `palette_support.nsp`, `background_updates.nsp`, `frame_callbacks.nsp`, `frame_synchronization.nsp`, `gameplay_full_stack.nsp`, `nametable_loading.nsp`, `scrolling_ppu_state.nsp`, `slow_update_callback.nsp`, `zero_page.nsp`, `memory_layout.nsp`, `metasprite_clipping.nsp`, `arrays.nsp`, `enumerations.nsp`, `records.nsp`, `chr_asset.nsp`) são compilados, montados e validados em `tests/test_integration.py` e/ou `tools/measure_benchmarks.py`.
 
 ### 6. Quais goldens protegem saídas amplas mas carecem de asserções focadas?
 * `tests/golden/minimal.asm`, `tests/golden/memory_layout.asm`, `tests/golden/zero_page.asm` e `tests/golden/frame_synchronization.asm` capturam o assembly completo gerado.
 * Subsistemas como Metasprites, Animação de Sprites, Atualizações de Fundo, Paletas e Rolagem dependem de testes estruturais focados com regex no backend e testes de integração no Mesen, em vez de arquivos golden completos.
 
 ### 7. Quais testes dependem primariamente do formato interno de implementação em vez de comportamento observável?
-* Determinadas asserções regex em `tests/test_backend.py` verificam comentários específicos do assembly ou nomes de símbolos temporários (`expression_temporary_0`). Testes orientados a comportamento em `test_backend_optimizations.py`, `test_arrays.py` e `test_integration.py` asseguram sequências de instruções observáveis, alocações de memória e estado de hardware.
+* Determinadas asserções regex em `tests/test_backend.py` verificam comentários específicos do assembly ou nomes de símbolos temporários (`expression_temporary_0`). Testes orientados a comportamento em `test_backend_optimizations.py`, `test_arrays.py`, `test_records.py` e `test_integration.py` asseguram sequências de instruções observáveis, alocações de memória e estado de hardware.
 
 ### 8. Há arquivos de teste cujas responsabilidades tornaram-se excessivamente amplas?
 * `tests/test_integration.py` abriga atualmente três responsabilidades distintas:
   1. Testes de Integração da Cadeia de Ferramentas (validação de build `ca65`/`ld65`, cabeçalhos de ROM, parâmetros de CLI)
   2. Testes de Regressão de Golden Assembly (comparação de 15 fixtures `.asm`)
-  3. Testes de Integração de Runtime no Mesen (orquestração de 24 execuções do Mesen headless)
+  3. Testes de Integração de Runtime no Mesen (orquestração de 27 execuções do Mesen headless)
   Embora bem estruturado (~800 linhas), manter a separação será importante à medida que novas versões da linguagem expandirem os testes de runtime.
 
 ### 9. Há inconsistências óbvias de nomenclatura/histórico que valha a pena limpar posteriormente?

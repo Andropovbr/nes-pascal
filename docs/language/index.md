@@ -12,6 +12,7 @@ compatible with Pascal or Free Pascal.
 - [Constants and variables](constants-and-variables.md)
 - [Arrays](arrays.md)
 - [Enumerations](enumerations.md)
+- [Records](records.md)
 - [Assignments](assignments.md)
 - [Expressions](expressions.md)
 - [Conditional statements](conditionals.md)

@@ -36,7 +36,7 @@ var
     Enabled: boolean;
 ```
 
-Cada declaração contém exatamente um identificador e um tipo escalar, de enumeração ou de array
+Cada declaração contém exatamente um identificador e um tipo escalar, de enumeração, record ou de array
 fixo explícito. O armazenamento é determinístico. Uma variável global escalar referenciada por pelo menos
 três operações do código-fonte é elegível para promoção automática para a Zero Page
 na ordem de declaração. Se o espaço de promoção opcional não estiver disponível, ela
@@ -49,6 +49,8 @@ Arrays fixos são sempre alocações contíguas na RAM comum. Consulte
 [Arrays](arrays.md) para a sintaxe, os tipos de elemento e o custo exato de memória.
 Variáveis de enumeração definidas pelo usuário são alocações escalares de um
 byte; consulte [Enumerações](enumerations.md).
+Variáveis record são alocações contíguas na RAM comum e nunca são promovidas
+automaticamente para a Zero Page; consulte [Records](records.md).
 
 ## Nomes e declarações duplicadas
 

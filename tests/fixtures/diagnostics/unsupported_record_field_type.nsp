@@ -1,0 +1,9 @@
+program UnsupportedRecordFieldType;
+type
+    Bad = record
+        Values: array[$00..$03] of byte;
+    end;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+end.

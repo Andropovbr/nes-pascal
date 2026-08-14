@@ -6,7 +6,8 @@
 
 A aritmética é definida apenas para valores de `byte`. Os operandos podem ser
 literais hexadecimais, constantes de `byte`, variáveis de `byte` previamente
-atribuídas ou expressões aritméticas aninhadas.
+atribuídas, campos `byte` de [records](records.md) previamente atribuídos ou
+expressões aritméticas aninhadas.
 
 Operadores suportados:
 
@@ -60,6 +61,9 @@ AtLeastOne := Counter >= $01;
 
 Comparar tipos diferentes produz E4004. Comparações ordenadas de enumerações
 produzem E4017; valores enum expõem apenas igualdade e desigualdade.
+
+Campos de records participam conforme seu tipo escalar ou enum declarado.
+Records inteiros não podem ser comparados; compare campos individuais.
 
 ## Expressões booleanas
 

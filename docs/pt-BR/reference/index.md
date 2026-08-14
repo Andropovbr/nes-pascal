@@ -11,6 +11,7 @@ abrangem o guia da linguagem e a API de runtime.
 - [Melhorias de baixo risco na geração de código (0.5.7)](../compiler/low-risk-codegen-0.5.7.md)
 - [Implementação e medições de arrays (0.5.8)](../compiler/arrays-0.5.8.md)
 - [Implementação e medições de enumerações (0.5.9)](../compiler/enumerations-0.5.9.md)
+- [Implementação e medições de records (0.5.10)](../compiler/records-0.5.10.md)
 - [Recursos não suportados](unsupported-features.md)
 - [Diagnósticos do compilador](diagnostics/index.md)
 

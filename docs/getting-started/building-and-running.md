@@ -21,6 +21,7 @@ python -m nes_pascal.cli examples/loops.nsp -o build/loops.nes
 python -m nes_pascal.cli examples/counting.nsp -o build/counting.nes
 python -m nes_pascal.cli examples/arrays.nsp -o build/arrays.nes
 python -m nes_pascal.cli examples/enumerations.nsp -o build/enumerations.nes
+python -m nes_pascal.cli examples/records.nsp -o build/records.nes
 python -m nes_pascal.cli examples/procedures.nsp -o build/procedures.nes
 python -m nes_pascal.cli examples/procedure_parameters.nsp -o build/procedure_parameters.nes
 python -m nes_pascal.cli examples/memory_layout.nsp -o build/memory_layout.nes
@@ -52,6 +53,8 @@ The examples demonstrate:
   loop filling, indexed accumulation, and Boolean-element branching;
 - `enumerations.nsp`: nominal game states, member assignments, exact-type
   comparisons, and a deterministic state transition;
+- `records.nsp`: fixed-layout records, enum and Boolean fields, arrays of
+  records, and constant and variable field indexing;
 - `procedures.nsp`: forward procedure resolution, nested calls, shared global
   state, `JSR`/`RTS`, and a conditional inside a procedure;
 - `procedure_parameters.nsp`: typed value parameters, left-to-right argument

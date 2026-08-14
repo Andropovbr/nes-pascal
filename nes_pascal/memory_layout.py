@@ -24,12 +24,16 @@ from .ast import (
     ResolvedProcedureCall,
     ResolvedProgram,
     ResolvedRepeatStatement,
+    ResolvedRecordField,
+    ResolvedRecordFieldAssignment,
     ResolvedStatement,
     ResolvedUnaryExpression,
     ResolvedValue,
     ResolvedVariable,
     ResolvedWhileStatement,
+    RecordType,
     SourcePosition,
+    VariableType,
     VariableValue,
 )
 from .builtins import BuiltinId, RuntimeFeature, builtin_by_id
@@ -913,7 +917,7 @@ def build_memory_layout(
     promoted_labels = {
         variable.label
         for variable in program.variables
-        if not isinstance(variable.type, ArrayType)
+        if not isinstance(variable.type, (ArrayType, RecordType))
         if reference_counts.get(variable.label, 0)
         >= settings.automatic_promotion_min_references
     }
@@ -922,7 +926,7 @@ def build_memory_layout(
     next_zero_page_address = zero_page_automatic.start
     next_user_address = user_capacity.start
     for source_name, variable, purpose, promotion_allowed in _user_variables(program):
-        size = variable.type.element_count if isinstance(variable.type, ArrayType) else 1
+        size = _type_storage_size(variable.type)
         promote = (
             promotion_allowed
             and size == 1
@@ -1601,7 +1605,12 @@ def _count_statement_variable_references(
     statement: ResolvedStatement,
     counts: dict[str, int],
 ) -> None:
-    if isinstance(statement, ResolvedArrayElementAssignment):
+    if isinstance(statement, ResolvedRecordFieldAssignment):
+        _count_variable(statement.target, counts)
+        if statement.index is not None:
+            _count_value_variable_references(statement.index, counts)
+        _count_value_variable_references(statement.value, counts)
+    elif isinstance(statement, ResolvedArrayElementAssignment):
         _count_variable(statement.target, counts)
         _count_value_variable_references(statement.index, counts)
         _count_value_variable_references(statement.value, counts)
@@ -1644,7 +1653,11 @@ def _count_value_variable_references(
     value: ResolvedValue,
     counts: dict[str, int],
 ) -> None:
-    if isinstance(value, ResolvedArrayElement):
+    if isinstance(value, ResolvedRecordField):
+        _count_variable(value.variable, counts)
+        if value.index is not None:
+            _count_value_variable_references(value.index, counts)
+    elif isinstance(value, ResolvedArrayElement):
         _count_variable(value.array, counts)
         _count_value_variable_references(value.index, counts)
     elif isinstance(value, VariableValue):
@@ -1692,6 +1705,16 @@ def _temporary_symbol_names(program: ResolvedProgram) -> tuple[str, ...]:
 
 
 def _statement_temporary_symbol_count(statement: ResolvedStatement) -> int:
+    if isinstance(statement, ResolvedRecordFieldAssignment):
+        index_count = (
+            expression_temporary_symbol_count(statement.index)
+            if statement.index is not None
+            else 0
+        )
+        return max(
+            index_count,
+            expression_temporary_symbol_count(statement.value),
+        )
     if isinstance(statement, ResolvedArrayElementAssignment):
         return max(
             expression_temporary_symbol_count(statement.index),
@@ -1742,6 +1765,19 @@ def _statement_temporary_symbol_count(statement: ResolvedStatement) -> int:
             default=0,
         )
     return 0
+
+
+def _type_storage_size(type_: VariableType) -> int:
+    if isinstance(type_, RecordType):
+        return type_.size
+    if isinstance(type_, ArrayType):
+        element_size = (
+            type_.element_type.size
+            if isinstance(type_.element_type, RecordType)
+            else 1
+        )
+        return type_.element_count * element_size
+    return 1
 
 
 def _count_for_statements(statement: ResolvedStatement) -> int:

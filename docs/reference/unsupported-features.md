@@ -10,7 +10,8 @@ the supported language.
 ## Language limitations
 
 - `nes_color`, `byte`, `boolean`, `sprite`, and `metasprite` are the built-in
-  types. User-defined `type` declarations currently support enumerations only.
+  types. User-defined `type` declarations support nominal enumerations and
+  fixed-layout records.
 - Constants cannot refer to other constants, and constant initializers cannot
   contain expressions.
 - Type inference and implicit conversions are not supported.
@@ -20,9 +21,12 @@ the supported language.
 - Equality and inequality require matching types; enums support only those two
   comparisons. Ordered comparisons are limited to `byte`.
 - Boolean expressions support only `not`, `and`, and `or`.
-- `case`, records, general functions, runtime strings, and inline Assembly are
-  not supported. Arrays are limited to fixed-size, one-dimensional global
-  arrays of `byte` or `boolean`; arrays of enum are not supported. A small fixed set of built-in query expressions
+- `case`, general functions, runtime strings, and inline Assembly are not
+  supported. Arrays are limited to fixed-size, one-dimensional global arrays
+  of `byte`, `boolean`, or records; arrays of enum are not supported. Records
+  are limited to named static layouts with `byte`, `boolean`, or enum fields;
+  nested, anonymous, recursive, variant, packed, and whole-record operations
+  are not supported. A small fixed set of built-in query expressions
   and the statically resolved `nes.sprite_create()` and
   `nes.metasprite_create(frame)` intrinsics are supported.
 - Procedure parameters are limited to `byte` and `boolean` values; enum

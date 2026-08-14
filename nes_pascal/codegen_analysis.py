@@ -10,6 +10,7 @@ from .ast import (
     ResolvedBooleanNotExpression,
     ResolvedBuiltinCall,
     ResolvedComparisonExpression,
+    ResolvedRecordField,
     ResolvedUnaryExpression,
     ResolvedValue,
     VariableValue,
@@ -21,6 +22,8 @@ def is_side_effect_free_value(value: ResolvedValue) -> bool:
 
     if isinstance(value, (ImmediateValue, VariableValue)):
         return True
+    if isinstance(value, ResolvedRecordField):
+        return value.index is None or is_side_effect_free_value(value.index)
     if isinstance(value, ResolvedArrayElement):
         return is_side_effect_free_value(value.index)
     if isinstance(value, (ResolvedUnaryExpression, ResolvedBooleanNotExpression)):
@@ -54,6 +57,11 @@ def can_use_direct_rhs_operand(left: ResolvedValue, right: ResolvedValue) -> boo
     direct_memory = isinstance(right, VariableValue) or (
         isinstance(right, ResolvedArrayElement)
         and isinstance(right.index, ImmediateValue)
+    ) or (
+        isinstance(right, ResolvedRecordField)
+        and (
+            right.index is None or isinstance(right.index, ImmediateValue)
+        )
     )
     return direct_memory and is_side_effect_free_value(left)
 
@@ -88,5 +96,7 @@ def expression_temporary_symbol_count(
             default=depth,
         )
     if isinstance(value, ResolvedArrayElement):
+        return expression_temporary_symbol_count(value.index, depth)
+    if isinstance(value, ResolvedRecordField) and value.index is not None:
         return expression_temporary_symbol_count(value.index, depth)
     return depth

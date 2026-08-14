@@ -18,16 +18,20 @@ var
 
 O limite inferior é sempre `$00`. O limite superior inclusivo pode ser de
 `$00` a `$FF`, portanto uma declaração contém entre 1 e 256 elementos. Apenas
-elementos `byte` e `boolean` são suportados. Arrays podem ser declarados somente
-na seção global `var`; não podem ser constantes, variáveis locais, parâmetros
-ou valores de retorno.
+elementos `byte`, `boolean` e [records](records.md) declarados são suportados.
+Arrays podem ser declarados somente na seção global `var`; não podem ser
+constantes, variáveis locais, parâmetros ou valores de retorno.
 
-Cada elemento ocupa um byte. Elementos booleanos usam o mesmo armazenamento
+Cada elemento escalar ocupa um byte. Elementos booleanos usam o mesmo armazenamento
 canônico dos booleanos escalares: `false` é `$00` e `true` é `$01`. Arrays
 booleanos não usam compactação por bits. Consequentemente:
 
 - `array[$00..$0F] of byte` consome exatamente 16 bytes de RAM;
 - `array[$00..$07] of boolean` consome exatamente 8 bytes de RAM.
+
+Um elemento record ocupa o tamanho calculado em compilação para seu record. O
+acesso a campo dobra ou calcula `índice * tamanho do record + offset do campo`;
+consulte [Records](records.md) para endereçamento e limites de offset.
 
 O compilador aloca cada array como um intervalo determinístico e contíguo na
 RAM comum e mostra o intervalo e o tipo no mapa de memória gerado. Arrays não
@@ -88,6 +92,6 @@ para verificá-los.
 ## Limitações atuais
 
 Arrays dinâmicos, abertos, multidimensionais, locais, usados como parâmetro ou
-retorno, de records e compactados por bits não são suportados. Arrays não podem
+retorno, de enums e compactados por bits não são suportados. Arrays não podem
 ser atribuídos ou comparados como valores inteiros, e não há ponteiros nem
 operações de fatia.

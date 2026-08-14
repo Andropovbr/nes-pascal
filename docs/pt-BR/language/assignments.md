@@ -18,12 +18,18 @@ O lado direito pode ser:
 - uma referência a uma variável previamente atribuída;
 - um membro de enumeração ou variável de enumeração previamente atribuída do
   mesmo tipo exato;
+- um campo tipado de um record ou elemento de array de records previamente
+  atribuído;
 - uma expressão aritmética de `byte`;
 - uma comparação ou expressão booleana cujo resultado seja `boolean`.
 
 Ambos os lados devem ter exatamente o mesmo tipo. Não há conversões implícitas.
 Ler uma variável antes de uma atribuição prévia é um erro de compilação.
 Constantes não podem ser alvos de atribuição.
+
+Um campo individual de record pode ser alvo de atribuição e preserva seu tipo
+declarado exato. Atribuição do record inteiro não é suportada; atribua os campos
+individualmente. Consulte [Records](records.md).
 
 Parâmetros de valor são cópias locais inicializadas e também podem ser alvos de
 atribuição dentro do procedimento em que foram declarados. Atribuir a um parâmetro

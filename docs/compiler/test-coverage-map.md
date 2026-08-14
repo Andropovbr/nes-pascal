@@ -2,7 +2,7 @@
 
 English | [Português (Brasil)](../pt-BR/compiler/test-coverage-map.md)
 
-This document provides a comprehensive semantic coverage map across all 28 implemented subsystems in NES Pascal. It catalogs the current automated test protection across compiler phases, diagnostics, static assembly goldens, toolchain builds, Mesen emulator runtime verification, benchmark corpus measurement, and documentation/examples.
+This document provides a comprehensive semantic coverage map across all 29 implemented subsystems in NES Pascal. It catalogs the current automated test protection across compiler phases, diagnostics, static assembly goldens, toolchain builds, Mesen emulator runtime verification, benchmark corpus measurement, and documentation/examples.
 
 ---
 
@@ -44,6 +44,7 @@ The matrix uses semantic verification tiers:
 | 26 | **Builtin infrastructure** | Strong | Strong | Strong | Strong | Strong | Partial | Strong | Strong | Strong | Unified registry & validation |
 | 27 | **Low-risk codegen opts** | N/A | N/A | N/A | Strong | Strong | Strong | Strong | Strong | Strong | Direct operands, flag branching |
 | 28 | **Arrays** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Fixed 1D, indexed access, boundaries |
+| 29 | **Records** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Nominal fixed layouts, typed fields, record arrays |
 
 ---
 
@@ -69,20 +70,20 @@ The matrix uses semantic verification tiers:
 * `zero_page` / `memory_layout` (pure layout benchmarks, although all benchmarks report memory layouts)
 
 ### 5. Which examples are not exercised by toolchain or runtime tests?
-* **None.** Every single example program in `examples/` (`minimal.nsp`, `arithmetic.nsp`, `boolean_expressions.nsp`, `conditionals.nsp`, `loops.nsp`, `counting.nsp`, `procedures.nsp`, `procedure_parameters.nsp`, `controller_input.nsp`, `sprite_support.nsp`, `metasprite_player.nsp`, `sprite_animation.nsp`, `palette_support.nsp`, `background_updates.nsp`, `frame_callbacks.nsp`, `frame_synchronization.nsp`, `gameplay_full_stack.nsp`, `nametable_loading.nsp`, `scrolling_ppu_state.nsp`, `slow_update_callback.nsp`, `zero_page.nsp`, `memory_layout.nsp`, `metasprite_clipping.nsp`, `arrays.nsp`, `chr_asset.nsp`) is actively compiled, assembled, and validated in `tests/test_integration.py` and/or `tools/measure_benchmarks.py`.
+* **None.** Every single example program in `examples/` (`minimal.nsp`, `arithmetic.nsp`, `boolean_expressions.nsp`, `conditionals.nsp`, `loops.nsp`, `counting.nsp`, `procedures.nsp`, `procedure_parameters.nsp`, `controller_input.nsp`, `sprite_support.nsp`, `metasprite_player.nsp`, `sprite_animation.nsp`, `palette_support.nsp`, `background_updates.nsp`, `frame_callbacks.nsp`, `frame_synchronization.nsp`, `gameplay_full_stack.nsp`, `nametable_loading.nsp`, `scrolling_ppu_state.nsp`, `slow_update_callback.nsp`, `zero_page.nsp`, `memory_layout.nsp`, `metasprite_clipping.nsp`, `arrays.nsp`, `enumerations.nsp`, `records.nsp`, `chr_asset.nsp`) is actively compiled, assembled, and validated in `tests/test_integration.py` and/or `tools/measure_benchmarks.py`.
 
 ### 6. Which goldens protect broad output but lack focused assertions?
 * `tests/golden/minimal.asm`, `tests/golden/memory_layout.asm`, `tests/golden/zero_page.asm`, and `tests/golden/frame_synchronization.asm` capture complete generated assembly files.
 * Subsystems such as Metasprites, Sprite Animation, Background Updates, Palettes, and Scrolling rely on focused structural backend regex tests and Mesen integration tests rather than whole-file golden files.
 
 ### 7. Which tests depend primarily on internal implementation shape rather than observable behavior?
-* Certain regex assertions in `tests/test_backend.py` check specific assembly comment formatting or temporary symbol names (`expression_temporary_0`). Behavior-oriented tests in `test_backend_optimizations.py`, `test_arrays.py`, and `test_integration.py` appropriately assert observable instruction sequences, memory allocations, and hardware state.
+* Certain regex assertions in `tests/test_backend.py` check specific assembly comment formatting or temporary symbol names (`expression_temporary_0`). Behavior-oriented tests in `test_backend_optimizations.py`, `test_arrays.py`, `test_records.py`, and `test_integration.py` appropriately assert observable instruction sequences, memory allocations, and hardware state.
 
 ### 8. Are there any test files whose responsibilities have become overly broad?
 * `tests/test_integration.py` currently houses three distinct concerns:
   1. Toolchain Integration Tests (`ca65`/`ld65` build validation, ROM headers, CLI parameters)
   2. Golden Assembly Regression Tests (comparing 15 `.asm` fixtures)
-  3. Mesen Runtime Integration Tests (orchestrating 24 headless Mesen test runs)
+  3. Mesen Runtime Integration Tests (orchestrating 27 headless Mesen test runs)
   While well-structured (~800 lines), maintaining separation will be important as future language releases expand runtime testing.
 
 ### 9. Are there obvious test-name/history inconsistencies worth cleaning later?

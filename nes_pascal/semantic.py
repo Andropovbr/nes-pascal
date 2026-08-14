@@ -24,6 +24,7 @@ from .ast import (
     ContinueStatement,
     DecrementStatement,
     EnumType,
+    EnumTypeDeclaration,
     ForStatement,
     HexLiteral,
     IfStatement,
@@ -35,12 +36,18 @@ from .ast import (
     MetaspriteAnimation,
     MetaspriteFrame,
     MetaspriteInstance,
+    NamedTypeReference,
     OamOwnerKind,
     OamReservation,
     Program,
     ProcedureCall,
     ProcedureDeclaration,
     RepeatStatement,
+    RecordField,
+    RecordFieldAssignment,
+    RecordFieldExpression,
+    RecordType,
+    RecordTypeDeclaration,
     ResolvedArgument,
     ResolvedArrayElement,
     ResolvedArrayElementAssignment,
@@ -60,6 +67,8 @@ from .ast import (
     ResolvedImportMetasprite,
     ResolvedLoadBackground,
     ResolvedRepeatStatement,
+    ResolvedRecordField,
+    ResolvedRecordFieldAssignment,
     ResolvedProgram,
     ResolvedProcedure,
     ResolvedProcedureCall,
@@ -76,6 +85,7 @@ from .ast import (
     ValueExpression,
     VariableValue,
     VariableReference,
+    VariableType,
     WhileStatement,
 )
 from .builtins import (
@@ -261,6 +271,12 @@ class SemanticAnalyzer:
                 declared_names.add(normalized_name)
                 constants[normalized_name] = TypedConstant(enum_type, value)
 
+        record_types = self._resolve_record_types(
+            program.record_types,
+            program.enum_types,
+            declared_names,
+        )
+
         for declaration in program.constants:
             normalized_name = declaration.name.lower()
             self._ensure_unique_name(
@@ -283,17 +299,21 @@ class SemanticAnalyzer:
                 declaration.position,
                 declared_names,
             )
-            if isinstance(declaration.type, ArrayType):
-                array_type = declaration.type
+            resolved_type = self._resolve_variable_type(
+                declaration.type,
+                record_types,
+            )
+            if isinstance(resolved_type, ArrayType):
+                array_type = resolved_type
                 if array_type.element_type not in (
                     BuiltInType.BYTE,
                     BuiltInType.BOOLEAN,
-                ):
+                ) and not isinstance(array_type.element_type, RecordType):
                     self._error(
                         array_type.element_type_position or declaration.position,
                         DiagnosticCode.INVALID_ARRAY_ELEMENT_TYPE,
                         f"Arrays of {array_type.element_type.value} are not supported.",
-                        "Use byte or boolean as the array element type.",
+                        "Use byte, boolean, or a declared record as the array element type.",
                         len(array_type.element_type.value),
                     )
                 if array_type.lower_bound != 0:
@@ -317,7 +337,7 @@ class SemanticAnalyzer:
                     )
             variable = ResolvedVariable(
                 declaration.name,
-                declaration.type,
+                resolved_type,
                 f"variable_{declaration.name}",
                 declaration.position,
             )
@@ -475,7 +495,154 @@ class SemanticAnalyzer:
             self.sprite_allocation_plan.reservations,
             self.imported_metasprite_assets,
             self.sprite_allocation_plan.metasprite_instances,
+            tuple(record_types.values()),
         )
+
+    def _resolve_record_types(
+        self,
+        declarations: tuple[RecordTypeDeclaration, ...],
+        enum_declarations: tuple[EnumTypeDeclaration, ...],
+        declared_names: set[str],
+    ) -> dict[str, RecordType]:
+        record_names: set[str] = set()
+        for declaration in declarations:
+            self._ensure_unique_name(
+                declaration.name,
+                declaration.position,
+                declared_names | record_names,
+            )
+            record_names.add(declaration.name.lower())
+        declared_names.update(record_names)
+
+        enum_types = {
+            declaration.type.name.lower(): declaration.type
+            for declaration in enum_declarations
+        }
+        resolved: dict[str, RecordType] = {}
+        for declaration in declarations:
+            if not declaration.fields:
+                self._error(
+                    declaration.position,
+                    DiagnosticCode.RECORD_LAYOUT_OVERFLOW,
+                    f"Record {declaration.name} must declare at least one field.",
+                    "Add a byte, boolean, or enumeration field.",
+                    len(declaration.name),
+                )
+            fields_: list[RecordField] = []
+            field_names: set[str] = set()
+            for field_declaration in declaration.fields:
+                normalized_field = field_declaration.name.lower()
+                if normalized_field in field_names:
+                    self._error(
+                        field_declaration.position,
+                        DiagnosticCode.DUPLICATE_RECORD_FIELD,
+                        f"Record {declaration.name} already declares field "
+                        f"{field_declaration.name}.",
+                        "Use a unique field name within the record.",
+                        len(field_declaration.name),
+                    )
+                field_names.add(normalized_field)
+                field_type = field_declaration.type
+                if isinstance(field_type, NamedTypeReference):
+                    normalized_type = field_type.name.lower()
+                    if normalized_type == declaration.name.lower():
+                        self._error(
+                            field_type.position,
+                            DiagnosticCode.RECURSIVE_RECORD_DEFINITION,
+                            f"Record {declaration.name} cannot contain itself through "
+                            f"field {field_declaration.name}.",
+                            "Use a byte, boolean, or enumeration field; record fields "
+                            "inside records are not supported.",
+                            len(field_type.name),
+                        )
+                    enum_type = enum_types.get(normalized_type)
+                    if enum_type is not None:
+                        field_type = enum_type
+                    else:
+                        self._error(
+                            field_type.position,
+                            DiagnosticCode.UNSUPPORTED_RECORD_FIELD_TYPE,
+                            f"Field {declaration.name}.{field_declaration.name} has "
+                            f"unsupported type {field_type.name}.",
+                            "Record fields may have type byte, boolean, or a declared enumeration.",
+                            len(field_type.name),
+                        )
+                if isinstance(field_type, (ArrayType, RecordType)) or (
+                    field_type not in (BuiltInType.BYTE, BuiltInType.BOOLEAN)
+                    and not isinstance(field_type, EnumType)
+                ):
+                    self._error(
+                        field_declaration.type_position,
+                        DiagnosticCode.UNSUPPORTED_RECORD_FIELD_TYPE,
+                        f"Field {declaration.name}.{field_declaration.name} has "
+                        f"unsupported type {field_type.value}.",
+                        "Record fields may have type byte, boolean, or a declared enumeration.",
+                        len(field_type.value),
+                    )
+                offset = len(fields_)
+                if offset >= 0x100:
+                    self._error(
+                        field_declaration.position,
+                        DiagnosticCode.RECORD_LAYOUT_OVERFLOW,
+                        f"Record {declaration.name} exceeds the supported 256-byte layout.",
+                        "Reduce the record to at most 256 byte-sized fields.",
+                        len(field_declaration.name),
+                    )
+                assert isinstance(field_type, (BuiltInType, EnumType))
+                fields_.append(
+                    RecordField(
+                        field_declaration.name,
+                        field_type,
+                        offset,
+                        field_declaration.position,
+                    )
+                )
+            resolved[declaration.name.lower()] = RecordType(
+                declaration.name,
+                tuple(fields_),
+                len(fields_),
+            )
+        return resolved
+
+    def _resolve_variable_type(
+        self,
+        declared_type: VariableType,
+        record_types: dict[str, RecordType],
+    ) -> VariableType:
+        if isinstance(declared_type, NamedTypeReference):
+            record_type = record_types.get(declared_type.name.lower())
+            if record_type is None:
+                self._error(
+                    declared_type.position,
+                    DiagnosticCode.UNKNOWN_TYPE,
+                    f"Unknown type: {declared_type.name}.",
+                    "Use a declared enumeration or record type.",
+                    len(declared_type.name),
+                )
+            return record_type
+        if isinstance(declared_type, ArrayType) and isinstance(
+            declared_type.element_type,
+            NamedTypeReference,
+        ):
+            element = record_types.get(declared_type.element_type.name.lower())
+            if element is None:
+                self._error(
+                    declared_type.element_type.position,
+                    DiagnosticCode.UNKNOWN_TYPE,
+                    f"Unknown type: {declared_type.element_type.name}.",
+                    "Use byte, boolean, or a declared record type as the array element type.",
+                    len(declared_type.element_type.name),
+                )
+            return ArrayType(
+                element,
+                declared_type.lower_bound,
+                declared_type.upper_bound,
+                declared_type.position,
+                declared_type.lower_bound_position,
+                declared_type.upper_bound_position,
+                declared_type.element_type_position,
+            )
+        return declared_type
 
     def _resolve_metasprite_imports(
         self,
@@ -850,7 +1017,21 @@ class SemanticAnalyzer:
         current_assignments = set(assigned_variables)
         resolved_statements: list[ResolvedStatement] = []
         for statement in statements:
-            if isinstance(statement, ArrayElementAssignment):
+            if isinstance(statement, RecordFieldAssignment):
+                self._reject_control_variable_modification(
+                    statement.target,
+                    statement.target_position,
+                    protected_control_variables,
+                )
+                resolved = self._resolve_record_field_assignment(
+                    statement,
+                    constants,
+                    variables,
+                    current_assignments,
+                )
+                resolved_statements.append(resolved)
+                current_assignments.add(statement.target.lower())
+            elif isinstance(statement, ArrayElementAssignment):
                 self._reject_control_variable_modification(
                     statement.target,
                     statement.target_position,
@@ -1406,6 +1587,14 @@ class SemanticAnalyzer:
                 validate_statement(statement, symbol.declaration.name)
 
         def validate_statement(statement: Statement, owner: str) -> None:
+            if isinstance(statement, RecordFieldAssignment):
+                if statement.index is not None and not self._vblank_expression_is_safe(
+                    statement.index
+                ):
+                    self._vblank_unsafe_expression(statement.index, owner)
+                if not self._vblank_expression_is_safe(statement.value):
+                    self._vblank_unsafe_expression(statement.value, owner)
+                return
             if isinstance(statement, ArrayElementAssignment):
                 if not self._vblank_expression_is_safe(statement.index):
                     self._vblank_unsafe_expression(statement.index, owner)
@@ -1545,6 +1734,8 @@ class SemanticAnalyzer:
             return self._vblank_expression_is_safe(value.operand)
         if isinstance(value, ArrayIndexExpression):
             return self._vblank_expression_is_safe(value.index)
+        if isinstance(value, RecordFieldExpression):
+            return value.index is None or self._vblank_expression_is_safe(value.index)
         if isinstance(value, BooleanBinaryExpression):
             return self._vblank_expression_is_safe(
                 value.left
@@ -1599,6 +1790,8 @@ class SemanticAnalyzer:
             return self._first_controller_query(value.operand)
         if isinstance(value, ArrayIndexExpression):
             return self._first_controller_query(value.index)
+        if isinstance(value, RecordFieldExpression) and value.index is not None:
+            return self._first_controller_query(value.index)
         if isinstance(
             value,
             (BinaryExpression, BooleanBinaryExpression, ComparisonExpression),
@@ -1623,6 +1816,8 @@ class SemanticAnalyzer:
             return self._first_get_tile(value.operand)
         if isinstance(value, ArrayIndexExpression):
             return self._first_get_tile(value.index)
+        if isinstance(value, RecordFieldExpression) and value.index is not None:
+            return self._first_get_tile(value.index)
         if isinstance(
             value,
             (BinaryExpression, BooleanBinaryExpression, ComparisonExpression),
@@ -1636,7 +1831,10 @@ class SemanticAnalyzer:
         return None
 
     def _statement_position_for_callback(self, statement: Statement) -> SourcePosition:
-        if isinstance(statement, (Assignment, ArrayElementAssignment)):
+        if isinstance(
+            statement,
+            (Assignment, ArrayElementAssignment, RecordFieldAssignment),
+        ):
             return statement.target_position
         position = getattr(statement, "position", None)
         assert position is not None
@@ -2232,6 +2430,14 @@ class SemanticAnalyzer:
                 f"Assign one element, for example {target.name}[$00] := value.",
                 len(target.name),
             )
+        if isinstance(target.type, RecordType):
+            self._error(
+                assignment.target_position,
+                DiagnosticCode.INVALID_RECORD_USAGE,
+                f"Record {target.name} cannot be assigned as a whole value.",
+                f"Assign one field, for example {target.name}.Field := value.",
+                len(target.name),
+            )
         value = self._resolve_value(
             assignment.value,
             target.type,
@@ -2275,6 +2481,14 @@ class SemanticAnalyzer:
                 "Index only a variable declared with an array type.",
                 len(target.name),
             )
+        if isinstance(target.type.element_type, RecordType):
+            self._error(
+                assignment.target_position,
+                DiagnosticCode.INVALID_RECORD_USAGE,
+                f"Record array element {target.name}[...] cannot be assigned as a whole value.",
+                f"Assign one field, for example {target.name}[$00].Field := value.",
+                len(target.name),
+            )
 
         # Index first, then value. The backend preserves this order for variable
         # indexes without reserving permanent Zero Page state.
@@ -2294,6 +2508,190 @@ class SemanticAnalyzer:
         )
         return ResolvedArrayElementAssignment(target, index, value)
 
+    def _resolve_record_field_assignment(
+        self,
+        assignment: RecordFieldAssignment,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+    ) -> ResolvedRecordFieldAssignment:
+        target = variables.get(assignment.target.lower())
+        if target is None:
+            self._error(
+                assignment.target_position,
+                DiagnosticCode.UNKNOWN_ASSIGNMENT_TARGET,
+                f"Unknown record variable: {assignment.target}.",
+                "Declare the record variable in the var section before assigning a field.",
+                len(assignment.target),
+            )
+        record_type, index = self._resolve_record_container(
+            target,
+            assignment.index,
+            assignment.target_position,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        field = record_type.field_named(assignment.field_name)
+        if field is None:
+            self._error(
+                assignment.field_position,
+                DiagnosticCode.UNKNOWN_RECORD_FIELD,
+                f"Record {record_type.name} has no field named {assignment.field_name}.",
+                "Use a field declared by the record type.",
+                len(assignment.field_name),
+            )
+        self._validate_record_index_range(
+            target,
+            record_type,
+            field,
+            index,
+            assignment.target_position,
+        )
+        field_target = ResolvedVariable(
+            f"{target.name}.{field.name}",
+            field.type,
+            target.label,
+            assignment.field_position,
+        )
+        value = self._resolve_value(
+            assignment.value,
+            field.type,
+            constants,
+            variables,
+            assigned_variables,
+            assignment_target=field_target,
+        )
+        return ResolvedRecordFieldAssignment(target, field, value, index)
+
+    def _resolve_record_field_value(
+        self,
+        expression: RecordFieldExpression,
+        expected_type: ScalarType,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+        assignment_target: ResolvedVariable | None,
+    ) -> ResolvedRecordField:
+        variable = variables.get(expression.record_name.lower())
+        if variable is None:
+            self._error(
+                expression.position,
+                DiagnosticCode.UNKNOWN_IDENTIFIER,
+                f"Unknown record identifier: {expression.record_name}.",
+                "Declare the record variable in the var section before reading a field.",
+                len(expression.record_name),
+            )
+        record_type, index = self._resolve_record_container(
+            variable,
+            expression.index,
+            expression.position,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        field = record_type.field_named(expression.field_name)
+        if field is None:
+            self._error(
+                expression.field_position,
+                DiagnosticCode.UNKNOWN_RECORD_FIELD,
+                f"Record {record_type.name} has no field named {expression.field_name}.",
+                "Use a field declared by the record type.",
+                len(expression.field_name),
+            )
+        self._validate_record_index_range(
+            variable,
+            record_type,
+            field,
+            index,
+            expression.position,
+        )
+        self._require_expression_result_type(
+            expression.position,
+            field.type,
+            expected_type,
+            f"Record field {variable.name}.{field.name}",
+            assignment_target,
+        )
+        normalized_name = variable.name.lower()
+        if normalized_name not in assigned_variables:
+            if self.required_variables is not None:
+                self.required_variables.add(normalized_name)
+                assigned_variables.add(normalized_name)
+            else:
+                self._error(
+                    expression.position,
+                    DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT,
+                    f"Record variable {variable.name} is read before a field is assigned.",
+                    f"Assign {variable.name}.{field.name} before reading the record.",
+                    len(variable.name),
+                )
+        return ResolvedRecordField(variable, field, index)
+
+    def _resolve_record_container(
+        self,
+        variable: ResolvedVariable,
+        index_expression: ValueExpression | None,
+        position: SourcePosition,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+    ) -> tuple[RecordType, ResolvedValue | None]:
+        if index_expression is None:
+            if not isinstance(variable.type, RecordType):
+                self._error(
+                    position,
+                    DiagnosticCode.FIELD_ACCESS_ON_NON_RECORD,
+                    f"Variable {variable.name} has type {variable.type.value} and has no record fields.",
+                    "Access fields only on a record variable or an array of records.",
+                    len(variable.name),
+                )
+            return variable.type, None
+        if not (
+            isinstance(variable.type, ArrayType)
+            and isinstance(variable.type.element_type, RecordType)
+        ):
+            self._error(
+                position,
+                DiagnosticCode.FIELD_ACCESS_ON_NON_RECORD,
+                f"Variable {variable.name} is not an array of records.",
+                "Use indexed field access only with an array whose element type is a record.",
+                len(variable.name),
+            )
+        index = self._resolve_array_index(
+            index_expression,
+            variable,
+            constants,
+            variables,
+            assigned_variables,
+        )
+        return variable.type.element_type, index
+
+    def _validate_record_index_range(
+        self,
+        variable: ResolvedVariable,
+        record_type: RecordType,
+        field: RecordField,
+        index: ResolvedValue | None,
+        position: SourcePosition,
+    ) -> None:
+        if index is None or isinstance(index, ImmediateValue):
+            return
+        assert isinstance(variable.type, ArrayType)
+        maximum_offset = (
+            (variable.type.element_count - 1) * record_type.size + field.offset
+        )
+        if record_type.size <= 0xFF and maximum_offset <= 0xFF:
+            return
+        self._error(
+            position,
+            DiagnosticCode.RECORD_LAYOUT_OVERFLOW,
+            f"Variable indexing of {variable.name}.{field.name} can require byte "
+            f"offset {maximum_offset}, beyond the 8-bit indexed range.",
+            "Use constant indexes or reduce the record array so every scaled field offset is at most 255.",
+            len(variable.name),
+        )
+
     def _resolve_value(
         self,
         expression: ValueExpression,
@@ -2303,6 +2701,15 @@ class SemanticAnalyzer:
         assigned_variables: set[str],
         assignment_target: ResolvedVariable | None = None,
     ) -> ResolvedValue:
+        if isinstance(expression, RecordFieldExpression):
+            return self._resolve_record_field_value(
+                expression,
+                expected_type,
+                constants,
+                variables,
+                assigned_variables,
+                assignment_target,
+            )
         if isinstance(expression, ArrayIndexExpression):
             return self._resolve_array_element(
                 expression,
@@ -2410,6 +2817,14 @@ class SemanticAnalyzer:
                 f"Read one element, for example {variable.name}[$00].",
                 len(expression.name),
             )
+        if isinstance(variable.type, RecordType):
+            self._error(
+                expression.position,
+                DiagnosticCode.INVALID_RECORD_USAGE,
+                f"Record {variable.name} cannot be used as a scalar value.",
+                f"Read one field, for example {variable.name}.Field.",
+                len(expression.name),
+            )
         self._require_matching_type(
             expression.name,
             expression.position,
@@ -2456,6 +2871,14 @@ class SemanticAnalyzer:
                 DiagnosticCode.INVALID_ARRAY_USAGE,
                 f"Variable {array.name} has type {array.type.value} and cannot be indexed.",
                 "Index only a variable declared with an array type.",
+                len(array.name),
+            )
+        if isinstance(array.type.element_type, RecordType):
+            self._error(
+                expression.position,
+                DiagnosticCode.INVALID_RECORD_USAGE,
+                f"Record array element {array.name}[...] cannot be used as a scalar value.",
+                f"Read one field, for example {array.name}[$00].Field.",
                 len(array.name),
             )
         self._require_expression_result_type(
@@ -2976,6 +3399,22 @@ class SemanticAnalyzer:
             "Comparison expression",
             assignment_target,
         )
+        comparison_types = (
+            self._expression_type_hint(expression.left, constants, variables),
+            self._expression_type_hint(expression.right, constants, variables),
+        )
+        record_type = next(
+            (type_ for type_ in comparison_types if isinstance(type_, RecordType)),
+            None,
+        )
+        if record_type is not None:
+            self._error(
+                expression.position,
+                DiagnosticCode.INVALID_RECORD_USAGE,
+                f"Whole-record comparison is not supported for type {record_type.name}.",
+                "Compare individual record fields instead.",
+                len(expression.operator.value),
+            )
         ordered_operators = {
             ComparisonOperator.LESS,
             ComparisonOperator.GREATER,
@@ -3059,7 +3498,24 @@ class SemanticAnalyzer:
         expression: ValueExpression,
         constants: dict[str, TypedConstant],
         variables: dict[str, ResolvedVariable],
-    ) -> ScalarType | None:
+    ) -> ScalarType | RecordType | None:
+        if isinstance(expression, RecordFieldExpression):
+            variable = variables.get(expression.record_name.lower())
+            if variable is None:
+                return None
+            record_type = (
+                variable.type
+                if expression.index is None and isinstance(variable.type, RecordType)
+                else variable.type.element_type
+                if expression.index is not None
+                and isinstance(variable.type, ArrayType)
+                and isinstance(variable.type.element_type, RecordType)
+                else None
+            )
+            if record_type is None:
+                return None
+            field = record_type.field_named(expression.field_name)
+            return field.type if field is not None else None
         if isinstance(expression, ArrayIndexExpression):
             variable = variables.get(expression.array_name.lower())
             if variable is not None and isinstance(variable.type, ArrayType):
@@ -3346,7 +3802,10 @@ class SemanticAnalyzer:
         statement: Statement,
         program: Program,
     ) -> SourcePosition:
-        if isinstance(statement, (Assignment, ArrayElementAssignment)):
+        if isinstance(
+            statement,
+            (Assignment, ArrayElementAssignment, RecordFieldAssignment),
+        ):
             return statement.target_position
         if isinstance(statement, IfStatement):
             return statement.position

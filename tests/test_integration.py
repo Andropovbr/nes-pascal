@@ -96,6 +96,9 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_enumerations_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("enumerations")
 
+    def test_records_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("records")
+
     def test_procedure_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("procedures")
 
@@ -653,6 +656,9 @@ class MesenIntegrationTests(unittest.TestCase):
 
     def test_enumerations_preserve_nominal_state_transitions(self) -> None:
         self._run_mesen_test("enumerations", "verify_enumerations.lua")
+
+    def test_records_preserve_fixed_layout_and_scaled_indexing(self) -> None:
+        self._run_mesen_test("records", "verify_records.lua")
 
     def test_array_boundary_runtime_state(self) -> None:
         self._run_mesen_test(

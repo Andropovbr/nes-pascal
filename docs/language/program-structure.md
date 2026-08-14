@@ -48,6 +48,10 @@ The declaration sections must appear in this order: `type`, `const`, then
 the top-level initialization sequence and may continue with frame-synchronized
 main-thread logic after `nes.run`.
 
+The `type` section may declare nominal [enumerations](enumerations.md) and
+fixed-layout [records](records.md). Record fields may use any declared enum in
+the section; nested record fields remain unsupported.
+
 Static `nes.on_update(Procedure)` and `nes.on_vblank(Procedure)` registrations,
 when present, belong to the unconditional top-level initialization sequence
 before `nes.run`. See [Frame callbacks](../runtime/frame-callbacks.md).

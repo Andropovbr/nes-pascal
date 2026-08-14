@@ -5,7 +5,8 @@ English | [Português (Brasil)](../pt-BR/language/expressions.md)
 ## Arithmetic expressions
 
 Arithmetic is defined only for `byte` values. Operands may be hexadecimal
-literals, `byte` constants, previously assigned `byte` variables, or nested
+literals, `byte` constants, previously assigned `byte` variables, `byte`
+fields selected from previously assigned [records](records.md), or nested
 arithmetic expressions.
 
 Supported operators:
@@ -60,6 +61,9 @@ AtLeastOne := Counter >= $01;
 
 Comparing different types produces E4004. Ordered enum comparisons produce
 E4017; enum values expose equality and inequality only.
+
+Record fields participate according to their declared scalar or enum type.
+Whole records cannot be compared; compare individual fields instead.
 
 ## Boolean expressions
 

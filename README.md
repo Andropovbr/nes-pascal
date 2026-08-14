@@ -11,9 +11,10 @@ short-circuit Boolean expressions, structured conditionals and loops,
 increment and decrement operations, and acyclic procedures with `byte` and
 `boolean` value parameters. User-defined nominal enumerations provide
 byte-sized game-state values with exact-type assignment and equality rules.
-Fixed global arrays provide contiguous static
-storage for `byte` and `boolean` elements with direct or native indexed
-addressing. The one-byte `sprite` type strongly selects one of
+Named records group byte, Boolean, and enum fields into nominal fixed layouts.
+Fixed global arrays provide contiguous static storage for `byte`, `boolean`,
+and record elements with direct or scaled indexed addressing. The one-byte
+`sprite` type strongly selects one of
 64 hardware OAM entries, while the opaque `metasprite` type identifies a
 static multi-component object compiled from PNG2CHR Studio metadata. The
 deterministic memory layout places mandatory
