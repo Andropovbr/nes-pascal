@@ -57,7 +57,7 @@ jobs:
         run: |
           cat benchmark-report.md >> "$GITHUB_STEP_SUMMARY"
 
-packaging-smoke:
+  packaging-smoke:
     name: packaging-smoke
     runs-on: ubuntu-24.04
     steps:
