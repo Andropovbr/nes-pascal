@@ -6,14 +6,10 @@ The reference section covers compiler and platform behavior that spans the
 language guide and runtime API.
 
 - [Compiler pipeline](compiler-pipeline.md)
-- [Optimization and architecture audit (0.5.5)](../compiler/optimization-audit-0.5.5.md)
-- [Builtin / intrinsic infrastructure (0.5.6)](../compiler/builtin-infrastructure.md)
-- [Low-risk code generation improvements (0.5.7)](../compiler/low-risk-codegen-0.5.7.md)
-- [Array implementation and measurements (0.5.8)](../compiler/arrays-0.5.8.md)
-- [Enumeration implementation and measurements (0.5.9)](../compiler/enumerations-0.5.9.md)
-- [Record implementation and measurements (0.5.10)](../compiler/records-0.5.10.md)
-- [Unsupported features](unsupported-features.md)
 - [Compiler diagnostics](diagnostics/index.md)
+- [Unsupported features](unsupported-features.md)
+- [Semantic test coverage map](../compiler/test-coverage-map.md)
+- [Compiler Implementation and Audit History](../compiler/index.md)
 
 For syntax and semantics, use the [Language Guide](../language/index.md). For
 the generated NES environment, use the [NES Runtime](../runtime/index.md).

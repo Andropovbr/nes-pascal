@@ -21,7 +21,6 @@ O trabalho planejado é acompanhado separadamente no
 
 ## Guia da Linguagem
 
-- [Guia da Linguagem](language/index.md)
 - [Estrutura do programa](language/program-structure.md)
 - [Identificadores e literais](language/identifiers-and-literals.md)
 - [Tipos embutidos](language/types.md)
@@ -51,13 +50,7 @@ O trabalho planejado é acompanhado separadamente no
 
 - [Referência](reference/index.md)
 - [Pipeline do compilador](reference/compiler-pipeline.md)
-- [Auditoria de otimização e arquitetura (0.5.5)](compiler/optimization-audit-0.5.5.md)
-- [Infraestrutura de builtins / intrínsecos (0.5.6)](compiler/builtin-infrastructure.md)
-- [Melhorias de baixo risco na geração de código (0.5.7)](compiler/low-risk-codegen-0.5.7.md)
-- [Implementação e medições de arrays (0.5.8)](compiler/arrays-0.5.8.md)
-- [Implementação e medições de enumerações (0.5.9)](compiler/enumerations-0.5.9.md)
-- [Implementação e medições de records (0.5.10)](compiler/records-0.5.10.md)
-- [Alocação de temporários de expressão (0.5.11)](compiler/expression-temporaries-0.5.11.md)
-- [Mapa de cobertura de testes semânticos](compiler/test-coverage-map.md)
-- [Recursos não suportados](reference/unsupported-features.md)
 - [Diagnósticos do compilador](reference/diagnostics/index.md)
+- [Recursos não suportados](reference/unsupported-features.md)
+- [Mapa de cobertura de testes semânticos](compiler/test-coverage-map.md)
+- [Histórico de implementação e auditorias do compilador](compiler/index.md)
