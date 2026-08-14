@@ -62,6 +62,7 @@ written, with explicit historical notes added where relevant.
 ## Cross-cutting audits
 
 - [Diagnostic catalog and error-message consistency audit](diagnostic-consistency-audit.md) — cross-cutting QA audit of the diagnostic catalog, coverage, message quality, precedence, and EN/PT-BR parity.
+- [Packaging, distribution, and clean-installation audit](packaging-and-clean-install-audit.md) — independent packaging/release-engineering audit of metadata, clean installation, wheel/sdist builds, installed CLI, outside-repository compilation, and CI packaging coverage.
 
 For durable, non-milestone compiler material, see the
 [Semantic test coverage map](test-coverage-map.md) and the
