@@ -237,6 +237,31 @@ end.
             analyze(parse(source, "missing-run.nsp"), source, "missing-run.nsp")
         self.assertEqual(context.exception.code, "E3001")
 
+    def test_duplicate_run_reports_the_later_statement(self) -> None:
+        source = """program DuplicateRun;
+begin
+    nes.set_background_color($21);
+    nes.run;
+    nes.run;
+end.
+"""
+        with self.assertRaises(CompilerError) as context:
+            analyze(parse(source, "duplicate-run.nsp"), source, "duplicate-run.nsp")
+        rendered = str(context.exception)
+        self.assertEqual(context.exception.code, "E3002")
+        self.assertEqual(
+            (context.exception.location.line, context.exception.location.column),
+            (5, 5),
+        )
+        self.assertIn("nes.run may appear only once.", rendered)
+        self.assertIn("Remove the later nes.run; call.", rendered)
+        self.assertNotIn("E3001", rendered)
+        self.assertNotIn("E3003", rendered)
+        self.assertNotIn(
+            "The program must set the background color exactly once.",
+            rendered,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

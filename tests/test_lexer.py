@@ -66,6 +66,19 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(context.exception.location.column, 15)
         self.assertIn("Unexpected character", str(context.exception))
 
+    def test_rejects_hexadecimal_literal_without_digits_with_location(self) -> None:
+        for source in ("program Demo; $g", "program Demo; $"):
+            with self.subTest(source=source):
+                with self.assertRaises(CompilerError) as context:
+                    tokenize(source, "broken.nsp")
+                self.assertEqual(context.exception.code, "E1002")
+                self.assertEqual(
+                    (context.exception.location.line, context.exception.location.column),
+                    (1, 15),
+                )
+                self.assertIn("Hexadecimal literal has no digits after '$'", str(context.exception))
+                self.assertIn("Use a literal such as $00 or $21", str(context.exception))
+
     def test_tokenizes_variable_declarations_assignments_and_booleans(self) -> None:
         tokens = tokenize(
             "var Counter: byte; Enabled: boolean; begin "
