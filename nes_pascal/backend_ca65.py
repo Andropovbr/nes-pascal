@@ -28,11 +28,16 @@ from .ast import (
     ResolvedProgram,
     ResolvedProcedure,
     ResolvedProcedureCall,
+    ResolvedRecordField,
+    ResolvedRecordFieldAssignment,
     ResolvedRepeatStatement,
     ResolvedStatement,
     ResolvedUnaryExpression,
     ResolvedValue,
+    ResolvedVariable,
     ResolvedWhileStatement,
+    ArrayType,
+    RecordType,
     Run,
     UnaryOperator,
     VariableValue,
@@ -548,7 +553,48 @@ def _generate_statements(
 ) -> list[str]:
     statement_lines: list[str] = []
     for statement in statements:
-        if isinstance(statement, ResolvedArrayElementAssignment):
+        if isinstance(statement, ResolvedRecordFieldAssignment):
+            if statement.index is None or isinstance(statement.index, ImmediateValue):
+                operand = _resolved_record_field_operand(
+                    statement.target,
+                    statement.field.offset,
+                    statement.index,
+                )
+                source_target = (
+                    statement.target.name
+                    if statement.index is None
+                    else f"{statement.target.name}[constant]"
+                )
+                statement_lines.extend(
+                    [
+                        "",
+                        f"; Source: {source_target}."
+                        f"{statement.field.name} := value",
+                        *_load_value(statement.value, label_counter),
+                        f"    sta {operand}",
+                    ]
+                )
+            else:
+                record_type = _record_type_for_variable(statement.target)
+                statement_lines.extend(
+                    [
+                        "",
+                        f"; Source: {statement.target.name}[index]."
+                        f"{statement.field.name} := value",
+                        "; evaluate index and scale to byte offset before value",
+                        *_load_value(statement.index, label_counter),
+                        *_scale_record_index(record_type.size, label_counter),
+                        *_add_record_field_offset(statement.field.offset),
+                        "    pha                     ; preserve scaled field offset",
+                        *_load_value(statement.value, label_counter),
+                        "    tay                     ; preserve assigned value",
+                        "    pla",
+                        "    tax                     ; scaled record field offset",
+                        "    tya",
+                        f"    sta {statement.target.label},x",
+                    ]
+                )
+        elif isinstance(statement, ResolvedArrayElementAssignment):
             if isinstance(statement.index, ImmediateValue):
                 offset = statement.index.value
                 operand = _array_element_operand(statement.target.label, offset)
@@ -2753,6 +2799,8 @@ def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
         return [f"    lda {value.variable.label}"]
     if isinstance(value, ResolvedArrayElement):
         return _load_array_element(value, 0, label_counter)
+    if isinstance(value, ResolvedRecordField):
+        return _load_record_field(value, 0, label_counter)
     if isinstance(value, ResolvedUnaryExpression):
         lines = _load_value(value.operand, label_counter)
         if value.operator is UnaryOperator.PLUS:
@@ -2969,6 +3017,8 @@ def _load_value_at_depth(
         return _load_builtin_value(value, depth, label_counter)
     if isinstance(value, ResolvedArrayElement):
         return _load_array_element(value, depth, label_counter)
+    if isinstance(value, ResolvedRecordField):
+        return _load_record_field(value, depth, label_counter)
     if isinstance(value, ResolvedBinaryExpression):
         return _load_binary_expression(value, depth, label_counter)
     if isinstance(value, ResolvedComparisonExpression):
@@ -3007,6 +3057,26 @@ def _load_array_element(
     ]
 
 
+def _load_record_field(
+    value: ResolvedRecordField,
+    depth: int,
+    label_counter: list[int],
+) -> list[str]:
+    if value.index is None or isinstance(value.index, ImmediateValue):
+        return [
+            f"    lda {_resolved_record_field_operand(value.variable, value.field.offset, value.index)}"
+        ]
+    record_type = _record_type_for_variable(value.variable)
+    return [
+        f"    ; record array field: scale index by {record_type.size}",
+        *_load_value_at_depth(value.index, depth, label_counter),
+        *_scale_record_index(record_type.size, label_counter),
+        *_add_record_field_offset(value.field.offset),
+        "    tax                     ; scaled record field offset",
+        f"    lda {value.variable.label},x",
+    ]
+
+
 def _direct_rhs_operand(
     left: ResolvedValue,
     right: ResolvedValue,
@@ -3017,6 +3087,12 @@ def _direct_rhs_operand(
         return f"#${right.value:02X}"
     if isinstance(right, VariableValue):
         return right.variable.label
+    if isinstance(right, ResolvedRecordField):
+        return _resolved_record_field_operand(
+            right.variable,
+            right.field.offset,
+            right.index,
+        )
     assert isinstance(right, ResolvedArrayElement)
     assert isinstance(right.index, ImmediateValue)
     return _array_element_operand(right.array.label, right.index.value)
@@ -3024,6 +3100,61 @@ def _direct_rhs_operand(
 
 def _array_element_operand(label: str, offset: int) -> str:
     return label if offset == 0 else f"{label} + {offset}"
+
+
+def _record_type_for_variable(variable: ResolvedVariable) -> RecordType:
+    if isinstance(variable.type, RecordType):
+        return variable.type
+    assert isinstance(variable.type, ArrayType)
+    assert isinstance(variable.type.element_type, RecordType)
+    return variable.type.element_type
+
+
+def _resolved_record_field_operand(
+    variable: ResolvedVariable,
+    field_offset: int,
+    index: ResolvedValue | None,
+) -> str:
+    record_type = _record_type_for_variable(variable)
+    element_index = index.value if isinstance(index, ImmediateValue) else 0
+    offset = element_index * record_type.size + field_offset
+    return _array_element_operand(variable.label, offset)
+
+
+def _scale_record_index(
+    record_size: int,
+    label_counter: list[int],
+) -> list[str]:
+    if record_size == 1:
+        return ["    ; record size 1: logical index is the byte offset"]
+    if record_size > 0 and record_size & (record_size - 1) == 0:
+        shifts = record_size.bit_length() - 1
+        return [
+            *("    asl a                   ; scale record index" for _ in range(shifts))
+        ]
+    loop_label = _new_label(label_counter, "record_index_scale")
+    done_label = _new_label(label_counter, "record_index_scaled")
+    return [
+        "    tax                     ; logical record index",
+        "    lda #$00                ; scaled byte offset",
+        "    cpx #$00",
+        f"    beq {done_label}",
+        f"{loop_label}:",
+        "    clc",
+        f"    adc #${record_size:02X}",
+        "    dex",
+        f"    bne {loop_label}",
+        f"{done_label}:",
+    ]
+
+
+def _add_record_field_offset(field_offset: int) -> list[str]:
+    if field_offset == 0:
+        return []
+    return [
+        "    clc",
+        f"    adc #${field_offset:02X}          ; record field offset",
+    ]
 
 
 def _comparison_setup(
@@ -3160,7 +3291,10 @@ _BOOLEAN_LOADS_WITH_VALID_ZERO_FLAG = {
 def _zero_flag_is_valid(value: ResolvedValue) -> bool:
     """Recognize only loads whose final instruction provably defines Z."""
 
-    if isinstance(value, (ImmediateValue, VariableValue, ResolvedArrayElement)):
+    if isinstance(
+        value,
+        (ImmediateValue, VariableValue, ResolvedArrayElement, ResolvedRecordField),
+    ):
         return True
     if isinstance(
         value,

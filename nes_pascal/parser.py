@@ -33,11 +33,16 @@ from .ast import (
     ImportMetasprite,
     LoadBackground,
     Literal,
+    NamedTypeReference,
     Program,
     ProcedureCall,
     ProcedureDeclaration,
     ProcedureParameter,
     RepeatStatement,
+    RecordFieldAssignment,
+    RecordFieldDeclaration,
+    RecordFieldExpression,
+    RecordTypeDeclaration,
     Run,
     ScalarType,
     SourcePosition,
@@ -46,6 +51,7 @@ from .ast import (
     UnaryOperator,
     ValueExpression,
     VariableDeclaration,
+    VariableType,
     VariableReference,
     WhileStatement,
 )
@@ -63,8 +69,10 @@ class Parser:
         self.filename = filename
         self.position = 0
         self.enum_types: dict[str, EnumType] = {}
+        self.record_type_names: set[str] = set()
         self.constant_names: set[str] = set()
         self.variable_names: set[str] = set()
+        self.variable_types: dict[str, VariableType] = {}
         self.parameter_names: set[str] = set()
 
     def parse(self) -> Program:
@@ -74,11 +82,14 @@ class Parser:
         )
         self._expect(TokenKind.SEMICOLON, "Expected ';' after the program name.")
 
-        enum_types = self._parse_enum_types()
+        enum_types, record_types = self._parse_type_declarations()
         constants = self._parse_constants()
         self.constant_names = {declaration.name.lower() for declaration in constants}
         variables = self._parse_variables()
         self.variable_names = {declaration.name.lower() for declaration in variables}
+        self.variable_types = {
+            declaration.name.lower(): declaration.type for declaration in variables
+        }
         procedures = self._parse_procedures()
         self._expect(TokenKind.BEGIN, "Expected 'begin' to start the program block.")
 
@@ -101,6 +112,7 @@ class Parser:
         return Program(
             name.text,
             tuple(enum_types),
+            tuple(record_types),
             tuple(constants),
             tuple(variables),
             tuple(procedures),
@@ -108,22 +120,63 @@ class Parser:
             SourcePosition(end_token.line, end_token.column),
         )
 
-    def _parse_enum_types(self) -> list[EnumTypeDeclaration]:
+    def _parse_type_declarations(
+        self,
+    ) -> tuple[list[EnumTypeDeclaration], list[RecordTypeDeclaration]]:
         if not self._match(TokenKind.TYPE):
-            return []
+            return [], []
         if not self._check(TokenKind.IDENTIFIER):
             self._error(
                 self._current(),
                 DiagnosticCode.INVALID_SYNTAX,
-                "Expected an enumeration type declaration after 'type'.",
-                "Declare an enumeration as: GameState = (Title, Playing);",
+                "Expected a type declaration after 'type'.",
+                "Declare an enumeration or named record type.",
             )
 
-        declarations: list[EnumTypeDeclaration] = []
+        enum_declarations: list[EnumTypeDeclaration] = []
+        record_declarations: list[RecordTypeDeclaration] = []
         while self._check(TokenKind.IDENTIFIER):
-            name = self._expect(TokenKind.IDENTIFIER, "Expected an enumeration type name.")
-            self._expect(TokenKind.EQUAL, "Expected '=' after the enumeration type name.")
-            self._expect(TokenKind.LEFT_PAREN, "Expected '(' before enumeration members.")
+            name = self._expect(TokenKind.IDENTIFIER, "Expected a type name.")
+            position = SourcePosition(name.line, name.column)
+            self._expect(TokenKind.EQUAL, "Expected '=' after the type name.")
+            if self._match(TokenKind.RECORD):
+                self.record_type_names.add(name.text.lower())
+                fields: list[RecordFieldDeclaration] = []
+                while not self._check(TokenKind.END):
+                    if self._check(TokenKind.EOF):
+                        self._error(
+                            self._current(),
+                            DiagnosticCode.INVALID_SYNTAX,
+                            f"Reached the end of the file before record {name.text} ended.",
+                            "Finish the record declaration with 'end;'.",
+                        )
+                    field_name = self._expect(
+                        TokenKind.IDENTIFIER,
+                        "Expected a record field name or 'end'.",
+                    )
+                    self._expect(TokenKind.COLON, "Expected ':' after the record field name.")
+                    type_token = self._current()
+                    field_type = self._parse_variable_type(allow_named=True)
+                    self._expect(
+                        TokenKind.SEMICOLON,
+                        "Expected ';' after the record field declaration.",
+                    )
+                    fields.append(
+                        RecordFieldDeclaration(
+                            field_name.text,
+                            field_type,
+                            SourcePosition(field_name.line, field_name.column),
+                            SourcePosition(type_token.line, type_token.column),
+                        )
+                    )
+                self._expect(TokenKind.END, "Expected 'end' after record fields.")
+                self._expect(TokenKind.SEMICOLON, "Expected ';' after the record declaration.")
+                record_declarations.append(
+                    RecordTypeDeclaration(name.text, tuple(fields), position)
+                )
+                continue
+
+            self._expect(TokenKind.LEFT_PAREN, "Expected '(' or 'record' after '='.")
             if self._check(TokenKind.RIGHT_PAREN):
                 self._error(
                     self._current(),
@@ -152,14 +205,14 @@ class Parser:
 
             enum_type = EnumType(name.text, tuple(member.name for member in members))
             self.enum_types[name.text.lower()] = enum_type
-            declarations.append(
+            enum_declarations.append(
                 EnumTypeDeclaration(
                     enum_type,
                     tuple(members),
-                    SourcePosition(name.line, name.column),
+                    position,
                 )
             )
-        return declarations
+        return enum_declarations, record_declarations
 
     def _parse_constants(self) -> list[ConstantDeclaration]:
         if not self._match(TokenKind.CONST):
@@ -220,9 +273,9 @@ class Parser:
             )
         return declarations
 
-    def _parse_variable_type(self) -> ScalarType | ArrayType:
+    def _parse_variable_type(self, *, allow_named: bool = False) -> VariableType:
         if not self._match(TokenKind.ARRAY):
-            return self._parse_scalar_type()
+            return self._parse_scalar_type(allow_named=allow_named)
 
         array_token = self._previous()
         self._expect(TokenKind.LEFT_BRACKET, "Expected '[' after 'array'.")
@@ -239,7 +292,7 @@ class Parser:
         self._expect(TokenKind.RIGHT_BRACKET, "Expected ']' after array bounds.")
         self._expect(TokenKind.OF, "Expected 'of' after array bounds.")
         element_token = self._current()
-        element_type = self._parse_scalar_type()
+        element_type = self._parse_scalar_type(allow_named=allow_named)
         assert lower.value is not None and upper.value is not None
         return ArrayType(
             element_type,
@@ -274,7 +327,11 @@ class Parser:
         )
         raise AssertionError("unreachable")
 
-    def _parse_scalar_type(self) -> ScalarType:
+    def _parse_scalar_type(
+        self,
+        *,
+        allow_named: bool = False,
+    ) -> ScalarType | NamedTypeReference:
         token = self._expect(TokenKind.IDENTIFIER, "Expected a type after ':'.")
         for built_in_type in BuiltInType:
             if (
@@ -289,6 +346,11 @@ class Parser:
         enum_type = self.enum_types.get(token.text.lower())
         if enum_type is not None:
             return enum_type
+        if allow_named or token.text.lower() in self.record_type_names:
+            return NamedTypeReference(
+                token.text,
+                SourcePosition(token.line, token.column),
+            )
         supported = ", ".join(
             type_.value
             for type_ in BuiltInType
@@ -302,7 +364,7 @@ class Parser:
             token,
             DiagnosticCode.UNKNOWN_TYPE,
             f"Unknown type: {token.text}.",
-            f"Supported built-in types: {supported}; or a declared enumeration type.",
+            f"Supported built-in types: {supported}; or a declared enumeration or record type.",
         )
         raise AssertionError("unreachable")
 
@@ -441,9 +503,13 @@ class Parser:
                 TokenKind.CONTINUE,
                 consume_terminator,
             )
-        if self._check(TokenKind.IDENTIFIER) and self._peek_kind() in (
-            TokenKind.ASSIGN,
-            TokenKind.LEFT_BRACKET,
+        if self._check(TokenKind.IDENTIFIER) and (
+            self._peek_kind() in (TokenKind.ASSIGN, TokenKind.LEFT_BRACKET)
+            or (
+                self._peek_kind() is TokenKind.DOT
+                and self._current().text.lower()
+                in (self.variable_names | self.parameter_names)
+            )
         ):
             return self._parse_assignment(consume_terminator)
         if self._check(TokenKind.IDENTIFIER) and self._peek_kind() in (
@@ -525,7 +591,7 @@ class Parser:
 
     def _parse_assignment(
         self, consume_terminator: bool
-    ) -> Assignment | ArrayElementAssignment:
+    ) -> Assignment | ArrayElementAssignment | RecordFieldAssignment:
         target = self._expect(TokenKind.IDENTIFIER, "Expected an assignment target.")
         target_position = SourcePosition(target.line, target.column)
         index = None
@@ -535,10 +601,25 @@ class Parser:
                 TokenKind.RIGHT_BRACKET,
                 "Expected ']' after the array index.",
             )
+        field = None
+        if self._match(TokenKind.DOT):
+            field = self._expect(
+                TokenKind.IDENTIFIER,
+                "Expected a record field name after '.'.",
+            )
         self._expect(TokenKind.ASSIGN, "Expected ':=' after the assignment target.")
         value = self._parse_expression()
         if consume_terminator:
             self._expect(TokenKind.SEMICOLON, "Expected ';' after the assignment.")
+        if field is not None:
+            return RecordFieldAssignment(
+                target.text,
+                field.text,
+                target_position,
+                SourcePosition(field.line, field.column),
+                value,
+                index,
+            )
         if index is not None:
             return ArrayElementAssignment(
                 target.text,
@@ -927,12 +1008,31 @@ class Parser:
             return self._parse_literal("value")
         if self._match(TokenKind.IDENTIFIER):
             position = SourcePosition(token.line, token.column)
+            index = None
             if self._match(TokenKind.LEFT_BRACKET):
                 index = self._parse_expression()
                 self._expect(
                     TokenKind.RIGHT_BRACKET,
                     "Expected ']' after the array index.",
                 )
+            if (
+                token.text.lower() in (self.variable_names | self.parameter_names)
+                and self.variable_types.get(token.text.lower())
+                is not BuiltInType.METASPRITE
+                and self._match(TokenKind.DOT)
+            ):
+                field = self._expect(
+                    TokenKind.IDENTIFIER,
+                    "Expected a record field name after '.'.",
+                )
+                return RecordFieldExpression(
+                    token.text,
+                    field.text,
+                    position,
+                    SourcePosition(field.line, field.column),
+                    index,
+                )
+            if index is not None:
                 return ArrayIndexExpression(token.text, index, position)
             if self._match(TokenKind.DOT):
                 member = self._expect(

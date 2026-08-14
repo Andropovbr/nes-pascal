@@ -12,6 +12,7 @@ com Pascal ou Free Pascal.
 - [Constantes e variáveis](constants-and-variables.md)
 - [Arrays](arrays.md)
 - [Enumerações](enumerations.md)
+- [Records](records.md)
 - [Atribuições](assignments.md)
 - [Expressões](expressions.md)
 - [Estruturas condicionais](conditionals.md)

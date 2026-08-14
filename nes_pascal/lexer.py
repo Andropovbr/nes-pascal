@@ -35,6 +35,7 @@ class TokenKind(Enum):
     OR = auto()
     ARRAY = auto()
     OF = auto()
+    RECORD = auto()
     IDENTIFIER = auto()
     HEX_LITERAL = auto()
     SEMICOLON = auto()
@@ -86,6 +87,7 @@ KEYWORDS = {
     "or": TokenKind.OR,
     "array": TokenKind.ARRAY,
     "of": TokenKind.OF,
+    "record": TokenKind.RECORD,
 }
 
 PUNCTUATION = {

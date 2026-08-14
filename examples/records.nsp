@@ -1,0 +1,36 @@
+program Records;
+type
+    EnemyState = (Inactive, Active, Dead);
+    Enemy = record
+        X: byte;
+        Y: byte;
+        State: EnemyState;
+        Visible: boolean;
+    end;
+var
+    Enemies: array[$00..$03] of Enemy;
+    Player: Enemy;
+    Index: byte;
+    Result: byte;
+    IsVisible: boolean;
+begin
+    Index := $01;
+    Player.X := $20;
+    Player.Y := $30;
+    Player.State := Active;
+    Player.Visible := true;
+    Enemies[$00].X := Player.X;
+    Enemies[$00].Y := Player.Y;
+    Enemies[$00].State := Player.State;
+    Enemies[$00].Visible := Player.Visible;
+    Enemies[Index].X := $44;
+    Enemies[Index].Y := Enemies[$00].Y + $01;
+    Enemies[Index].State := Active;
+    Enemies[Index].Visible := true;
+    Result := Enemies[Index].X;
+    IsVisible := Enemies[Index].Visible;
+    if Enemies[Index].State = Active then
+        Result := Result + $01;
+    nes.set_background_color($0F);
+    nes.run;
+end.

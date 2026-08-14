@@ -92,6 +92,13 @@ diagnostics section.
 | E4016 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4017 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E4018 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4019 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4020 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4021 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4022 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4023 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4024 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
+| E4025 | Type System | [Type-system diagnostics](reference/diagnostics/type-system.md) |
 | E5001 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5002 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |
 | E5003 | Code Generation | [Code-generation diagnostics](reference/diagnostics/code-generation.md) |

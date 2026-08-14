@@ -1,0 +1,14 @@
+program InvalidRecordUsage;
+type
+    Position = record
+        X: byte;
+    end;
+var
+    A: Position;
+    B: Position;
+begin
+    A.X := $10;
+    B := A;
+    nes.set_background_color($0F);
+    nes.run;
+end.

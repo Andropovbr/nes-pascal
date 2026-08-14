@@ -1,0 +1,9 @@
+program RecursiveRecordDefinition;
+type
+    Node = record
+        Next: Node;
+    end;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+end.

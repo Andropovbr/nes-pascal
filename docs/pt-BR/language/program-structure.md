@@ -48,6 +48,10 @@ O bloco principal contém
 a sequência de inicialização de nível superior e pode continuar com a lógica
 da thread principal sincronizada por quadros após `nes.run`.
 
+A seção `type` pode declarar [enumerações](enumerations.md) nominais e
+[records](records.md) de layout fixo. Campos de record podem usar qualquer enum
+declarado na seção; campos record aninhados continuam não suportados.
+
 Os registros estáticos `nes.on_update(Procedure)` e `nes.on_vblank(Procedure)`,
 quando presentes, pertencem à sequência incondicional de inicialização de nível
 superior antes de `nes.run`. Consulte [Callbacks de quadro](../runtime/frame-callbacks.md).

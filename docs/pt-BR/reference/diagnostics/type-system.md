@@ -169,10 +169,11 @@ Diagnósticos do sistema de tipos utilizam o intervalo E4000-E4999.
 ## E4010 - Tipo de elemento de array inválido
 
 - **Categoria:** Type System
-- **Explicação:** Arrays fixos suportam atualmente apenas elementos `byte` e
-  `boolean`.
+- **Explicação:** Arrays fixos suportam `byte`, `boolean` ou um record declarado
+  como tipo de elemento.
 - **Gatilho:** Declarar `array[$00..$03] of nes_color`.
-- **Correção sugerida:** Use `byte` ou `boolean` como tipo do elemento.
+- **Correção sugerida:** Use `byte`, `boolean` ou um record declarado como tipo
+  do elemento.
 
 ## E4011 - Tipo de índice de array inválido
 
@@ -241,3 +242,72 @@ Diagnósticos do sistema de tipos utilizam o intervalo E4000-E4999.
   essa enumeração.
 - **Gatilho:** Atribuir `Missing` a uma variável `GameState`.
 - **Correção sugerida:** Use um membro declarado pelo tipo enum de destino.
+
+## E4019 - Campo duplicado em record
+
+- **Categoria:** Sistema de Tipos
+- **Explicação:** Os nomes de campos devem ser únicos dentro de um record,
+  seguindo as regras case-insensitive da linguagem.
+- **Gatilho:** Compile
+  `tests/fixtures/diagnostics/duplicate_record_field.nsp`.
+- **Correção sugerida:** Renomeie ou remova o campo repetido.
+
+## E4020 - Campo de record desconhecido
+
+- **Categoria:** Sistema de Tipos
+- **Explicação:** O campo selecionado não foi declarado pelo tipo record.
+- **Gatilho:** Compile
+  `tests/fixtures/diagnostics/unknown_record_field.nsp`.
+- **Correção sugerida:** Selecione um campo declarado pelo record de destino.
+
+## E4021 - Acesso a campo em valor que não é record
+
+- **Categoria:** Sistema de Tipos
+- **Explicação:** A seleção de campo com ponto exige uma variável record ou um
+  elemento de array de records.
+- **Gatilho:** Compile
+  `tests/fixtures/diagnostics/field_access_on_non_record.nsp`.
+- **Correção sugerida:** Remova o seletor de campo ou use um valor record
+  declarado.
+
+## E4022 - Tipo de campo de record não suportado
+
+- **Categoria:** Sistema de Tipos
+- **Explicação:** Campos de records atualmente aceitam apenas `byte`, `boolean`
+  e tipos de enumeração declarados. Arrays e records aninhados não são campos
+  nesta milestone.
+- **Gatilho:** Compile
+  `tests/fixtures/diagnostics/unsupported_record_field_type.nsp`.
+- **Correção sugerida:** Armazene os dados aninhados separadamente ou use um
+  tipo de campo de um byte suportado.
+
+## E4023 - Definição recursiva de record
+
+- **Categoria:** Sistema de Tipos
+- **Explicação:** Um record não pode conter a si mesmo diretamente. Layouts
+  recursivos não têm tamanho estático finito.
+- **Gatilho:** Compile
+  `tests/fixtures/diagnostics/recursive_record_definition.nsp`.
+- **Correção sugerida:** Remova o campo recursivo e armazene um identificador
+  ou índice explícito em byte.
+
+## E4024 - Layout ou offset indexado de record inválido
+
+- **Categoria:** Sistema de Tipos
+- **Explicação:** Um record está vazio ou excede o layout suportado de 256
+  bytes, ou um acesso variável a array de records pode exigir um offset acima
+  de `$FF` e sofrer truncamento no endereçamento indexado do 6502.
+- **Gatilho:** Declare um record vazio, um record com mais de 256 campos de um
+  byte ou indexe por variável um array de records suficientemente grande.
+- **Correção sugerida:** Use um layout fixo suportado, reduza o tamanho, divida
+  o array ou use um índice constante em tempo de compilação.
+
+## E4025 - Uso inválido de record
+
+- **Categoria:** Sistema de Tipos
+- **Explicação:** Records são agregados estáticos, não valores de expressão
+  completos na milestone 0.5.10.
+- **Gatilho:** Compile
+  `tests/fixtures/diagnostics/invalid_record_usage.nsp`.
+- **Correção sugerida:** Leia, atribua ou compare os campos tipados
+  individualmente.

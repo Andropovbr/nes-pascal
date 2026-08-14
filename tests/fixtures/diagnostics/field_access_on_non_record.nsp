@@ -1,0 +1,8 @@
+program FieldAccessOnNonRecord;
+var
+    Counter: byte;
+begin
+    Counter.X := $10;
+    nes.set_background_color($0F);
+    nes.run;
+end.

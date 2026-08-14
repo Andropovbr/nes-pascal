@@ -38,7 +38,7 @@ var
 ```
 
 Each declaration contains exactly one identifier and an explicit scalar,
-enumeration, or fixed-array type. Storage is deterministic. A scalar global referenced by at least three source
+enumeration, record, or fixed-array type. Storage is deterministic. A scalar global referenced by at least three source
 operations is eligible for automatic Zero Page promotion in declaration
 order. If optional promotion space is unavailable, it falls back to regular
 RAM without changing its symbol or behavior. Other globals and every procedure
@@ -50,6 +50,8 @@ Fixed arrays are always contiguous regular-RAM allocations. See
 [Arrays](arrays.md) for their syntax, element types, and exact memory cost.
 User-defined enum variables are one-byte scalar allocations; see
 [Enumerations](enumerations.md).
+Record variables are contiguous regular-RAM allocations and are never
+automatically promoted to Zero Page; see [Records](records.md).
 
 ## Names and duplicate declarations
 

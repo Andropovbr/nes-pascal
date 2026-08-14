@@ -18,16 +18,20 @@ var
 
 The lower bound is always `$00`. The inclusive upper bound may be `$00`
 through `$FF`, so one declaration contains between 1 and 256 elements. Only
-`byte` and `boolean` elements are supported. Arrays may be declared only in
-the global `var` section; they cannot be constants, local variables,
-parameters, or return values.
+`byte`, `boolean`, and declared [record](records.md) elements are supported.
+Arrays may be declared only in the global `var` section; they cannot be
+constants, local variables, parameters, or return values.
 
-Each element occupies one byte. Boolean elements use the same canonical
+Each scalar element occupies one byte. Boolean elements use the same canonical
 storage as scalar booleans: `false` is `$00` and `true` is `$01`. Boolean
 arrays are not bit-packed. Consequently:
 
 - `array[$00..$0F] of byte` consumes exactly 16 bytes of RAM;
 - `array[$00..$07] of boolean` consumes exactly 8 bytes of RAM.
+
+A record element occupies its record's compile-time size. Field access folds
+or calculates `index * record size + field offset`; see
+[Records](records.md) for the addressing and offset limits.
 
 The compiler allocates each array as one deterministic, contiguous regular-RAM
 range and shows that range and type in the generated memory map. Arrays are not
@@ -85,6 +89,6 @@ There is no runtime bounds metadata or generated bounds-checking routine.
 
 ## Current limitations
 
-Dynamic, open, multidimensional, local, parameter, returned, record-element,
-and bit-packed arrays are not supported. Arrays cannot be assigned or compared
-as whole values, and no pointer or slicing operations exist.
+Dynamic, open, multidimensional, local, parameter, returned, enum-element, and
+bit-packed arrays are not supported. Arrays cannot be assigned or compared as
+whole values, and no pointer or slicing operations exist.

@@ -42,10 +42,52 @@ ScalarType = BuiltInType | EnumType
 
 
 @dataclass(frozen=True, slots=True)
+class NamedTypeReference:
+    """A parsed user type name awaiting semantic resolution."""
+
+    name: str
+    position: SourcePosition
+
+    @property
+    def value(self) -> str:
+        return self.name
+
+
+@dataclass(frozen=True, slots=True)
+class RecordField:
+    """One resolved byte-sized field in a fixed-layout record."""
+
+    name: str
+    type: ScalarType
+    offset: int
+    position: SourcePosition | None = field(default=None, compare=False)
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class RecordType:
+    """A nominal, compile-time-laid-out user-defined record type."""
+
+    name: str
+    fields: tuple[RecordField, ...]
+    size: int
+
+    @property
+    def value(self) -> str:
+        return self.name
+
+    def field_named(self, name: str) -> RecordField | None:
+        normalized = name.lower()
+        return next(
+            (field for field in self.fields if field.name.lower() == normalized),
+            None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class ArrayType:
     """A fixed-size, zero-based global array type."""
 
-    element_type: ScalarType
+    element_type: ScalarType | RecordType | NamedTypeReference
     lower_bound: int
     upper_bound: int
     position: SourcePosition | None = field(default=None, compare=False)
@@ -65,7 +107,7 @@ class ArrayType:
         )
 
 
-VariableType = ScalarType | ArrayType
+VariableType = ScalarType | RecordType | NamedTypeReference | ArrayType
 
 
 class UnaryOperator(Enum):
@@ -136,6 +178,21 @@ class EnumTypeDeclaration:
 
 
 @dataclass(frozen=True, slots=True)
+class RecordFieldDeclaration:
+    name: str
+    type: VariableType
+    position: SourcePosition
+    type_position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class RecordTypeDeclaration:
+    name: str
+    fields: tuple[RecordFieldDeclaration, ...]
+    position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
 class VariableDeclaration:
     name: str
     type: VariableType
@@ -167,6 +224,15 @@ class ArrayIndexExpression:
     array_name: str
     index: ValueExpression
     position: SourcePosition
+
+
+@dataclass(frozen=True, slots=True)
+class RecordFieldExpression:
+    record_name: str
+    field_name: str
+    position: SourcePosition
+    field_position: SourcePosition
+    index: ValueExpression | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,6 +285,7 @@ ValueExpression = (
     | ConstantReference
     | VariableReference
     | ArrayIndexExpression
+    | RecordFieldExpression
     | UnaryExpression
     | BinaryExpression
     | ComparisonExpression
@@ -241,6 +308,16 @@ class ArrayElementAssignment:
     target_position: SourcePosition
     index: ValueExpression
     value: ValueExpression
+
+
+@dataclass(frozen=True, slots=True)
+class RecordFieldAssignment:
+    target: str
+    field_name: str
+    target_position: SourcePosition
+    field_position: SourcePosition
+    value: ValueExpression
+    index: ValueExpression | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -342,6 +419,7 @@ class ProcedureCall:
 Statement = (
     Assignment
     | ArrayElementAssignment
+    | RecordFieldAssignment
     | BuiltinCall
     | LoadBackground
     | Run
@@ -371,6 +449,7 @@ class ProcedureDeclaration:
 class Program:
     name: str
     enum_types: tuple[EnumTypeDeclaration, ...]
+    record_types: tuple[RecordTypeDeclaration, ...]
     constants: tuple[ConstantDeclaration, ...]
     variables: tuple[VariableDeclaration, ...]
     procedures: tuple[ProcedureDeclaration, ...]
@@ -401,6 +480,13 @@ class VariableValue:
 class ResolvedArrayElement:
     array: ResolvedVariable
     index: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedRecordField:
+    variable: ResolvedVariable
+    field: RecordField
+    index: ResolvedValue | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -446,6 +532,7 @@ ResolvedValue = (
     ImmediateValue
     | VariableValue
     | ResolvedArrayElement
+    | ResolvedRecordField
     | ResolvedUnaryExpression
     | ResolvedBinaryExpression
     | ResolvedComparisonExpression
@@ -466,6 +553,14 @@ class ResolvedArrayElementAssignment:
     target: ResolvedVariable
     index: ResolvedValue
     value: ResolvedValue
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedRecordFieldAssignment:
+    target: ResolvedVariable
+    field: RecordField
+    value: ResolvedValue
+    index: ResolvedValue | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -624,6 +719,7 @@ class OamReservation:
 ResolvedStatement = (
     ResolvedAssignment
     | ResolvedArrayElementAssignment
+    | ResolvedRecordFieldAssignment
     | ResolvedBuiltinCall
     | ResolvedLoadBackground
     | Run
@@ -658,3 +754,4 @@ class ResolvedProgram:
     oam_reservations: tuple[OamReservation, ...] = ()
     metasprite_assets: tuple[MetaspriteAsset, ...] = ()
     metasprite_instances: tuple[MetaspriteInstance, ...] = ()
+    record_types: tuple[RecordType, ...] = ()

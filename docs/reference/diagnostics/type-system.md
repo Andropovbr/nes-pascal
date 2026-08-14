@@ -181,10 +181,11 @@ Type-system diagnostics use the E4000-E4999 range.
 ## E4010 - Invalid array element type
 
 - **Category:** Type System
-- **Explanation:** Fixed arrays currently support only `byte` and `boolean`
-  elements.
+- **Explanation:** Fixed arrays currently support `byte`, `boolean`, or a
+  declared record as the element type.
 - **Trigger:** Declare `array[$00..$03] of nes_color`.
-- **Suggested fix:** Use `byte` or `boolean` as the element type.
+- **Suggested fix:** Use `byte`, `boolean`, or a declared record as the element
+  type.
 
 ## E4011 - Invalid array index type
 
@@ -250,3 +251,70 @@ Type-system diagnostics use the E4000-E4999 range.
   by that enum.
 - **Trigger:** Assign `Missing` to a `GameState` variable.
 - **Suggested fix:** Use a member declared by the target enum type.
+
+## E4019 - Duplicate record field
+
+- **Category:** Type System
+- **Explanation:** Field names must be unique within one record, using the
+  language's case-insensitive name rules.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/duplicate_record_field.nsp`.
+- **Suggested fix:** Rename or remove the repeated field.
+
+## E4020 - Unknown record field
+
+- **Category:** Type System
+- **Explanation:** The selected field is not declared by the record type.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/unknown_record_field.nsp`.
+- **Suggested fix:** Select a field declared by the target record.
+
+## E4021 - Field access on non-record
+
+- **Category:** Type System
+- **Explanation:** Dot field selection requires a record variable or a record
+  array element.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/field_access_on_non_record.nsp`.
+- **Suggested fix:** Remove the field selector or use a declared record value.
+
+## E4022 - Unsupported record field type
+
+- **Category:** Type System
+- **Explanation:** Record fields currently support only `byte`, `boolean`, and
+  declared enumeration types. Arrays and nested records are not fields in this
+  milestone.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/unsupported_record_field_type.nsp`.
+- **Suggested fix:** Store the nested data separately or use a supported
+  one-byte field type.
+
+## E4023 - Recursive record definition
+
+- **Category:** Type System
+- **Explanation:** A record cannot contain itself directly. Recursive layouts
+  have no finite static size.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/recursive_record_definition.nsp`.
+- **Suggested fix:** Remove the recursive field and store an explicit byte
+  identity or index instead.
+
+## E4024 - Invalid record layout or indexed offset
+
+- **Category:** Type System
+- **Explanation:** A record is empty or exceeds the supported 256-byte layout,
+  or a variable record-array access could require an offset above `$FF` and be
+  truncated by 6502 indexed addressing.
+- **Trigger:** Declare an empty record, a record with more than 256 one-byte
+  fields, or variable-index a sufficiently large record array.
+- **Suggested fix:** Give the record a supported fixed layout, reduce its size,
+  split the array, or use a compile-time constant index.
+
+## E4025 - Invalid record usage
+
+- **Category:** Type System
+- **Explanation:** Records are static aggregates, not whole expression values
+  in milestone 0.5.10.
+- **Trigger:** Compile
+  `tests/fixtures/diagnostics/invalid_record_usage.nsp`.
+- **Suggested fix:** Read, assign, or compare the individual typed fields.
