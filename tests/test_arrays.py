@@ -398,7 +398,8 @@ class ArrayMemoryAndBackendTests(unittest.TestCase):
         self.assertIn("sta variable_Values,x", block)
         self.assertEqual(block.count("pha"), 1)
         self.assertEqual(block.count("pla"), 1)
-        self.assertEqual(layout.temporary_storage.size, 16)
+        self.assertEqual(layout.expression_temporary_bytes, 1)
+        self.assertEqual(layout.compiler_cache_bytes, 0)
         self.assertNotIn("array_index_temp", assembly)
 
     @unittest.skipUnless(
@@ -417,8 +418,10 @@ class ArrayMemoryAndBackendTests(unittest.TestCase):
         self.assertEqual(metrics.estimated_static_base_cycles, 569)
         self.assertEqual(metrics.max_expression_tree_depth, 2)
         self.assertEqual(metrics.max_live_temporaries, 1)
-        self.assertEqual(metrics.memory.zp_temporary_reserved_bytes, 16)
-        self.assertEqual(metrics.memory.zp_temporary_required_bytes, 3)
+        self.assertEqual(
+            metrics.memory.zp_expression_temporary_reserved_bytes, 1
+        )
+        self.assertEqual(metrics.memory.zp_compiler_cache_bytes, 2)
         self.assertEqual(metrics.memory.regular_user_bytes, 16)
         self.assertEqual(metrics.memory.zp_promoted_user_bytes, 3)
         self.assertEqual(metrics.runtime_features, ())

@@ -56,6 +56,7 @@ Planned work is tracked separately in the
 - [Array implementation and measurements (0.5.8)](compiler/arrays-0.5.8.md)
 - [Enumeration implementation and measurements (0.5.9)](compiler/enumerations-0.5.9.md)
 - [Record implementation and measurements (0.5.10)](compiler/records-0.5.10.md)
+- [Expression temporary allocation (0.5.11)](compiler/expression-temporaries-0.5.11.md)
 - [Semantic test coverage map](compiler/test-coverage-map.md)
 - [Unsupported features](reference/unsupported-features.md)
 - [Compiler diagnostics](reference/diagnostics/index.md)

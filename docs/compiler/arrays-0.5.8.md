@@ -1,5 +1,9 @@
 # Array Implementation and Measurements (0.5.8)
 
+> Historical note: fixed-pool figures below record the 0.5.8 state. Milestone
+> [0.5.11](expression-temporaries-0.5.11.md) now reserves 1 expression byte and
+> 2 separate loop-cache bytes for this benchmark, recovering 13 ZP bytes.
+
 English | [Português (Brasil)](../pt-BR/compiler/arrays-0.5.8.md)
 
 Milestone 0.5.8 adds fixed-size global arrays as a compiler language construct,

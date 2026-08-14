@@ -92,6 +92,10 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertEqual(first.runtime_data.size, 4)
         self.assertEqual(
             (first.temporary_storage.start, first.temporary_storage.end),
+            (0x0010, None),
+        )
+        self.assertEqual(
+            (first.zero_page_recovered.start, first.zero_page_recovered.end),
             (0x0010, 0x001F),
         )
         self.assertEqual(
@@ -253,7 +257,9 @@ class MemoryLayoutTests(unittest.TestCase):
             context.exception.code,
             DiagnosticCode.TEMPORARY_RAM_EXHAUSTED,
         )
-        self.assertIn("17 temporary bytes", str(context.exception))
+        self.assertIn("requires 17 bytes", str(context.exception))
+        self.assertIn("17 expression temporaries", str(context.exception))
+        self.assertIn("only 16 bytes", str(context.exception))
 
     def test_malformed_internal_layouts_fail_cleanly(self) -> None:
         cases = (
@@ -295,7 +301,8 @@ class MemoryLayoutTests(unittest.TestCase):
         config = generate_linker_config(layout)
 
         self.assertIn("ZP_RUNTIME: start = $0000, size = $0010", config)
-        self.assertIn("ZP_TEMP: start = $0010, size = $0010", config)
+        self.assertIn("ZP_TEMP: start = $0010, size = $0000", config)
+        self.assertIn("ZP_TEMP_FREE: start = $0010, size = $0010", config)
         self.assertIn("ZP_EXPLICIT: start = $0020, size = $0060", config)
         self.assertIn("ZP_AUTO: start = $0080, size = $0080", config)
         self.assertIn("STACK:   start = $0100, size = $0100", config)
@@ -314,7 +321,10 @@ class MemoryLayoutTests(unittest.TestCase):
         )
         custom_config = generate_linker_config(custom_layout)
         self.assertIn("RUNTIME: start = $0200, size = $0004", custom_config)
-        self.assertIn("ZP_TEMP: start = $0010, size = $0008", custom_config)
+        self.assertIn("ZP_TEMP: start = $0010, size = $0000", custom_config)
+        self.assertIn(
+            "ZP_TEMP_FREE: start = $0010, size = $0008", custom_config
+        )
         self.assertIn("ZP_AUTO: start = $0078, size = $0080", custom_config)
         self.assertIn("USER:    start = $0204, size = $05FC", custom_config)
 
@@ -332,7 +342,16 @@ class MemoryLayoutTests(unittest.TestCase):
 
         self.assertIn("Physical CPU RAM: $0000-$07FF (2048 bytes)", report)
         self.assertIn("$0000  $000F    16  Runtime   Zero Page runtime", report)
-        self.assertIn("$0010  $001F    16  Compiler  Zero Page temporaries", report)
+        self.assertIn(
+            "Expression temporary reservation: 0 bytes", report
+        )
+        self.assertIn(
+            "$0010  ----      0  Compiler  Expression temporaries", report
+        )
+        self.assertIn(
+            "$0010  $001F    16  Free      Recovered temporary Zero Page",
+            report,
+        )
         self.assertIn("$0080  $00FF   128  User      Automatic Zero Page", report)
         self.assertNotIn("OAM shadow", report)
         self.assertIn("$0200  $0203     4  Runtime   Runtime data", report)

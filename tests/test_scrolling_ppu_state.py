@@ -215,8 +215,10 @@ class ScrollingBenchmarkTests(unittest.TestCase):
         self.assertEqual(metrics.estimated_static_base_cycles, 753)
         self.assertEqual(metrics.max_expression_tree_depth, 0)
         self.assertEqual(metrics.max_live_temporaries, 0)
-        self.assertEqual(metrics.memory.zp_temporary_reserved_bytes, 16)
-        self.assertEqual(metrics.memory.zp_temporary_required_bytes, 0)
+        self.assertEqual(
+            metrics.memory.zp_expression_temporary_reserved_bytes, 0
+        )
+        self.assertEqual(metrics.memory.zp_compiler_cache_bytes, 0)
         self.assertEqual(metrics.memory.regular_user_bytes, 0)
         self.assertEqual(metrics.memory.zp_promoted_user_bytes, 0)
         self.assertEqual(metrics.memory.regular_runtime_bytes, 48)

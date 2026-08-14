@@ -6,9 +6,9 @@ progression. Do not infer the current or next milestone from numbering alone.
 ## Current roadmap state
 
 - **Current release:** Release 0.5 — Sprites and Gameplay
-- **Last completed milestone:** [`0.5.10 — Records`](0.md#records)
-- **Next milestone:** [`0.5.11 — Expression Temporary Allocation`](0.md#expression-temporary-allocation)
-- **Next milestone file:** [Version 0 roadmap](0.md#expression-temporary-allocation)
+- **Last completed milestone:** [`0.5.11 — Expression Temporary Allocation`](0.md#expression-temporary-allocation)
+- **Next milestone:** [`0.5.12 — Functions`](0.md#functions)
+- **Next milestone file:** [Version 0 roadmap](0.md#functions)
 
 ## Philosophy
 

@@ -1,12 +1,18 @@
 program TemporaryRamExhausted;
 
 var
+    Values: array[$00..$00] of byte;
+    Index: byte;
     Result: byte;
 
 begin
-    Result := $01 + ($01 + ($01 + ($01 + ($01 + ($01 + ($01 + ($01 + ($01 +
-        ($01 + ($01 + ($01 + ($01 + ($01 + ($01 + ($01 + ($01 +
-        ($01 + $01)))))))))))))))));
+    Values[$00] := $01;
+    Index := $00;
+    Result := Values[Index] + Values[Index] + Values[Index] + Values[Index] +
+        Values[Index] + Values[Index] + Values[Index] + Values[Index] +
+        Values[Index] + Values[Index] + Values[Index] + Values[Index] +
+        Values[Index] + Values[Index] + Values[Index] + Values[Index] +
+        Values[Index] + Values[Index];
     nes.set_background_color($21);
     nes.run;
 end.

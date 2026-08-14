@@ -1,5 +1,9 @@
 # Implementação e Medições de Records (0.5.10)
 
+> Nota histórica: os números do pool fixo abaixo registram o estado da 0.5.10.
+> O milestone [0.5.11](expression-temporaries-0.5.11.md) agora reserva zero bytes
+> de expressão neste benchmark e recupera toda a janela legada de 16 bytes.
+
 [English](../../compiler/records-0.5.10.md) | Português (Brasil)
 
 A milestone 0.5.10 adiciona records nominais de layout fixo como metadados de

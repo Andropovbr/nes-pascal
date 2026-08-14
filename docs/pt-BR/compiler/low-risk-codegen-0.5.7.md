@@ -1,5 +1,8 @@
 # Melhorias de Baixo Risco na Geração de Código
 
+> Nota histórica: a reserva fixa descrita abaixo foi substituída pelo pool com
+> escopo exato no [milestone 0.5.11](expression-temporaries-0.5.11.md).
+
 [English](../../compiler/low-risk-codegen-0.5.7.md) | Português (Brasil)
 
 O milestone 0.5.7 adiciona um conjunto pequeno de decisões locais no lowering

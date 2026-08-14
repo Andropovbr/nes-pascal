@@ -309,16 +309,16 @@ end.
         self.assertEqual(metrics.prg_code_bytes, 3350)
         self.assertEqual(metrics.prg_total_used_bytes, 3356)
         self.assertEqual(metrics.max_expression_tree_depth, 1)
-        self.assertEqual(metrics.max_live_temporaries, 1)
+        self.assertEqual(metrics.max_live_temporaries, 0)
         self.assertEqual(metrics.pattern_stats.total_instructions, 815)
         self.assertEqual(metrics.estimated_static_base_cycles, 2712)
         self.assertEqual(accounting.zp_runtime_symbol_bytes, 13)
-        self.assertEqual(accounting.zp_temporary_reserved_bytes, 16)
-        self.assertEqual(accounting.zp_temporary_required_bytes, 0)
+        self.assertEqual(accounting.zp_expression_temporary_reserved_bytes, 0)
+        self.assertEqual(accounting.zp_compiler_cache_bytes, 0)
         self.assertEqual(accounting.zp_promoted_user_bytes, 4)
-        self.assertEqual(accounting.zp_benchmark_allocated_or_reserved_bytes, 33)
+        self.assertEqual(accounting.zp_benchmark_allocated_or_reserved_bytes, 17)
         self.assertEqual(accounting.zp_policy_reserved_unavailable_bytes, 99)
-        self.assertEqual(accounting.zp_allocator_visible_free_bytes, 124)
+        self.assertEqual(accounting.zp_allocator_visible_free_bytes, 140)
         self.assertEqual(accounting.regular_runtime_bytes, 1002)
         self.assertEqual(accounting.regular_user_bytes, 2)
         self.assertEqual(accounting.regular_runtime_user_allocated_bytes, 1004)
@@ -326,14 +326,14 @@ end.
         self.assertEqual(accounting.non_zp_allocated_bytes, 1260)
         self.assertEqual(accounting.hardware_stack_reserved_bytes, 256)
         self.assertEqual(accounting.regular_allocator_visible_free_bytes, 276)
-        self.assertEqual(accounting.total_allocator_visible_free_bytes, 400)
+        self.assertEqual(accounting.total_allocator_visible_free_bytes, 416)
         self.assertEqual(
             accounting.compiler_runtime_user_allocated_or_reserved_bytes,
-            1293,
+            1277,
         )
         self.assertEqual(
             accounting.total_committed_or_reserved_address_space_bytes,
-            1648,
+            1632,
         )
         self.assertEqual(
             accounting.total_committed_or_reserved_address_space_bytes
@@ -648,6 +648,19 @@ class MesenIntegrationTests(unittest.TestCase):
             "verify_low_risk_codegen.lua",
             source_path=(
                 ROOT / "tests" / "fixtures" / "runtime" / "low_risk_codegen.nsp"
+            ),
+        )
+
+    def test_expression_temporaries_preserve_nested_runtime_values(self) -> None:
+        self._run_mesen_test(
+            "expression_temporaries",
+            "verify_expression_temporaries.lua",
+            source_path=(
+                ROOT
+                / "tests"
+                / "fixtures"
+                / "runtime"
+                / "expression_temporaries.nsp"
             ),
         )
 

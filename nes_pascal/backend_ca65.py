@@ -48,7 +48,7 @@ from .builtins import (
     PaletteKind,
     builtin_by_id,
 )
-from .codegen_analysis import can_use_direct_rhs_operand
+from .codegen_analysis import TemporaryPool, can_use_direct_rhs_operand
 from .memory_layout import (
     BackgroundRuntimeFeatures,
     ProgramMemoryLayout,
@@ -166,9 +166,11 @@ def generate(
 
     label_counter = [0]
     for_counter = [0]
+    temporary_pool = TemporaryPool(layout.expression_temporary_bytes)
     statement_lines = _generate_statements(
         program.statements,
         label_counter,
+        temporary_pool,
         (),
         for_counter,
         palette_runtime_enabled,
@@ -180,12 +182,19 @@ def generate(
     procedure_lines = _generate_procedures(
         program.procedures,
         label_counter,
+        temporary_pool,
         for_counter,
         palette_runtime_enabled,
         background_queue_enabled,
         background_shadow_enabled,
         ppu_state_enabled,
         sprite_zero_enabled and not custom_sprite_palette_initialized,
+    )
+    temporary_pool.assert_all_released()
+    assert temporary_pool.max_live == layout.expression_temporary_bytes, (
+        "expression temporary analysis/emission mismatch: "
+        f"reserved {layout.expression_temporary_bytes}, "
+        f"emitted peak {temporary_pool.max_live}"
     )
 
     temporaries = "\n".join(temporary_lines)
@@ -543,6 +552,7 @@ runtime_read_controller_ports:
 def _generate_statements(
     statements: tuple[ResolvedStatement, ...],
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     loop_targets: tuple[tuple[str, str], ...],
     for_counter: list[int],
     palette_runtime_enabled: bool,
@@ -570,7 +580,7 @@ def _generate_statements(
                         "",
                         f"; Source: {source_target}."
                         f"{statement.field.name} := value",
-                        *_load_value(statement.value, label_counter),
+                        *_load_value(statement.value, label_counter, temporary_pool),
                         f"    sta {operand}",
                     ]
                 )
@@ -582,11 +592,11 @@ def _generate_statements(
                         f"; Source: {statement.target.name}[index]."
                         f"{statement.field.name} := value",
                         "; evaluate index and scale to byte offset before value",
-                        *_load_value(statement.index, label_counter),
+                        *_load_value(statement.index, label_counter, temporary_pool),
                         *_scale_record_index(record_type.size, label_counter),
                         *_add_record_field_offset(statement.field.offset),
                         "    pha                     ; preserve scaled field offset",
-                        *_load_value(statement.value, label_counter),
+                        *_load_value(statement.value, label_counter, temporary_pool),
                         "    tay                     ; preserve assigned value",
                         "    pla",
                         "    tax                     ; scaled record field offset",
@@ -602,7 +612,7 @@ def _generate_statements(
                     [
                         "",
                         f"; Source: {statement.target.name}[constant] := value",
-                        *_load_value(statement.value, label_counter),
+                        *_load_value(statement.value, label_counter, temporary_pool),
                         f"    sta {operand}",
                     ]
                 )
@@ -612,9 +622,9 @@ def _generate_statements(
                         "",
                         f"; Source: {statement.target.name}[index] := value",
                         "; evaluate index before value; preserve it on hardware stack",
-                        *_load_value(statement.index, label_counter),
+                        *_load_value(statement.index, label_counter, temporary_pool),
                         "    pha",
-                        *_load_value(statement.value, label_counter),
+                        *_load_value(statement.value, label_counter, temporary_pool),
                         "    tay                     ; preserve assigned value",
                         "    pla",
                         "    tax                     ; native array index",
@@ -627,7 +637,7 @@ def _generate_statements(
                 [
                     "",
                     f"; Source: {statement.target.name} := value",
-                    *_load_value(statement.value, label_counter),
+                    *_load_value(statement.value, label_counter, temporary_pool),
                     f"    sta {statement.target.label}",
                 ]
             )
@@ -636,6 +646,7 @@ def _generate_statements(
                 _generate_builtin_statement(
                     statement,
                     label_counter,
+                    temporary_pool,
                     palette_runtime_enabled,
                 )
             )
@@ -725,14 +736,15 @@ def _generate_statements(
                         statement.condition,
                         then_label,
                         else_label,
-                        0,
                         label_counter,
+                        temporary_pool,
                         "long-branch-safe false path",
                     ),
                     f"{then_label}:",
                     *_generate_statements(
                         statement.then_branch,
                         label_counter,
+                        temporary_pool,
                         loop_targets,
                         for_counter,
                         palette_runtime_enabled,
@@ -751,6 +763,7 @@ def _generate_statements(
                         *_generate_statements(
                             statement.else_branch,
                             label_counter,
+                            temporary_pool,
                             loop_targets,
                             for_counter,
                             palette_runtime_enabled,
@@ -775,14 +788,15 @@ def _generate_statements(
                         statement.condition,
                         body_label,
                         end_label,
-                        0,
                         label_counter,
+                        temporary_pool,
                         "long-branch-safe loop exit",
                     ),
                     f"{body_label}:",
                     *_generate_statements(
                         statement.body,
                         label_counter,
+                        temporary_pool,
                         (*loop_targets, (end_label, condition_label)),
                         for_counter,
                         palette_runtime_enabled,
@@ -807,6 +821,7 @@ def _generate_statements(
                     *_generate_statements(
                         statement.body,
                         label_counter,
+                        temporary_pool,
                         (*loop_targets, (end_label, condition_label)),
                         for_counter,
                         palette_runtime_enabled,
@@ -820,8 +835,8 @@ def _generate_statements(
                         statement.condition,
                         end_label,
                         body_label,
-                        0,
                         label_counter,
+                        temporary_pool,
                         "long-branch-safe repeat",
                     ),
                     f"{end_label}:",
@@ -829,11 +844,11 @@ def _generate_statements(
             )
         elif isinstance(statement, ResolvedIncrementStatement):
             statement_lines.extend(
-                _generate_increment(statement, label_counter)
+                _generate_increment(statement, label_counter, temporary_pool)
             )
         elif isinstance(statement, ResolvedDecrementStatement):
             statement_lines.extend(
-                _generate_decrement(statement, label_counter)
+                _generate_decrement(statement, label_counter, temporary_pool)
             )
         elif isinstance(statement, ResolvedForStatement):
             for_index = for_counter[0]
@@ -861,9 +876,9 @@ def _generate_statements(
                     "",
                     f"; Source: for variable := initial "
                     f"{statement.direction.value} final do",
-                    *_load_value(statement.initial, label_counter),
+                    *_load_value(statement.initial, label_counter, temporary_pool),
                     f"    sta {statement.target.label}",
-                    *_load_value(statement.final, label_counter),
+                    *_load_value(statement.final, label_counter, temporary_pool),
                     f"    sta {limit_temporary}   ; evaluate final value once",
                     f"{condition_label}:",
                     f"    lda {statement.target.label}",
@@ -874,6 +889,7 @@ def _generate_statements(
                     *_generate_statements(
                         statement.body,
                         label_counter,
+                        temporary_pool,
                         (*loop_targets, (end_label, step_label)),
                         for_counter,
                         palette_runtime_enabled,
@@ -897,7 +913,7 @@ def _generate_statements(
                 statement_lines.extend(
                     [
                         f"    ; argument {index}: {argument.parameter.name}",
-                        *_load_value(argument.value, label_counter),
+                        *_load_value(argument.value, label_counter, temporary_pool),
                         f"    sta {argument.parameter.label}",
                     ]
                 )
@@ -939,6 +955,7 @@ def _generate_statements(
 def _generate_builtin_statement(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
     descriptor = builtin_by_id(statement.builtin)
@@ -947,17 +964,20 @@ def _generate_builtin_statement(
         raise ValueError(
             f"builtin {descriptor.public_name} is not a statement emitter"
         )
-    return emitter(statement, label_counter, palette_runtime_enabled)
+    return emitter(
+        statement, label_counter, temporary_pool, palette_runtime_enabled
+    )
 
 
 def _emit_set_background_color(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
     value = statement.arguments[0]
     if statement.queued:
-        return _queue_universal_color(value, label_counter)
+        return _queue_universal_color(value, label_counter, temporary_pool)
     return [
         "",
         "; Source: nes.set_background_color(value)",
@@ -965,7 +985,7 @@ def _emit_set_background_color(
         "    sta $2006               ; universal palette address, high byte",
         "    lda #$00",
         "    sta $2006               ; low byte",
-        *_load_value(value, label_counter),
+        *_load_value(value, label_counter, temporary_pool),
         "    sta $2007",
         *(
             ["    sta runtime_palette_shadow"]
@@ -978,9 +998,10 @@ def _emit_set_background_color(
 def _emit_wait_frame(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
-    del statement, palette_runtime_enabled
+    del statement, temporary_pool, palette_runtime_enabled
     wait_frame_label = _new_label(label_counter, "wait_frame")
     return [
         "",
@@ -1000,6 +1021,7 @@ def _emit_wait_frame(
 def _emit_set_sprite_zero(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
     del palette_runtime_enabled
@@ -1010,13 +1032,13 @@ def _emit_set_sprite_zero(
         "; Runtime: invalidate, stage all bytes, then publish atomically",
         "    lda #$00",
         "    sta runtime_sprite_zero_ready",
-        *_load_value(x, label_counter),
+        *_load_value(x, label_counter, temporary_pool),
         "    sta runtime_sprite_zero_pending_x",
-        *_load_value(y, label_counter),
+        *_load_value(y, label_counter, temporary_pool),
         "    sta runtime_sprite_zero_pending_y",
-        *_load_value(tile, label_counter),
+        *_load_value(tile, label_counter, temporary_pool),
         "    sta runtime_sprite_zero_pending_tile",
-        *_load_value(attributes, label_counter),
+        *_load_value(attributes, label_counter, temporary_pool),
         "    sta runtime_sprite_zero_pending_attributes",
         "    lda #$01",
         "    sta runtime_sprite_zero_ready",
@@ -1026,44 +1048,51 @@ def _emit_set_sprite_zero(
 def _emit_sprite_operation(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
     del palette_runtime_enabled
-    return _generate_sprite_operation(statement, label_counter)
+    return _generate_sprite_operation(statement, label_counter, temporary_pool)
 
 
 def _emit_metasprite_operation(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
     del palette_runtime_enabled
-    return _generate_metasprite_operation(statement, label_counter)
+    return _generate_metasprite_operation(
+        statement, label_counter, temporary_pool
+    )
 
 
 def _emit_set_palette(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
     return _generate_set_palette(
-        statement, label_counter, palette_runtime_enabled
+        statement, label_counter, temporary_pool, palette_runtime_enabled
     )
 
 
 def _emit_set_palette_color(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
     return _generate_set_palette_color(
-        statement, label_counter, palette_runtime_enabled
+        statement, label_counter, temporary_pool, palette_runtime_enabled
     )
 
 
 def _emit_set_tile(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
     del palette_runtime_enabled
@@ -1071,11 +1100,11 @@ def _emit_set_tile(
     return [
         "",
         "; Source: nes.set_tile(x, y, tile)",
-        *_load_value(x, label_counter),
+        *_load_value(x, label_counter, temporary_pool),
         "    pha                     ; preserve X across expressions",
-        *_load_value(y, label_counter),
+        *_load_value(y, label_counter, temporary_pool),
         "    pha                     ; preserve Y across tile expression",
-        *_load_value(tile, label_counter),
+        *_load_value(tile, label_counter, temporary_pool),
         "    sta runtime_background_pending_value",
         "    pla",
         "    sta runtime_background_y",
@@ -1088,6 +1117,7 @@ def _emit_set_tile(
 def _emit_set_attribute(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
     del palette_runtime_enabled
@@ -1095,11 +1125,11 @@ def _emit_set_attribute(
     return [
         "",
         "; Source: nes.set_attribute(x, y, value)",
-        *_load_value(x, label_counter),
+        *_load_value(x, label_counter, temporary_pool),
         "    pha                     ; preserve X across expressions",
-        *_load_value(y, label_counter),
+        *_load_value(y, label_counter, temporary_pool),
         "    pha                     ; preserve Y across value expression",
-        *_load_value(value, label_counter),
+        *_load_value(value, label_counter, temporary_pool),
         "    sta runtime_background_pending_value",
         "    pla",
         "    sta runtime_background_y",
@@ -1112,6 +1142,7 @@ def _emit_set_attribute(
 def _emit_set_scroll(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
     del palette_runtime_enabled
@@ -1122,9 +1153,9 @@ def _emit_set_scroll(
         "; Runtime: invalidate, stage both axes, then publish atomically",
         "    lda #$00",
         "    sta runtime_scroll_ready",
-        *_load_value(x, label_counter),
+        *_load_value(x, label_counter, temporary_pool),
         "    sta runtime_scroll_pending_x",
-        *_load_value(y, label_counter),
+        *_load_value(y, label_counter, temporary_pool),
         "    sta runtime_scroll_pending_y",
         "    lda #$01",
         "    sta runtime_scroll_ready",
@@ -1134,9 +1165,10 @@ def _emit_set_scroll(
 def _emit_clear_background_updates(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
-    del statement, label_counter, palette_runtime_enabled
+    del statement, label_counter, temporary_pool, palette_runtime_enabled
     return [
         "",
         "; Source: nes.clear_background_updates()",
@@ -1154,9 +1186,10 @@ def _emit_clear_background_updates(
 def _emit_clear_background_update_overflow(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
-    del statement, label_counter, palette_runtime_enabled
+    del statement, label_counter, temporary_pool, palette_runtime_enabled
     return [
         "",
         "; Source: nes.clear_background_update_overflow()",
@@ -1241,6 +1274,7 @@ _METASPRITE_OPERATION_SUFFIXES = {
 def _generate_sprite_operation(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     suffix = _SPRITE_OPERATION_SUFFIXES[statement.builtin]
     command = f"nes.sprite_{suffix}"
@@ -1253,14 +1287,14 @@ def _generate_sprite_operation(
     if value is not None:
         lines.extend(
             [
-                *_load_value(value, label_counter),
+                *_load_value(value, label_counter, temporary_pool),
                 "    sta runtime_sprite_value ; evaluate the property once",
             ]
         )
     if secondary_value is not None:
         lines.extend(
             [
-                *_load_value(secondary_value, label_counter),
+                *_load_value(secondary_value, label_counter, temporary_pool),
                 "    sta runtime_sprite_secondary_value ; evaluate Y once",
             ]
         )
@@ -1272,7 +1306,7 @@ def _generate_sprite_operation(
     if not isinstance(sprite, ImmediateValue) and not created:
         lines.extend(
             [
-                *_load_value(sprite, label_counter),
+                *_load_value(sprite, label_counter, temporary_pool),
                 f"    jsr runtime_sprite_{suffix}",
             ]
         )
@@ -1389,6 +1423,7 @@ def _generate_sprite_operation(
 def _generate_metasprite_operation(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     suffix = _METASPRITE_OPERATION_SUFFIXES[statement.builtin]
     command = f"nes.metasprite_{suffix}"
@@ -1401,20 +1436,20 @@ def _generate_metasprite_operation(
     if value is not None:
         lines.extend(
             [
-                *_load_value(value, label_counter),
+                *_load_value(value, label_counter, temporary_pool),
                 "    sta runtime_metasprite_offset_x ; evaluate the value once",
             ]
         )
     if secondary_value is not None:
         lines.extend(
             [
-                *_load_value(secondary_value, label_counter),
+                *_load_value(secondary_value, label_counter, temporary_pool),
                 "    sta runtime_metasprite_offset_y ; evaluate Y once",
             ]
         )
     lines.extend(
         [
-            *_load_value(instance, label_counter),
+            *_load_value(instance, label_counter, temporary_pool),
             f"    jsr runtime_metasprite_{suffix}",
         ]
     )
@@ -2165,6 +2200,7 @@ def _direct_palette_write(
     low_address: int,
     values: tuple[ResolvedValue, ...],
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     lines = [
         "    bit $2002               ; reset PPU address latch",
@@ -2174,13 +2210,16 @@ def _direct_palette_write(
         "    sta $2006               ; palette address, low byte",
     ]
     for value in values:
-        lines.extend([*_load_value(value, label_counter), "    sta $2007"])
+        lines.extend(
+            [*_load_value(value, label_counter, temporary_pool), "    sta $2007"]
+        )
     return lines
 
 
 def _queue_universal_color(
     value: ResolvedValue,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     return [
         "",
@@ -2188,7 +2227,7 @@ def _queue_universal_color(
         "; Runtime: invalidate, stage, then publish for the next VBlank",
         "    lda #$00",
         "    sta runtime_palette_universal_dirty",
-        *_load_value(value, label_counter),
+        *_load_value(value, label_counter, temporary_pool),
         "    sta runtime_palette_shadow",
         "    lda #$01",
         "    sta runtime_palette_universal_dirty",
@@ -2198,6 +2237,7 @@ def _queue_universal_color(
 def _generate_set_palette(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
     kind = (
@@ -2215,24 +2255,27 @@ def _generate_set_palette(
             "",
             f"; Source: {command}(index, color0, color1, color2, color3)",
             "; Initialization: color 0 uses the canonical universal color",
-            *_direct_palette_write(0x00, (colors[0],), label_counter),
+            *_direct_palette_write(
+                0x00, (colors[0],), label_counter, temporary_pool
+            ),
             *_direct_palette_write(
                 base + 1,
                 colors[1:],
                 label_counter,
+                temporary_pool,
             ),
         ]
         if palette_runtime_enabled:
             lines.extend(
                 [
-                    *_load_value(colors[0], label_counter),
+                    *_load_value(colors[0], label_counter, temporary_pool),
                     "    sta runtime_palette_shadow",
                 ]
             )
             for index, value in enumerate(colors[1:], start=1):
                 lines.extend(
                     [
-                        *_load_value(value, label_counter),
+                        *_load_value(value, label_counter, temporary_pool),
                         f"    sta runtime_palette_shadow + {base + index}",
                     ]
                 )
@@ -2246,13 +2289,13 @@ def _generate_set_palette(
         "    lda #$00",
         f"    sta {dirty}",
         "    sta runtime_palette_universal_dirty",
-        *_load_value(colors[0], label_counter),
+        *_load_value(colors[0], label_counter, temporary_pool),
         "    sta runtime_palette_shadow ; canonical universal color",
     ]
     for index, value in enumerate(colors[1:], start=1):
         lines.extend(
             [
-                *_load_value(value, label_counter),
+                *_load_value(value, label_counter, temporary_pool),
                 f"    sta runtime_palette_shadow + {base + index}",
             ]
         )
@@ -2269,6 +2312,7 @@ def _generate_set_palette(
 def _generate_set_palette_color(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     palette_runtime_enabled: bool,
 ) -> list[str]:
     kind = (
@@ -2282,19 +2326,19 @@ def _generate_set_palette_color(
     command = f"nes.set_{kind.value}_palette_color"
     if color_index.value == 0:
         if statement.queued:
-            lines = _queue_universal_color(color, label_counter)
+            lines = _queue_universal_color(color, label_counter, temporary_pool)
             lines[1] = f"; Source: {command}(palette, color, value)"
             return lines
         lines = [
             "",
             f"; Source: {command}(palette, color, value)",
             "; Initialization: color 0 uses the canonical universal color",
-            *_direct_palette_write(0x00, (color,), label_counter),
+            *_direct_palette_write(0x00, (color,), label_counter, temporary_pool),
         ]
         if palette_runtime_enabled:
             lines.extend(
                 [
-                    *_load_value(color, label_counter),
+                    *_load_value(color, label_counter, temporary_pool),
                     "    sta runtime_palette_shadow",
                 ]
             )
@@ -2306,12 +2350,14 @@ def _generate_set_palette_color(
         lines = [
             "",
             f"; Source: {command}(palette, color, value)",
-            *_direct_palette_write(offset, (color,), label_counter),
+            *_direct_palette_write(
+                offset, (color,), label_counter, temporary_pool
+            ),
         ]
         if palette_runtime_enabled:
             lines.extend(
                 [
-                    *_load_value(color, label_counter),
+                    *_load_value(color, label_counter, temporary_pool),
                     f"    sta runtime_palette_shadow + {offset}",
                 ]
             )
@@ -2324,7 +2370,7 @@ def _generate_set_palette_color(
         "; Runtime: invalidate, stage one color, then publish the palette",
         "    lda #$00",
         f"    sta {dirty}",
-        *_load_value(color, label_counter),
+        *_load_value(color, label_counter, temporary_pool),
         f"    sta runtime_palette_shadow + {offset}",
         "    lda #$01",
         f"    sta {dirty}",
@@ -2700,6 +2746,7 @@ def _generate_background_storage(background_data: bytes) -> str:
 def _generate_procedures(
     procedures: tuple[ResolvedProcedure, ...],
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     for_counter: list[int],
     palette_runtime_enabled: bool,
     background_queue_enabled: bool,
@@ -2718,6 +2765,7 @@ def _generate_procedures(
                 *_generate_statements(
                     procedure.body,
                     label_counter,
+                    temporary_pool,
                     (),
                     for_counter,
                     palette_runtime_enabled,
@@ -2735,6 +2783,7 @@ def _generate_procedures(
 def _generate_increment(
     statement: ResolvedIncrementStatement,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     if statement.amount is None:
         return [
@@ -2745,7 +2794,7 @@ def _generate_increment(
     return [
         "",
         f"; Source: inc({statement.target.name}, amount)",
-        *_load_value(statement.amount, label_counter),
+        *_load_value(statement.amount, label_counter, temporary_pool),
         "    clc",
         f"    adc {statement.target.label}",
         f"    sta {statement.target.label}",
@@ -2755,6 +2804,7 @@ def _generate_increment(
 def _generate_decrement(
     statement: ResolvedDecrementStatement,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     if statement.amount is None:
         return [
@@ -2775,21 +2825,27 @@ def _generate_decrement(
             f"    sbc {direct_operand}",
             f"    sta {statement.target.label}",
         ]
-    return [
-        "",
-        f"; Source: dec({statement.target.name}, amount)",
-        *_load_value(statement.amount, label_counter),
-        "    sta expression_temporary_0",
-        f"    lda {statement.target.label}",
-        "    sec",
-        "    sbc expression_temporary_0",
-        f"    sta {statement.target.label}",
-    ]
+    amount_lines = _load_value(statement.amount, label_counter, temporary_pool)
+    with temporary_pool.acquire() as temporary:
+        return [
+            "",
+            f"; Source: dec({statement.target.name}, amount)",
+            *amount_lines,
+            f"    sta {temporary.name}",
+            f"    lda {statement.target.label}",
+            "    sec",
+            f"    sbc {temporary.name}",
+            f"    sta {statement.target.label}",
+        ]
 
 
-def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
+def _load_value(
+    value: ResolvedValue,
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+) -> list[str]:
     if isinstance(value, ResolvedBuiltinCall):
-        return _load_builtin_value(value, 0, label_counter)
+        return _load_builtin_value(value, label_counter, temporary_pool)
     if isinstance(value, ImmediateValue):
         if value.type is BuiltInType.BOOLEAN:
             description = "true" if value.value else "false"
@@ -2798,11 +2854,11 @@ def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
     if isinstance(value, VariableValue):
         return [f"    lda {value.variable.label}"]
     if isinstance(value, ResolvedArrayElement):
-        return _load_array_element(value, 0, label_counter)
+        return _load_array_element(value, label_counter, temporary_pool)
     if isinstance(value, ResolvedRecordField):
-        return _load_record_field(value, 0, label_counter)
+        return _load_record_field(value, label_counter, temporary_pool)
     if isinstance(value, ResolvedUnaryExpression):
-        lines = _load_value(value.operand, label_counter)
+        lines = _load_value(value.operand, label_counter, temporary_pool)
         if value.operator is UnaryOperator.PLUS:
             return [*lines, "    ; unary + leaves the byte unchanged"]
         return [
@@ -2813,13 +2869,13 @@ def _load_value(value: ResolvedValue, label_counter: list[int]) -> list[str]:
         ]
 
     if isinstance(value, ResolvedBinaryExpression):
-        return _load_binary_expression(value, 0, label_counter)
+        return _load_binary_expression(value, label_counter, temporary_pool)
     if isinstance(value, ResolvedComparisonExpression):
-        return _load_comparison_expression(value, 0, label_counter)
+        return _load_comparison_expression(value, label_counter, temporary_pool)
     if isinstance(value, ResolvedBooleanNotExpression):
-        return _load_boolean_not_expression(value, 0, label_counter)
+        return _load_boolean_not_expression(value, label_counter, temporary_pool)
     assert isinstance(value, ResolvedBooleanBinaryExpression)
-    return _load_boolean_binary_expression(value, 0, label_counter)
+    return _load_boolean_binary_expression(value, label_counter, temporary_pool)
 
 
 _CONTROLLER_BUTTON_NAMES = {
@@ -2836,22 +2892,23 @@ _CONTROLLER_BUTTON_NAMES = {
 
 def _load_builtin_value(
     value: ResolvedBuiltinCall,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     descriptor = builtin_by_id(value.builtin)
     loader = _BUILTIN_VALUE_LOADERS.get(descriptor.emitter)
     if loader is None:
         raise ValueError(f"builtin {descriptor.public_name} has no value loader")
-    return loader(value, depth, label_counter)
+    with temporary_pool.call_scope():
+        return loader(value, label_counter, temporary_pool)
 
 
 def _load_sprite_create(
     value: ResolvedBuiltinCall,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
-    del depth, label_counter
+    del label_counter, temporary_pool
     index = value.arguments[0]
     assert isinstance(index, ImmediateValue)
     return [f"    lda #${index.value:02X}              ; static sprite reservation"]
@@ -2859,10 +2916,10 @@ def _load_sprite_create(
 
 def _load_metasprite_create(
     value: ResolvedBuiltinCall,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
-    del depth, label_counter
+    del label_counter, temporary_pool
     index = value.arguments[0]
     assert isinstance(index, ImmediateValue)
     return [
@@ -2872,22 +2929,22 @@ def _load_metasprite_create(
 
 def _load_metasprite_animation_finished(
     value: ResolvedBuiltinCall,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     return [
         "    ; nes.metasprite_animation_finished(instance)",
-        *_load_value_at_depth(value.arguments[0], depth, label_counter),
+        *_load_value(value.arguments[0], label_counter, temporary_pool),
         "    jsr runtime_metasprite_animation_finished",
     ]
 
 
 def _load_background_updates_overflowed(
     value: ResolvedBuiltinCall,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
-    del value, depth, label_counter
+    del value, label_counter, temporary_pool
     return [
         "    ; nes.background_updates_overflowed(): sticky queue state",
         "    lda runtime_background_queue_overflow",
@@ -2896,10 +2953,10 @@ def _load_background_updates_overflowed(
 
 def _load_controller_query(
     query: ResolvedBuiltinCall,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
-    del depth
+    del temporary_pool
     controller, button = query.arguments
     assert isinstance(controller, ImmediateValue)
     assert isinstance(button, ImmediateValue)
@@ -2950,15 +3007,15 @@ def _load_controller_query(
 
 def _load_get_tile(
     query: ResolvedBuiltinCall,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     x, y = query.arguments
     return [
         "    ; nes.get_tile(x, y): read the confirmed PPU tile shadow",
-        *_load_value_at_depth(x, depth, label_counter),
+        *_load_value(x, label_counter, temporary_pool),
         "    pha                     ; preserve X across Y expression",
-        *_load_value_at_depth(y, depth, label_counter),
+        *_load_value(y, label_counter, temporary_pool),
         "    sta runtime_background_y",
         "    pla",
         "    sta runtime_background_x",
@@ -2982,68 +3039,37 @@ _BUILTIN_VALUE_LOADERS = {
 
 def _load_binary_expression(
     expression: ResolvedBinaryExpression,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     direct_operand = _direct_rhs_operand(expression.left, expression.right)
     if direct_operand is not None:
         lines = [
             f"    ; binary {expression.operator.value}: direct right operand",
-            *_load_value_at_depth(expression.left, depth, label_counter),
+            *_load_value(expression.left, label_counter, temporary_pool),
         ]
         if expression.operator is BinaryOperator.ADD:
             return [*lines, "    clc", f"    adc {direct_operand}"]
         return [*lines, "    sec", f"    sbc {direct_operand}"]
 
-    temporary = f"expression_temporary_{depth}"
-    lines = [
-        f"    ; binary {expression.operator.value}: evaluate right operand",
-        *_load_value_at_depth(expression.right, depth + 1, label_counter),
-        f"    sta {temporary}",
-        "    ; evaluate left operand",
-        *_load_value_at_depth(expression.left, depth + 1, label_counter),
-    ]
-    if expression.operator is BinaryOperator.ADD:
-        return [*lines, "    clc", f"    adc {temporary}"]
-    return [*lines, "    sec", f"    sbc {temporary}"]
-
-
-def _load_value_at_depth(
-    value: ResolvedValue,
-    depth: int,
-    label_counter: list[int],
-) -> list[str]:
-    if isinstance(value, ResolvedBuiltinCall):
-        return _load_builtin_value(value, depth, label_counter)
-    if isinstance(value, ResolvedArrayElement):
-        return _load_array_element(value, depth, label_counter)
-    if isinstance(value, ResolvedRecordField):
-        return _load_record_field(value, depth, label_counter)
-    if isinstance(value, ResolvedBinaryExpression):
-        return _load_binary_expression(value, depth, label_counter)
-    if isinstance(value, ResolvedComparisonExpression):
-        return _load_comparison_expression(value, depth, label_counter)
-    if isinstance(value, ResolvedBooleanNotExpression):
-        return _load_boolean_not_expression(value, depth, label_counter)
-    if isinstance(value, ResolvedBooleanBinaryExpression):
-        return _load_boolean_binary_expression(value, depth, label_counter)
-    if isinstance(value, ResolvedUnaryExpression):
-        lines = _load_value_at_depth(value.operand, depth, label_counter)
-        if value.operator is UnaryOperator.PLUS:
-            return [*lines, "    ; unary + leaves the byte unchanged"]
-        return [
-            *lines,
-            "    eor #$FF                ; unary -: two's complement",
-            "    clc",
-            "    adc #$01",
+    right_lines = _load_value(expression.right, label_counter, temporary_pool)
+    with temporary_pool.acquire() as temporary:
+        lines = [
+            f"    ; binary {expression.operator.value}: evaluate right operand",
+            *right_lines,
+            f"    sta {temporary.name}",
+            "    ; evaluate left operand",
+            *_load_value(expression.left, label_counter, temporary_pool),
         ]
-    return _load_value(value, label_counter)
+        if expression.operator is BinaryOperator.ADD:
+            return [*lines, "    clc", f"    adc {temporary.name}"]
+        return [*lines, "    sec", f"    sbc {temporary.name}"]
 
 
 def _load_array_element(
     value: ResolvedArrayElement,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     if isinstance(value.index, ImmediateValue):
         return [
@@ -3051,7 +3077,7 @@ def _load_array_element(
         ]
     return [
         "    ; array element: native variable index",
-        *_load_value_at_depth(value.index, depth, label_counter),
+        *_load_value(value.index, label_counter, temporary_pool),
         "    tax",
         f"    lda {value.array.label},x",
     ]
@@ -3059,8 +3085,8 @@ def _load_array_element(
 
 def _load_record_field(
     value: ResolvedRecordField,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     if value.index is None or isinstance(value.index, ImmediateValue):
         return [
@@ -3069,7 +3095,7 @@ def _load_record_field(
     record_type = _record_type_for_variable(value.variable)
     return [
         f"    ; record array field: scale index by {record_type.size}",
-        *_load_value_at_depth(value.index, depth, label_counter),
+        *_load_value(value.index, label_counter, temporary_pool),
         *_scale_record_index(record_type.size, label_counter),
         *_add_record_field_offset(value.field.offset),
         "    tax                     ; scaled record field offset",
@@ -3159,37 +3185,38 @@ def _add_record_field_offset(field_offset: int) -> list[str]:
 
 def _comparison_setup(
     expression: ResolvedComparisonExpression,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     direct_operand = _direct_rhs_operand(expression.left, expression.right)
     if direct_operand is not None:
         return [
             f"    ; comparison {expression.operator.value}: direct right operand",
-            *_load_value_at_depth(expression.left, depth, label_counter),
+            *_load_value(expression.left, label_counter, temporary_pool),
             f"    cmp {direct_operand}",
         ]
 
-    temporary = f"expression_temporary_{depth}"
-    return [
-        f"    ; comparison {expression.operator.value}: evaluate right operand",
-        *_load_value_at_depth(expression.right, depth + 1, label_counter),
-        f"    sta {temporary}",
-        "    ; evaluate left operand",
-        *_load_value_at_depth(expression.left, depth + 1, label_counter),
-        f"    cmp {temporary}",
-    ]
+    right_lines = _load_value(expression.right, label_counter, temporary_pool)
+    with temporary_pool.acquire() as temporary:
+        return [
+            f"    ; comparison {expression.operator.value}: evaluate right operand",
+            *right_lines,
+            f"    sta {temporary.name}",
+            "    ; evaluate left operand",
+            *_load_value(expression.left, label_counter, temporary_pool),
+            f"    cmp {temporary.name}",
+        ]
 
 
 def _load_comparison_expression(
     expression: ResolvedComparisonExpression,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     true_label = _new_label(label_counter, "comparison_true")
     false_label = _new_label(label_counter, "comparison_false")
     end_label = _new_label(label_counter, "comparison_end")
-    lines = _comparison_setup(expression, depth, label_counter)
+    lines = _comparison_setup(expression, label_counter, temporary_pool)
     branches = {
         ComparisonOperator.EQUAL: [f"    beq {true_label}"],
         ComparisonOperator.NOT_EQUAL: [f"    bne {true_label}"],
@@ -3218,14 +3245,14 @@ def _load_comparison_expression(
 
 def _load_boolean_not_expression(
     expression: ResolvedBooleanNotExpression,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     true_label = _new_label(label_counter, "not_true")
     end_label = _new_label(label_counter, "not_end")
     return [
         "    ; boolean not",
-        *_load_value_at_depth(expression.operand, depth, label_counter),
+        *_load_value(expression.operand, label_counter, temporary_pool),
         *([] if _zero_flag_is_valid(expression.operand) else ["    cmp #$00"]),
         f"    beq {true_label}",
         "    lda #$00              ; false",
@@ -3238,8 +3265,8 @@ def _load_boolean_not_expression(
 
 def _load_boolean_binary_expression(
     expression: ResolvedBooleanBinaryExpression,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
 ) -> list[str]:
     evaluate_right_label = _new_label(label_counter, "boolean_evaluate_right")
     true_label = _new_label(label_counter, "boolean_true")
@@ -3247,7 +3274,7 @@ def _load_boolean_binary_expression(
     end_label = _new_label(label_counter, "boolean_end")
     lines = [
         f"    ; boolean {expression.operator.value}: evaluate left operand",
-        *_load_value_at_depth(expression.left, depth, label_counter),
+        *_load_value(expression.left, label_counter, temporary_pool),
         *([] if _zero_flag_is_valid(expression.left) else ["    cmp #$00"]),
     ]
     if expression.operator is BooleanOperator.AND:
@@ -3268,7 +3295,7 @@ def _load_boolean_binary_expression(
         *lines,
         f"{evaluate_right_label}:",
         "    ; evaluate right operand",
-        *_load_value_at_depth(expression.right, depth, label_counter),
+        *_load_value(expression.right, label_counter, temporary_pool),
         *([] if _zero_flag_is_valid(expression.right) else ["    cmp #$00"]),
         f"    bne {true_label}",
         f"{false_label}:",
@@ -3315,11 +3342,11 @@ def _emit_comparison_branch(
     expression: ResolvedComparisonExpression,
     true_label: str,
     false_label: str,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     false_path_comment: str | None,
 ) -> list[str]:
-    lines = _comparison_setup(expression, depth, label_counter)
+    lines = _comparison_setup(expression, label_counter, temporary_pool)
     if expression.operator is ComparisonOperator.EQUAL:
         return [
             *lines,
@@ -3422,8 +3449,8 @@ def _emit_boolean_branch(
     value: ResolvedValue,
     true_label: str,
     false_label: str,
-    depth: int,
     label_counter: list[int],
+    temporary_pool: TemporaryPool,
     false_path_comment: str | None = None,
 ) -> list[str]:
     """Branch without materializing a Boolean value.
@@ -3438,8 +3465,8 @@ def _emit_boolean_branch(
             value,
             true_label,
             false_label,
-            depth,
             label_counter,
+            temporary_pool,
             false_path_comment,
         )
     if isinstance(value, ResolvedBooleanNotExpression):
@@ -3450,8 +3477,8 @@ def _emit_boolean_branch(
                 value.operand,
                 operand_true,
                 true_label,
-                depth,
                 label_counter,
+                temporary_pool,
                 None,
             ),
             f"{operand_true}:",
@@ -3466,8 +3493,8 @@ def _emit_boolean_branch(
                     value.left,
                     evaluate_right,
                     false_label,
-                    depth,
                     label_counter,
+                    temporary_pool,
                     false_path_comment,
                 ),
                 f"{evaluate_right}:",
@@ -3476,8 +3503,8 @@ def _emit_boolean_branch(
                     value.right,
                     true_label,
                     false_label,
-                    depth,
                     label_counter,
+                    temporary_pool,
                     false_path_comment,
                 ),
             ]
@@ -3489,8 +3516,8 @@ def _emit_boolean_branch(
                 value.left,
                 short_circuit_true,
                 evaluate_right,
-                depth,
                 label_counter,
+                temporary_pool,
                 None,
             ),
             f"{short_circuit_true}:",
@@ -3501,8 +3528,8 @@ def _emit_boolean_branch(
                 value.right,
                 true_label,
                 false_label,
-                depth,
                 label_counter,
+                temporary_pool,
                 false_path_comment,
             ),
         ]
@@ -3525,7 +3552,7 @@ def _emit_boolean_branch(
 
     zero_test = [] if _zero_flag_is_valid(value) else ["    cmp #$00"]
     return [
-        *_load_value_at_depth(value, depth, label_counter),
+        *_load_value(value, label_counter, temporary_pool),
         *zero_test,
         f"    bne {true_label}",
         _absolute_jump(false_label, false_path_comment),

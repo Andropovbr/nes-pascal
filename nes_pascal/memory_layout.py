@@ -37,7 +37,7 @@ from .ast import (
     VariableValue,
 )
 from .builtins import BuiltinId, RuntimeFeature, builtin_by_id
-from .codegen_analysis import expression_temporary_symbol_count
+from .codegen_analysis import TemporaryRequirements, analyze_program_temporaries
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
 
 
@@ -104,6 +104,8 @@ class MemoryLayoutSettings:
     zero_page_start: int = 0x0000
     zero_page_size: int = 0x0100
     zero_page_runtime_size: int = 0x0010
+    # Maximum combined capacity for expression temporaries and compiler caches.
+    # Each program reserves only its measured requirement within this limit.
     temporary_storage_size: int = 0x0010
     zero_page_explicit_reserve_size: int = 0x0060
     zero_page_automatic_size: int = 0x0080
@@ -275,7 +277,9 @@ class ProgramMemoryLayout:
     def display_regions(self) -> tuple[MemoryRange, ...]:
         regions = (
             self.zero_page_runtime,
-            self.temporary_storage,
+            self.expression_temporary_storage,
+            self.compiler_cache_storage,
+            self.zero_page_recovered,
             self.zero_page_explicit_reserve,
             self.zero_page_automatic,
             self.zero_page_unallocated,
@@ -288,12 +292,65 @@ class ProgramMemoryLayout:
         return tuple(
             region
             for region in regions
-            if region.size or region == self.runtime_data
+            if region.size
+            or region in (self.expression_temporary_storage, self.runtime_data)
+        )
+
+    @property
+    def expression_temporary_symbols(self) -> tuple[MemorySymbol, ...]:
+        return tuple(
+            symbol
+            for symbol in self.temporary_symbols
+            if symbol.assembly_symbol.startswith("expression_temporary_")
+        )
+
+    @property
+    def compiler_cache_symbols(self) -> tuple[MemorySymbol, ...]:
+        return tuple(
+            symbol
+            for symbol in self.temporary_symbols
+            if not symbol.assembly_symbol.startswith("expression_temporary_")
+        )
+
+    @property
+    def expression_temporary_storage(self) -> MemoryRange:
+        return MemoryRange(
+            "Expression temporaries",
+            self.temporary_storage.start,
+            sum(symbol.size for symbol in self.expression_temporary_symbols),
+            RegionKind.COMPILER,
+        )
+
+    @property
+    def compiler_cache_storage(self) -> MemoryRange:
+        expression_storage = self.expression_temporary_storage
+        return MemoryRange(
+            "Compiler caches",
+            expression_storage.start + expression_storage.size,
+            sum(symbol.size for symbol in self.compiler_cache_symbols),
+            RegionKind.COMPILER,
+        )
+
+    @property
+    def zero_page_recovered(self) -> MemoryRange:
+        return MemoryRange(
+            "Recovered temporary Zero Page",
+            self.temporary_storage.start + self.temporary_storage.size,
+            self.settings.temporary_storage_size - self.temporary_storage.size,
+            RegionKind.FREE,
         )
 
     @property
     def temporary_bytes_used(self) -> int:
         return sum(symbol.size for symbol in self.temporary_symbols)
+
+    @property
+    def expression_temporary_bytes(self) -> int:
+        return self.expression_temporary_storage.size
+
+    @property
+    def compiler_cache_bytes(self) -> int:
+        return self.compiler_cache_storage.size
 
     @property
     def reserved_or_used_bytes(self) -> int:
@@ -311,6 +368,7 @@ class ProgramMemoryLayout:
         return (
             self.free_ram.size
             + automatic_available
+            + self.zero_page_recovered.size
             + self.zero_page_unallocated.size
         )
 
@@ -359,11 +417,30 @@ def build_memory_layout(
     if settings.runtime_data_size < required_runtime_size:
         settings = replace(settings, runtime_data_size=required_runtime_size)
 
+    temporary_requirements = analyze_program_temporaries(program)
+    if temporary_requirements.total_bytes > settings.temporary_storage_size:
+        _raise_error(
+            DiagnosticCode.TEMPORARY_RAM_EXHAUSTED,
+            "Compiler-managed Zero Page storage requires "
+            f"{temporary_requirements.total_bytes} bytes "
+            f"({temporary_requirements.expression_temporaries} expression "
+            f"temporaries and {temporary_requirements.compiler_caches} compiler "
+            f"caches), but only {settings.temporary_storage_size} bytes are "
+            "available.",
+            filename,
+            source,
+            suggestion=(
+                "Simplify nested expressions or loops. Mandatory temporary "
+                "allocations cannot borrow optional promotion space."
+            ),
+        )
+
     regions = _validated_regions(
         settings,
         source,
         filename,
         oam_shadow_enabled=sprite_features.oam_shadow,
+        temporary_storage_size=temporary_requirements.total_bytes,
     )
     (
         physical_ram,
@@ -379,21 +456,7 @@ def build_memory_layout(
         user_capacity,
     ) = regions
 
-    temporary_names = _temporary_symbol_names(program)
-    if len(temporary_names) > temporary_storage.size:
-        _raise_error(
-            DiagnosticCode.TEMPORARY_RAM_EXHAUSTED,
-            "Expression and loop code requires "
-            f"{len(temporary_names)} temporary bytes, but the "
-            f"{temporary_storage.name} region has only "
-            f"{temporary_storage.size} bytes available.",
-            filename,
-            source,
-            suggestion=(
-                "Simplify nested expressions or loops. Mandatory temporary "
-                "allocations cannot borrow optional promotion space."
-            ),
-        )
+    temporary_names = _temporary_symbol_names(temporary_requirements)
 
     background_runtime_symbols: list[MemorySymbol] = []
     next_background_address = (
@@ -897,15 +960,31 @@ def build_memory_layout(
         ),
         *background_runtime_symbols,
     )
+    expression_storage = MemoryRange(
+        "Expression temporaries",
+        temporary_storage.start,
+        temporary_requirements.expression_temporaries,
+        RegionKind.COMPILER,
+    )
+    compiler_cache_storage = MemoryRange(
+        "Compiler caches",
+        expression_storage.start + expression_storage.size,
+        temporary_requirements.compiler_caches,
+        RegionKind.COMPILER,
+    )
     temporary_symbols = tuple(
         MemorySymbol(
             name,
             temporary_storage.start + index,
             1,
             SymbolKind.COMPILER,
-            temporary_storage.name,
             (
-                "reusable expression evaluation byte"
+                expression_storage.name
+                if name.startswith("expression_temporary_")
+                else compiler_cache_storage.name
+            ),
+            (
+                "scoped reusable expression evaluation byte"
                 if name.startswith("expression_temporary_")
                 else "cached for-loop final value"
             ),
@@ -1017,7 +1096,8 @@ def validate_segment_capacities(
     )
     checked_regions = (
         layout.zero_page_runtime,
-        layout.temporary_storage,
+        layout.expression_temporary_storage,
+        layout.compiler_cache_storage,
         layout.zero_page_automatic,
         layout.oam_shadow,
         layout.runtime_data,
@@ -1095,6 +1175,11 @@ def generate_linker_config(layout: ProgramMemoryLayout) -> str:
         memory_lines.append(
             _linker_memory_line("ZP_FREE", layout.zero_page_unallocated)
         )
+    if layout.zero_page_recovered.size:
+        memory_lines.insert(
+            2,
+            _linker_memory_line("ZP_TEMP_FREE", layout.zero_page_recovered),
+        )
     memory_lines.extend(
         [
             _linker_memory_line("USER", layout.user_capacity),
@@ -1155,24 +1240,24 @@ def generate_memory_map(layout: ProgramMemoryLayout) -> str:
         f"${physical_end:04X} ({layout.physical_ram.size} bytes)",
         "Mirrors: $0800-$1FFF mirror $0000-$07FF and are not allocatable.",
         "Zero Page: $0000-$00FF (256 bytes)",
+        f"Expression temporary reservation: "
+        f"{layout.expression_temporary_bytes} "
+        f"{'byte' if layout.expression_temporary_bytes == 1 else 'bytes'} "
+        "(maximum simultaneously live)",
+        f"Other compiler caches: {layout.compiler_cache_bytes} "
+        f"{'byte' if layout.compiler_cache_bytes == 1 else 'bytes'}",
         "",
         "Regions",
         "-------",
         "",
         "Start  End    Size  Owner     Region",
     ]
-    temporary_detail = (
-        f" ({layout.temporary_bytes_used} used, "
-        f"{layout.temporary_storage.size - layout.temporary_bytes_used} reserved)"
-    )
     promotion_detail = (
         f" ({layout.promoted_bytes_used} used, "
         f"{layout.zero_page_automatic.size - layout.promoted_bytes_used} available)"
     )
     for region in layout.display_regions:
-        if region == layout.temporary_storage:
-            detail = temporary_detail
-        elif region == layout.zero_page_automatic:
+        if region == layout.zero_page_automatic:
             detail = promotion_detail
         else:
             detail = ""
@@ -1255,6 +1340,7 @@ def _validated_regions(
     filename: str,
     *,
     oam_shadow_enabled: bool,
+    temporary_storage_size: int,
 ) -> tuple[MemoryRange, ...]:
     if (
         settings.mapper_number != 0
@@ -1351,12 +1437,14 @@ def _validated_regions(
     temporary = MemoryRange(
         "Zero Page temporaries",
         zero_page_runtime.start + zero_page_runtime.size,
-        settings.temporary_storage_size,
+        temporary_storage_size,
         RegionKind.COMPILER,
     )
     zero_page_explicit_reserve = MemoryRange(
         "Future explicit Zero Page",
-        temporary.start + temporary.size,
+        zero_page_runtime.start
+        + zero_page_runtime.size
+        + settings.temporary_storage_size,
         settings.zero_page_explicit_reserve_size,
         RegionKind.RESERVED,
     )
@@ -1366,15 +1454,13 @@ def _validated_regions(
         settings.zero_page_automatic_size,
         RegionKind.USER,
     )
-    zero_page_end = zero_page.end
-    assert zero_page_end is not None
-    zero_page_unallocated_start = (
-        zero_page_automatic.start + zero_page_automatic.size
-    )
     zero_page_unallocated = MemoryRange(
         "Unallocated Zero Page",
-        zero_page_unallocated_start,
-        zero_page_end + 1 - zero_page_unallocated_start,
+        zero_page_automatic.start + zero_page_automatic.size,
+        zero_page.start
+        + zero_page.size
+        - zero_page_automatic.start
+        - zero_page_automatic.size,
         RegionKind.FREE,
     )
     stack = MemoryRange(
@@ -1684,87 +1770,16 @@ def _count_variable(variable: ResolvedVariable, counts: dict[str, int]) -> None:
         counts[variable.label] += 1
 
 
-def _temporary_symbol_names(program: ResolvedProgram) -> tuple[str, ...]:
-    all_statements = (
-        *program.statements,
-        *(
-            statement
-            for procedure in program.procedures
-            for statement in procedure.body
-        ),
-    )
-    expression_count = max(
-        (_statement_temporary_symbol_count(statement) for statement in all_statements),
-        default=0,
-    )
-    for_count = sum(_count_for_statements(statement) for statement in all_statements)
+def _temporary_symbol_names(
+    requirements: TemporaryRequirements,
+) -> tuple[str, ...]:
     return (
-        *(f"expression_temporary_{index}" for index in range(expression_count)),
-        *(f"for_limit_{index}" for index in range(for_count)),
+        *(
+            f"expression_temporary_{index}"
+            for index in range(requirements.expression_temporaries)
+        ),
+        *(f"for_limit_{index}" for index in range(requirements.compiler_caches)),
     )
-
-
-def _statement_temporary_symbol_count(statement: ResolvedStatement) -> int:
-    if isinstance(statement, ResolvedRecordFieldAssignment):
-        index_count = (
-            expression_temporary_symbol_count(statement.index)
-            if statement.index is not None
-            else 0
-        )
-        return max(
-            index_count,
-            expression_temporary_symbol_count(statement.value),
-        )
-    if isinstance(statement, ResolvedArrayElementAssignment):
-        return max(
-            expression_temporary_symbol_count(statement.index),
-            expression_temporary_symbol_count(statement.value),
-        )
-    if isinstance(statement, ResolvedAssignment):
-        return expression_temporary_symbol_count(statement.value)
-    if isinstance(statement, ResolvedBuiltinCall):
-        return max(
-            (expression_temporary_symbol_count(value) for value in statement.arguments),
-            default=0,
-        )
-    if isinstance(statement, ResolvedIncrementStatement):
-        return expression_temporary_symbol_count(statement.amount) if statement.amount else 0
-    if isinstance(statement, ResolvedDecrementStatement):
-        if statement.amount is None:
-            return 0
-        if isinstance(statement.amount, (ImmediateValue, VariableValue)):
-            return 0
-        return max(1, expression_temporary_symbol_count(statement.amount))
-    if isinstance(statement, ResolvedIfStatement):
-        branches = [
-            _statement_temporary_symbol_count(item) for item in statement.then_branch
-        ]
-        if statement.else_branch is not None:
-            branches.extend(
-                _statement_temporary_symbol_count(item) for item in statement.else_branch
-            )
-        return max([expression_temporary_symbol_count(statement.condition), *branches])
-    if isinstance(statement, (ResolvedWhileStatement, ResolvedRepeatStatement)):
-        body = [_statement_temporary_symbol_count(item) for item in statement.body]
-        return max([expression_temporary_symbol_count(statement.condition), *body])
-    if isinstance(statement, ResolvedForStatement):
-        body = [_statement_temporary_symbol_count(item) for item in statement.body]
-        return max(
-            [
-                expression_temporary_symbol_count(statement.initial),
-                expression_temporary_symbol_count(statement.final),
-                *body,
-            ]
-        )
-    if isinstance(statement, ResolvedProcedureCall):
-        return max(
-            (
-                expression_temporary_symbol_count(argument.value)
-                for argument in statement.arguments
-            ),
-            default=0,
-        )
-    return 0
 
 
 def _type_storage_size(type_: VariableType) -> int:
@@ -1778,16 +1793,3 @@ def _type_storage_size(type_: VariableType) -> int:
         )
         return type_.element_count * element_size
     return 1
-
-
-def _count_for_statements(statement: ResolvedStatement) -> int:
-    if isinstance(statement, ResolvedForStatement):
-        return 1 + sum(_count_for_statements(item) for item in statement.body)
-    if isinstance(statement, ResolvedIfStatement):
-        count = sum(_count_for_statements(item) for item in statement.then_branch)
-        if statement.else_branch is not None:
-            count += sum(_count_for_statements(item) for item in statement.else_branch)
-        return count
-    if isinstance(statement, (ResolvedWhileStatement, ResolvedRepeatStatement)):
-        return sum(_count_for_statements(item) for item in statement.body)
-    return 0

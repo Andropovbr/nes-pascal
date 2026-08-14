@@ -2,7 +2,7 @@
 
 English | [Português (Brasil)](../pt-BR/compiler/test-coverage-map.md)
 
-This document provides a comprehensive semantic coverage map across all 29 implemented subsystems in NES Pascal. It catalogs the current automated test protection across compiler phases, diagnostics, static assembly goldens, toolchain builds, Mesen emulator runtime verification, benchmark corpus measurement, and documentation/examples.
+This document provides a comprehensive semantic coverage map across all 30 implemented subsystems in NES Pascal. It catalogs the current automated test protection across compiler phases, diagnostics, static assembly goldens, toolchain builds, Mesen emulator runtime verification, benchmark corpus measurement, and documentation/examples.
 
 ---
 
@@ -45,6 +45,7 @@ The matrix uses semantic verification tiers:
 | 27 | **Low-risk codegen opts** | N/A | N/A | N/A | Strong | Strong | Strong | Strong | Strong | Strong | Direct operands, flag branching |
 | 28 | **Arrays** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Fixed 1D, indexed access, boundaries |
 | 29 | **Records** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Nominal fixed layouts, typed fields, record arrays |
+| 30 | **Expression temporary allocation** | N/A | N/A | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Scoped maximum-live pool, cache separation, exhaustion |
 
 ---
 
@@ -83,7 +84,7 @@ The matrix uses semantic verification tiers:
 * `tests/test_integration.py` currently houses three distinct concerns:
   1. Toolchain Integration Tests (`ca65`/`ld65` build validation, ROM headers, CLI parameters)
   2. Golden Assembly Regression Tests (comparing 15 `.asm` fixtures)
-  3. Mesen Runtime Integration Tests (orchestrating 27 headless Mesen test runs)
+  3. Mesen Runtime Integration Tests (orchestrating 28 headless Mesen test runs)
   While well-structured (~800 lines), maintaining separation will be important as future language releases expand runtime testing.
 
 ### 9. Are there obvious test-name/history inconsistencies worth cleaning later?

@@ -49,6 +49,10 @@ class ZeroPageAllocationTests(unittest.TestCase):
         )
         self.assertEqual(
             (layout.temporary_storage.start, layout.temporary_storage.end),
+            (0x0010, None),
+        )
+        self.assertEqual(
+            (layout.zero_page_recovered.start, layout.zero_page_recovered.end),
             (0x0010, 0x001F),
         )
         self.assertEqual(
@@ -150,7 +154,8 @@ class ZeroPageAllocationTests(unittest.TestCase):
         report = generate_memory_map(layout)
 
         self.assertIn("Zero Page runtime", report)
-        self.assertIn("Zero Page temporaries", report)
+        self.assertIn("Expression temporary reservation: 0 bytes", report)
+        self.assertIn("Recovered temporary Zero Page", report)
         self.assertIn("Future explicit Zero Page", report)
         self.assertIn("Automatic Zero Page variables (2 used, 126 available)", report)
         self.assertIn("$0080", report)

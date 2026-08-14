@@ -1,5 +1,9 @@
 # Milestone 0.5.5: Auditoria de Arquitetura do Compilador e Geração de Código
 
+> Linha de base histórica: o milestone 0.5.11 substituiu o modelo fixo por
+> profundidade de AST identificado aqui por alocação com escopo baseada no pico
+> real de uso. Consulte [Alocação de Temporários de Expressão (0.5.11)](expression-temporaries-0.5.11.md).
+
 [English](../../compiler/optimization-audit-0.5.5.md) | Português (Brasil)
 
 Este documento estabelece a linha de base oficial de arquitetura, geração de código e consumo de recursos para o compilador **NES Pascal** a partir do milestone **0.5.5**.
