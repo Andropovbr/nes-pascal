@@ -3,19 +3,21 @@ import shutil
 import unittest
 
 from nes_pascal.ast import (
+    BuiltInType,
     ComparisonExpression,
     EnumType,
     ImmediateValue,
     ResolvedAssignment,
     ResolvedComparisonExpression,
     ResolvedIfStatement,
+    SourcePosition,
 )
 from nes_pascal.backend_ca65 import generate
 from nes_pascal.diagnostics import CompilerError
 from nes_pascal.lexer import TokenKind, tokenize
 from nes_pascal.memory_layout import build_memory_layout, generate_memory_map
 from nes_pascal.parser import parse
-from nes_pascal.semantic import analyze
+from nes_pascal.semantic import SemanticAnalyzer, analyze
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -214,18 +216,31 @@ end.
         self.assertEqual(context.exception.code, "E4016")
 
     def test_require_expression_result_type_suggestion_names_expected_type(self) -> None:
-        """P3-2: _require_expression_result_type suggestion is dynamic, not hardcoded 'boolean'."""
-        # A byte expression where a boolean is expected: suggestion must mention 'boolean'.
-        source_byte_to_bool = program_with(
-            "    Enabled := $01;",
-            "    GameState = (Title, Playing);",
-            "    Enabled: boolean;",
-        )
+        """P3-2: suggestion in _require_expression_result_type names the actual expected type.
+
+        The old implementation hardcoded 'boolean', which is wrong when expected_type
+        is an EnumType.  This test calls the method directly with expected_type=EnumType
+        and assignment_target=None — the only path that reaches that suggestion — and
+        asserts that the hint mentions the enum name, not 'boolean'.
+        This test would fail against the old hardcoded implementation.
+        """
+        game_state = EnumType("GameState", ("Title", "Playing"))
+        analyzer = SemanticAnalyzer(source="", filename="<test>")
+        pos = SourcePosition(line=1, column=1)
+
         with self.assertRaises(CompilerError) as context:
-            resolve(source_byte_to_bool)
-        suggestion = str(context.exception)
-        self.assertIn("boolean", suggestion)
-        self.assertNotIn("byte value", suggestion)
+            analyzer._require_expression_result_type(
+                position=pos,
+                actual_type=BuiltInType.BOOLEAN,
+                expected_type=game_state,
+                description="Boolean expression",
+                assignment_target=None,
+            )
+
+        error_text = str(context.exception)
+        # Suggestion must mention the enum name, not 'boolean'.
+        self.assertIn("GameState", error_text)
+        self.assertNotIn("boolean value", error_text)
 
 
 
