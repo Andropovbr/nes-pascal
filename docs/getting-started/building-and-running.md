@@ -40,6 +40,7 @@ python -m nes_pascal.cli examples/palette_support.nsp -o build/palette_support.n
 python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
 python -m nes_pascal.cli examples/background_updates.nsp -o build/background_updates.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
 python -m nes_pascal.cli examples/scrolling_ppu_state.nsp -o build/scrolling_ppu_state.nes --mirroring horizontal
+python -m nes_pascal.cli examples/gameplay_full_stack.nsp -o build/gameplay_full_stack.nes --chr assets/game.chr --nametable assets/nametable_loading.nam --metasprite assets/player_consolidated.json
 ```
 
 The examples demonstrate:
@@ -100,6 +101,9 @@ The examples demonstrate:
 - `background_updates.nsp`: bounded and repeated tile writes, confirmed-shadow
   reads, rejected tile and attribute overflow, pending cancellation, explicit
   overflow clearing, and one raw attribute update after runtime starts.
+- `gameplay_full_stack.nsp`: the full-stack example that combines background
+  loading, controller input, palettes, a moving metasprite player with
+  animation, and combined RAM pressure in one program.
 
 The player example's `PlayerMinimumX`, `PlayerMaximumX`, `PlayerMinimumY`, and
 `PlayerMaximumY` constants are specific to the bundled asset rather than
