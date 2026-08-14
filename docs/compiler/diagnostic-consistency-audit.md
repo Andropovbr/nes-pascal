@@ -92,18 +92,24 @@ Coverage strength per code, classifying each as:
   code asserted via message without a stable code assertion.
 - **Missing** — no automated protection found anywhere in the suite.
 - **Not Applicable** — no such classification needed; every code is reachable
-  and 112 of 118 have direct regression protection.
+  and 118 of 118 have direct regression protection.
+
+> **Update (follow-up hardening, `chore/diagnostic-missing-coverage`):** the
+> six codes originally classified as Missing below were given direct automated
+> regression protection. They are now **Strong**:
+>
+> | Code | New protection |
+> | --- | --- |
+> | E1002 | `test_lexer.py` — inline `tokenize` cases assert exact code `E1002`, `$` position (1,15), and message. |
+> | E3002 | `test_diagnostic_precedence.py` — inline duplicate-`nes.run` program asserts exact code `E3002`, second-statement position, message, and no E3001/E3003 masking. |
+> | E5001 | `test_cli.py` — `compile_source` with `shutil.which` patched to `None` (and per-component variants); asserts `ToolchainError` message contains `E5001` and tool names. |
+> | E5002 | `test_cli.py` — `compile_source` with `subprocess.run` mocked to a nonzero result; asserts `E5002`, the failing tool name, and retained stderr detail; ca65 and ld65 paths covered separately. |
+> | E6001 | `test_cli.py` — `main()` with `Path.read_text` patched to raise `OSError`; asserts exit code 1 and stderr contains `E6001`. |
+> | E6012 | `test_metasprites.py` — `load_metasprite_assets` with `Path.read_text` raising `OSError` and `UnicodeDecodeError` (subtests); asserts exact code `E6012`, configured/resolved paths, error detail, and absence of the "not found" wording. |
 
 ### Codes with **no** automated protection (Missing)
 
-| Code | Trigger | Notes |
-| --- | --- | --- |
-| E1002 | `$` not followed by a hex digit | Lexer code path has no test; only the happy path (`$21`) and `E1000` are covered. |
-| E3002 | a second `nes.run` statement | No test compiles `nes.run; nes.run;`. |
-| E5001 | ca65/ld65 absent from `PATH` | CLI/toolchain driver path never exercised; `test_integration.py` skips without the tools. |
-| E5002 | ca65/ld65 returns a nonzero status | No test mocks `subprocess`/tool failure. |
-| E6001 | `OSError` while reading source / writing output | CLI `main()` error path never exercised. |
-| E6012 | metasprite metadata file exists but is unreadable (`OSError`/`UnicodeError`) | Analogous CHR path (`E6003`) is covered in `test_assets.py` via `patch.object(Path, "read_bytes", ...)`; the metasprite path has no equivalent. |
+None. Every diagnostic code now has direct automated regression protection.
 
 ### Codes whose coverage is meaningful but not a dedicated fixture (Partial)
 
@@ -128,9 +134,9 @@ via `test_records.py`; enums (E4015–E4018) via `test_enumerations.py`; arrays
 `test_memory_layout.py`; and the precedence battery in
 `test_diagnostic_precedence.py`.
 
-**Conclusion:** 112 of 118 codes have direct regression protection. The six
-Missing codes (E1002, E3002, E5001, E5002, E6001, E6012) are the audit's main
-coverage gap.
+**Conclusion:** 118 of 118 codes have direct regression protection. The six
+codes originally reported as Missing (E1002, E3002, E5001, E5002, E6001,
+E6012) were covered by the follow-up hardening task described above.
 
 ---
 
@@ -256,25 +262,18 @@ Inspected all 102 files in `tests/fixtures/diagnostics/`.
 | --- | --- | --- |
 | **P0** | 0 | No wrong code, compiler crash, or diagnostic corruption found. |
 | **P1** | 0 | No important missing or misleading user-facing diagnostic behavior that requires a code change. |
-| **P2** | 3 | (1) `E3005` for a bare procedure/function name in an expression is misleading ("Unknown identifier" for a declared name); (2) `E3018` for a function registered as a callback says "Unknown callback procedure" for a declared name; (3) missing regression protection for E1002, E3002, E5001, E5002, E6001, E6012 (six codes with zero automated coverage). |
+| **P2** | 2 | (1) `E3005` for a bare procedure/function name in an expression is misleading ("Unknown identifier" for a declared name); (2) `E3018` for a function registered as a callback says "Unknown callback procedure" for a declared name. The former P2 finding of missing regression protection for E1002, E3002, E5001, E5002, E6001, E6012 is **resolved** by the follow-up hardening task. |
 | **P3** | 8 | (1) Catalog/doc title mismatches for E4024, E6011, E6012; (2) E3015 index inconsistency (fixed); (3) E3063 shadows E3060/E4004 — ordering undocumented; (4) orphan fixtures `invalid_builtin_context.nsp`, `invalid_builtin_argument_count.nsp`; (5) docs triggers for E3053/E3054/E3056/E4009 omit the required `--metasprite` configuration; (6) `E3016`/`E3060` "1 argument(s)" grammar; (7) `E3022` suggestion "before nes.run;." punctuation; (8) E5004/E5007 `1:1` positions lack model support for a more precise location. |
 
 ### Recommendation
 
 The diagnostic system is structurally healthy: the catalog, category ranges,
 documentation index, and PT-BR set are internally consistent and machine
-checked; 112 of 118 codes have direct regression protection; and no P0/P1
+checked; 118 of 118 codes have direct regression protection; and no P0/P1
 defect exists. The backlog below is for follow-up hardening, not a gate.
 
 **P2 backlog**
-1. Add focused negative coverage for E1002 (lexer) and E3002 (duplicate
-   `nes.run`).
-2. Add CLI/driver-level tests for E5001 (missing toolchain), E5002 (tool
-   failure), and E6001 (file access failure), e.g. by mocking
-   `shutil.which`/`subprocess.run`/`Path`.
-3. Add a metasprite read-failure test for E6012 (mirror the `E6003`
-   `patch.object(Path, "read_bytes", ...)` pattern in `test_assets.py`).
-4. Consider wording improvements for the E3005 bare-name path and the E3018
+1. Consider wording improvements for the E3005 bare-name path and the E3018
    function-as-callback path.
 
 **P3 backlog**
@@ -301,6 +300,11 @@ defect exists. The backlog below is for follow-up hardening, not a gate.
   expected codes and locations (see sections 4 and 5).
 - Note: `make validate` requires `PYTHON=python3` in this environment because
   the Makefile defaults to `python`; CI is unaffected.
+
+**Follow-up validation (`chore/diagnostic-missing-coverage`):** the hardening
+task added eight focused tests (E1002, E3002, E5001 x2, E5002 x2, E6001,
+E6012), bringing the suite to **537 tests**; `make test` and `make validate`
+are green on the follow-up branch (see the follow-up report).
 
 ## 11. GitHub Actions run
 
