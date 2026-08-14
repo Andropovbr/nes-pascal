@@ -281,15 +281,19 @@ applicable tier. No map correction is warranted.
 
 ## 14. GitHub Actions run
 
-To be completed after pushing `audit/0.5.11-validation`. The authoritative CI
-gate (`.github/workflows/ci.yml`: compiler job, Mesen job, `ci-gate`) must be
-confirmed against the pushed branch; local equivalents of every job passed as
-reported above.
+Pushed `audit/0.5.11-validation` (`ab557e2`). The authoritative CI pipeline
+(`.github/workflows/ci.yml`) ran against the pushed branch: GitHub Actions run
+`31767587223` (run number 50, event `push`, head `ab557e2`).
+
+- `compiler-toolchain` job: **completed / success**
+- `mesen-runtime` job: **completed / success**
+- `ci-gate` job: **completed / success**
 
 ## 15. Final ci-gate
 
-Pending remote confirmation. Local evidence for every CI job passed; this audit
-does not claim remote CI success until the pushed branch's gate is verified.
+The aggregated `ci-gate` job **passed** for the pushed branch, confirming the
+compiler-toolchain and Mesen runtime jobs and the overall gate remotely. Local
+evidence (section 13) agrees with the remote result.
 
 ---
 
