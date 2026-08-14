@@ -123,3 +123,28 @@ Code-generation diagnostics use the E5000-E5999 range.
 
 - **Suggested fix:** Correct the compiler's allocation or segment generation;
   changing user source should not be necessary for an internal mismatch.
+
+## E5007 - Hardware stack call depth exhausted
+
+- **Category:** Code Generation
+- **Explanation:** The statically known maximum nested procedure/function call
+  depth would consume more of the reserved 256-byte 6502 hardware stack
+  (`$0100-$01FF`) than the ABI permits. Every active `JSR` reserves two bytes
+  for its return address; the remaining capacity keeps 10 bytes for runtime
+  `JSR` frames and NMI headroom, so the supported maximum source-call depth is
+  123. Recursion is rejected earlier with `E3014`, so this diagnostic fires
+  only for long acyclic call chains.
+- **Trigger:** A program whose maximum nested call depth exceeds 123. The
+  boundary is exercised programmatically in `tests/test_functions.py` (124
+  functions chained through the deepest call emits this diagnostic).
+- **Expected compiler output:**
+
+  ```text
+  E5007 <input>:1:1
+
+  Callable nesting depth of 124 exceeds the supported maximum of 123. Each nested procedure or function call consumes two bytes of the 256-byte NES hardware stack for its JSR return address, and 10 bytes are reserved for runtime and NMI stack usage.
+  ```
+
+- **Suggested fix:** Reduce the length of call chains. Recursion is not
+  supported; split long chains of procedures and functions that call one
+  another into a flatter structure.

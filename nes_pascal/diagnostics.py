@@ -113,6 +113,7 @@ class DiagnosticCode(StrEnum):
     TEMPORARY_RAM_EXHAUSTED = "E5004"
     INVALID_MEMORY_LAYOUT = "E5005"
     RAM_SEGMENT_OVERFLOW = "E5006"
+    HARDWARE_STACK_CALL_DEPTH_EXHAUSTED = "E5007"
     FILE_ACCESS_FAILURE = "E6001"
     CHR_ASSET_NOT_FOUND = "E6002"
     CHR_ASSET_READ_FAILURE = "E6003"
@@ -442,6 +443,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.RAM_SEGMENT_OVERFLOW: DiagnosticDefinition(
         DiagnosticCategory.CODE_GENERATION, "RAM segment overflow"
+    ),
+    DiagnosticCode.HARDWARE_STACK_CALL_DEPTH_EXHAUSTED: DiagnosticDefinition(
+        DiagnosticCategory.CODE_GENERATION, "Hardware stack call depth exhausted"
     ),
     DiagnosticCode.FILE_ACCESS_FAILURE: DiagnosticDefinition(
         DiagnosticCategory.RUNTIME, "File access failure"

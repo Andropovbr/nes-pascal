@@ -111,6 +111,7 @@ apenas na nova seção de diagnósticos.
 | E5004 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |
 | E5005 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |
 | E5006 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |
+| E5007 | Code Generation | [Diagnósticos de geração de código](reference/diagnostics/code-generation.md) |
 | E6001 | Runtime Validation | [Diagnósticos de validação em runtime](reference/diagnostics/runtime-validation.md) |
 | E6002 | Runtime Validation | [Diagnósticos de validação em runtime](reference/diagnostics/runtime-validation.md) |
 | E6003 | Runtime Validation | [Diagnósticos de validação em runtime](reference/diagnostics/runtime-validation.md) |

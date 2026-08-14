@@ -122,6 +122,7 @@ devem utilizar o intervalo reservado para a sua categoria.
 | [E5004](code-generation.md) | Code Generation | RAM temporária esgotada |
 | [E5005](code-generation.md) | Code Generation | Layout de memória inválido |
 | [E5006](code-generation.md) | Code Generation | Estouro de segmento de RAM |
+| [E5007](code-generation.md) | Code Generation | Profundidade de chamadas de pilha de hardware esgotada |
 | [E6001](runtime-validation.md) | Runtime Validation | Falha de acesso a arquivo |
 | [E6002](runtime-validation.md) | Runtime Validation | Asset de CHR-ROM não encontrado |
 | [E6003](runtime-validation.md) | Runtime Validation | Falha de leitura de asset de CHR-ROM |

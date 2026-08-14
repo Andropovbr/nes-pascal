@@ -265,7 +265,7 @@ for every applicable tier. No map correction is warranted.
 | --- | --- |
 | P0 | None found. No correctness or semantic defect identified in the implemented, documented scope. |
 | P1 | None. All 12 documented milestone requirements are implemented and have focused regression protection. |
-| P2-1 | **No compile-time guard on maximum source-call depth vs the 256-byte hardware stack.** A 130-function chain (each body calling the next) compiles successfully with `max_call_depth = 130`; at runtime the JSR return addresses exceed 256 bytes, wrap the stack pointer, and silently corrupt state. Nested-call *expression* chains are naturally bounded by the 17-temp `E5004` limit, but sequential call chains are not. Reachable, silent, and undocumented; the design doc reserves the full stack and reports depth, but nothing rejects depth > 128. |
+| P2-1 | ~~No compile-time guard on maximum source-call depth vs the 256-byte hardware stack~~ **Resolved** on `fix/function-call-depth-stack-guard`: a derived budget reserves 10 bytes beyond the two bytes per active `JSR` return address (4 bytes for runtime-internal `JSR` frames reachable from user statements, 6 bytes for NMI headroom), giving a supported maximum callable depth of `(256 - 10) / 2 = 123`. `E5007` (`HARDWARE_STACK_CALL_DEPTH_EXHAUSTED`) rejects deeper acyclic chains at compile time; the 124-chain boundary is covered by focused tests in `tests/test_functions.py`. |
 | P3-1 | Function argument *type* mismatch (`E4004`) has no dedicated negative fixture; only an in-process unit assertion (`Enabled($01)`) and CLI probes. Same code path as the pre-existing `E4004`; low incremental value. |
 | P3-2 | `docs/pt-BR/compiler/functions-0.5.12.md` missing; breaks the per-milestone PT-BR design-doc pattern (all prior milestone design docs are translated). All user-facing 0.5.12 docs are translated. |
 | P3-3 | A function registered as a frame callback (`nes.on_update(SomeFunction)`) is rejected with `E3018` "Unknown callback procedure: SomeFunction" although the function is declared; the rejection is correct, but the message does not explain that functions cannot be callbacks. |
@@ -285,6 +285,9 @@ for every applicable tier. No map correction is warranted.
   args, array/record indexed calls, for/while/if conditions, 4-level and
   4-deep-temp nesting, callback/type/namespace misuse — all behaved as
   documented.
+- Call-depth guard boundary (programmatic chain probes): 122/123 accepted,
+  124/125 rejected with `E5007`; mixed function/procedure chains at 123/124
+  behave identically; a cyclic 163-chain reports `E3014`, never `E5007`.
 - Determinism: repeated compilation produces byte-identical Assembly; benchmark
   reports regenerated deterministically across runs.
 - Note: `make validate` requires `PYTHON=python3` in this environment because
@@ -319,9 +322,11 @@ backend; analysis and codegen agree on temporary liveness, so call-safety
 divergence would be a loud compile-time failure rather than silent corruption.
 Evaluation order, Boolean materialization, short-circuit lowering, and all
 size/cycle invariants are preserved (pre/post benchmark identity across the
-corpus). No P0 or P1 findings exist. The single P2 item is a hardening boundary
-(maximum source-call depth has no compile-time guard against the 256-byte
-hardware stack); the P3 items are documentation polish and minor diagnostic
-wording. None block the milestone's acceptance criteria.
+corpus). No P0, P1, or P2 findings remain: the single P2 hardening item
+(maximum source-call depth guard, `E5007`) is resolved on
+`fix/function-call-depth-stack-guard` with a derived 123-call budget and
+focused boundary coverage. The remaining P3 items are documentation polish and
+minor diagnostic wording, none of which block the milestone's acceptance
+criteria.
 
-**READY WITH FOLLOW-UP HARDENING**
+**READY**

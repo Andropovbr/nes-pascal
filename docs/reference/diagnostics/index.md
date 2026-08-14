@@ -122,6 +122,7 @@ the range reserved for their category.
 | [E5004](code-generation.md) | Code Generation | Temporary RAM exhausted |
 | [E5005](code-generation.md) | Code Generation | Invalid memory layout |
 | [E5006](code-generation.md) | Code Generation | RAM segment overflow |
+| [E5007](code-generation.md) | Code Generation | Hardware stack call depth exhausted |
 | [E6001](runtime-validation.md) | Runtime Validation | File access failure |
 | [E6002](runtime-validation.md) | Runtime Validation | CHR-ROM asset not found |
 | [E6003](runtime-validation.md) | Runtime Validation | CHR-ROM asset read failure |

@@ -62,6 +62,15 @@ regular-RAM result byte and returns its value in `A`; no runtime stack frame or
 fixed return area is reserved. Each active `JSR` uses only its normal two-byte
 hardware-stack return address, reported by the benchmark call-depth metric.
 
+The maximum statically known nested call depth is bounded to keep `JSR` return
+addresses inside the reserved 256-byte hardware stack (`$0100-$01FF`). Ten
+bytes are reserved beyond the return addresses: four for runtime-internal
+`JSR` frames reachable from user statements and six for an NMI that can fire
+while game code executes. With two bytes per active call, the supported maximum
+source-call depth is 123 (`(256 - 10) / 2`). A program whose deepest call chain
+exceeds this limit is rejected at compile time with `E5007`; recursion is
+rejected earlier with `E3014`.
+
 General sprite operations conditionally link the page-aligned 256-byte OAM
 shadow at `$0200-$02FF`. They reserve `runtime_sprite_logical_y` at
 `$0300-$033F` and `runtime_sprite_value` at `$0340`.

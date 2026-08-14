@@ -62,6 +62,16 @@ em RAM comum e retorna em `A`; não há frame de runtime nem área fixa global d
 retorno. Cada `JSR` ativo usa apenas seu endereço de retorno normal de dois bytes
 na pilha de hardware, reportado pela métrica de profundidade de chamadas.
 
+A profundidade máxima estaticamente conhecida de chamadas aninhadas é limitada
+para manter os endereços de retorno de `JSR` dentro da pilha de hardware
+reservada de 256 bytes (`$0100-$01FF`). Dez bytes são reservados além dos
+endereços de retorno: quatro para frames de `JSR` internos do runtime
+alcançáveis a partir de instruções do usuário e seis para uma NMI que pode
+ocorrer durante a execução do código do jogo. Com dois bytes por chamada ativa,
+a profundidade máxima suportada de chamadas de fonte é 123 (`(256 - 10) / 2`).
+Um programa cuja cadeia de chamadas mais profunda exceda esse limite é rejeitado
+na compilação com `E5007`; recursão é rejeitada antes com `E3014`.
+
 Operações gerais de sprites incluem condicionalmente o shadow de OAM de 256 bytes
 alinhado a página em `$0200-$02FF`. Elas reservam `runtime_sprite_logical_y` em
 `$0300-$033F` e `runtime_sprite_value` em `$0340`. `nes.sprite_set_position` adiciona
