@@ -292,9 +292,11 @@ for every applicable tier. No map correction is warranted.
 
 ## 14. GitHub Actions run
 
-Pushed `audit/0.5.12-validation` (commit listed in section 15). The
-authoritative CI pipeline (`.github/workflows/ci.yml`) ran against the pushed
-branch. [Result to be filled after the run completes.]
+Pushed `audit/0.5.12-validation` (`db741b7`). The authoritative CI pipeline
+(`.github/workflows/ci.yml`) ran against the pushed branch: GitHub Actions run
+`31772705402` (run number 55, event `push`, head `db741b7`).
+
+[Results to be recorded in section 15 after the run completes.]
 
 ## 15. Final ci-gate
 
