@@ -103,6 +103,13 @@ devem utilizar o intervalo reservado para a sua categoria.
 | [E4016](type-system.md) | Type System | Membros de enumeração em excesso |
 | [E4017](type-system.md) | Type System | Comparação de enumeração inválida |
 | [E4018](type-system.md) | Type System | Membro de enumeração desconhecido |
+| [E4019](type-system.md) | Type System | Campo duplicado em record |
+| [E4020](type-system.md) | Type System | Campo de record desconhecido |
+| [E4021](type-system.md) | Type System | Acesso a campo em valor que não é record |
+| [E4022](type-system.md) | Type System | Tipo de campo de record não suportado |
+| [E4023](type-system.md) | Type System | Definição recursiva de record |
+| [E4024](type-system.md) | Type System | Layout ou offset indexado de record inválido |
+| [E4025](type-system.md) | Type System | Uso inválido de record |
 | [E5001](code-generation.md) | Code Generation | Toolchain ausente |
 | [E5002](code-generation.md) | Code Generation | Falha no toolchain |
 | [E5003](code-generation.md) | Code Generation | RAM do usuário esgotada |

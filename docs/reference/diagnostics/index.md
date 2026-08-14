@@ -103,6 +103,13 @@ the range reserved for their category.
 | [E4016](type-system.md) | Type System | Too many enumeration members |
 | [E4017](type-system.md) | Type System | Invalid enumeration comparison |
 | [E4018](type-system.md) | Type System | Unknown enumeration member |
+| [E4019](type-system.md) | Type System | Duplicate record field |
+| [E4020](type-system.md) | Type System | Unknown record field |
+| [E4021](type-system.md) | Type System | Field access on non-record |
+| [E4022](type-system.md) | Type System | Unsupported record field type |
+| [E4023](type-system.md) | Type System | Recursive record definition |
+| [E4024](type-system.md) | Type System | Invalid record layout or indexed offset |
+| [E4025](type-system.md) | Type System | Invalid record usage |
 | [E5001](code-generation.md) | Code Generation | Missing toolchain |
 | [E5002](code-generation.md) | Code Generation | Toolchain failure |
 | [E5003](code-generation.md) | Code Generation | User RAM exhausted |
