@@ -174,7 +174,10 @@ class RecordSemanticTests(unittest.TestCase):
             "field_access_on_non_record.nsp": "E4021",
             "unsupported_record_field_type.nsp": "E4022",
             "recursive_record_definition.nsp": "E4023",
+            "empty_record_definition.nsp": "E4024",
+            "oversized_record_definition.nsp": "E4024",
             "invalid_record_usage.nsp": "E4025",
+            "whole_record_comparison.nsp": "E4025",
         }
         for name, code in expected.items():
             with self.subTest(name=name):
@@ -194,6 +197,30 @@ class RecordSemanticTests(unittest.TestCase):
         with self.assertRaises(CompilerError) as context:
             resolve(source)
         self.assertEqual(context.exception.code, "E4024")
+
+    def test_record_layout_and_usage_fixtures_target_the_intended_rule(self) -> None:
+        expected = {
+            "empty_record_definition.nsp": (
+                "E4024",
+                "Record Empty must declare at least one field.",
+            ),
+            "oversized_record_definition.nsp": (
+                "E4024",
+                "Record Large exceeds the supported 256-byte layout.",
+            ),
+            "whole_record_comparison.nsp": (
+                "E4025",
+                "Whole-record comparison is not supported for type Position.",
+            ),
+        }
+        for name, (code, message) in expected.items():
+            with self.subTest(name=name):
+                path = DIAGNOSTICS / name
+                source = path.read_text(encoding="utf-8")
+                with self.assertRaises(CompilerError) as context:
+                    resolve(source, str(path))
+                self.assertEqual(context.exception.code, code)
+                self.assertIn(message, str(context.exception))
 
 
 class RecordMemoryAndBackendTests(unittest.TestCase):
