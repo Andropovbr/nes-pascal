@@ -41,7 +41,7 @@ devem utilizar o intervalo reservado para a sua categoria.
 | [E3012](semantic.md) | Semantic Analysis | Modificação da variável de controle do for |
 | [E3013](semantic.md) | Semantic Analysis | Procedimento desconhecido |
 | [E3014](semantic.md) | Semantic Analysis | Ciclo recursivo entre rotinas |
-| [E3015](semantic.md) | Semantic Analysis | Comando de runtime dentro de procedimento |
+| [E3015](semantic.md) | Semantic Analysis | Comando de runtime dentro de rotina |
 | [E3016](semantic.md) | Semantic Analysis | Contagem incorreta de argumentos de procedimento |
 | [E3017](semantic.md) | Semantic Analysis | Espera de quadro antes do início do runtime |
 | [E3018](semantic.md) | Semantic Analysis | Procedimento de callback desconhecido |

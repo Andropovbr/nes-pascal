@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from nes_pascal.ast import (
     MetaspriteAsset,
@@ -396,6 +397,36 @@ class MetaspriteAssetTests(unittest.TestCase):
             with self.assertRaises(CompilerError) as raised:
                 load_metasprite_assets((METADATA,), source_path, SOURCE, None)
             self.assertEqual(raised.exception.code, DiagnosticCode.INCOMPATIBLE_METASPRITE_CHR)
+
+    def test_unreadable_metadata_is_not_confused_with_missing_asset(self) -> None:
+        cases = (
+            (OSError("access denied"), "access denied"),
+            (
+                UnicodeDecodeError(
+                    "utf-8", b"\xff\xfe", 0, 1, "invalid start byte"
+                ),
+                "invalid start byte",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source_path = root / "main.nsp"
+            for error, fragment in cases:
+                with self.subTest(error=error):
+                    with patch.object(Path, "read_text", side_effect=error):
+                        with self.assertRaises(CompilerError) as raised:
+                            load_metasprite_assets(
+                                ("shape.json",), source_path, SOURCE, bytes(8192)
+                            )
+                    message = str(raised.exception)
+                    self.assertEqual(
+                        raised.exception.code,
+                        DiagnosticCode.METASPRITE_ASSET_READ_FAILURE,
+                    )
+                    self.assertIn("shape.json", message)
+                    self.assertIn(str((root / "shape.json").resolve()), message)
+                    self.assertIn(fragment, message)
+                    self.assertNotIn("was not found", message)
 
     def test_duplicate_configured_asset_roots_are_rejected(self) -> None:
         with self.assertRaises(CompilerError) as raised:
