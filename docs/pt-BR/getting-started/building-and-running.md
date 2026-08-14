@@ -173,7 +173,9 @@ de 64 bytes:
 
 ```text
 python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
-python -m nes_pascal.cli game.nsp -o build/game.nes --nametable-tiles assets/screen.tiles --nametable-attributes assets/screen.attributes
+# Forma dividida ilustrativa: substitua os caminhos de espaço reservado pelos
+# seus próprios arquivos de mapa de tiles de 960 bytes e tabela de atributos de 64 bytes.
+python -m nes_pascal.cli <seu-programa>.nsp -o build/<seu-programa>.nes --nametable-tiles <seu-mapa-de-tiles>.tiles --nametable-attributes <sua-tabela-de-atributos>.attributes
 ```
 
 As opções são formatos mutuamente exclusivos. As opções divididas devem aparecer juntas.

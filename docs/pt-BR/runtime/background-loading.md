@@ -31,10 +31,15 @@ do hardware para `$23C0-$23FF`. Não há cabeçalho, compressão, conversão ou 
 
 ## Arquivos separados de tiles e atributos
 
-Os mesmos bytes podem ser configurados separadamente:
+Os mesmos bytes podem ser configurados separadamente. O repositório não contém
+arquivos separados de tiles/atributos (o exemplo incluído `examples/nametable_loading.nsp`
+usa a forma combinada `--nametable` acima), então a forma dividida é mostrada abaixo
+com caminhos de espaço reservado explícitos:
 
 ```text
-python -m nes_pascal.cli game.nsp -o build/game.nes --nametable-tiles assets/screen.tiles --nametable-attributes assets/screen.attributes
+# Exemplo ilustrativo: substitua os caminhos de espaço reservado pelos seus
+# próprios arquivos de mapa de tiles de 960 bytes e tabela de atributos de 64 bytes.
+python -m nes_pascal.cli <seu-programa>.nsp -o build/<seu-programa>.nes --nametable-tiles <seu-mapa-de-tiles>.tiles --nametable-attributes <sua-tabela-de-atributos>.attributes
 ```
 
 O arquivo de tiles deve conter exatamente 960 bytes e o arquivo de atributos exatamente

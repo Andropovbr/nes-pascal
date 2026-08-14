@@ -182,30 +182,30 @@ absolute addressing.
 
 ## Generated memory map
 
-For an output named `build/zero_page.nes`, the compiler writes
-`build/zero_page.map`. The report separates maximum-live expression
-reservation, compiler caches, policy reservation, recovered Zero Page,
-optional promotion, and hardware reservation. It identifies every user symbol
-as `Zero Page` or `Regular RAM`.
+Compiling the focused example `examples/zero_page.nsp` to
+`build/zero_page.nes` writes `build/zero_page.map`. The report separates
+maximum-live expression reservation, compiler caches, policy reservation,
+recovered Zero Page, optional promotion, and hardware reservation. It
+identifies every user symbol as `Zero Page` or `Regular RAM`.
 
-An excerpt for the focused example is:
+An excerpt of the generated regions table is:
 
 ```text
 Start  End    Size  Owner     Region
 $0000  $000F    16  Runtime   Zero Page runtime
 $0010  ----      0  Compiler  Expression temporaries
-$0010  $0010     1  Compiler  Compiler caches
-$0011  $001F    15  Free      Recovered temporary Zero Page
+$0010  $001F    16  Free      Recovered temporary Zero Page
 $0020  $007F    96  Reserved  Future explicit Zero Page
 $0080  $00FF   128  User      Automatic Zero Page variables (2 used, 126 available)
 $0100  $01FF   256  Reserved  6502 hardware stack
-$0200  ----      0  Runtime   Runtime data
-$0200  $0200     1  User      Regular user variables
-$0201  $07FF  1535  Free      General free RAM
+$0200  $0203     4  Runtime   Runtime data
+$0204  $0204     1  User      Regular user variables
+$0205  $07FF  1531  Free      General free RAM
 ```
 
-The map also prints `Expression temporary reservation: 0 bytes` and
-`Other compiler caches: 1 byte` for this example. The generated `.cfg`,
+The map also prints `Expression temporary reservation: 0 bytes (maximum
+simultaneously live)` and `Other compiler caches: 0 bytes` for this example.
+The generated `.cfg`,
 Assembly segments, and `.map` report all use the same
 validated layout object, so their address calculations cannot drift.
 

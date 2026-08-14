@@ -40,7 +40,7 @@ o comportamento dos programas existentes. Selecione o espelhamento vertical em t
 de compilação com:
 
 ```text
-python -m nes_pascal.cli game.nsp -o build/game.nes --mirroring vertical
+python -m nes_pascal.cli examples/scrolling_ppu_state.nsp -o build/scrolling_ppu_state.nes --mirroring vertical
 ```
 
 `horizontal` e `vertical` definem o bit 0 da flag 6 do cabeçalho iNES como `0` e `1`,

@@ -160,7 +160,9 @@ file or a 960-byte tile map plus a 64-byte attribute table:
 
 ```text
 python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
-python -m nes_pascal.cli game.nsp -o build/game.nes --nametable-tiles assets/screen.tiles --nametable-attributes assets/screen.attributes
+# Illustrative split form: replace the placeholder paths with your own
+# 960-byte tile map and 64-byte attribute table.
+python -m nes_pascal.cli <your-program>.nsp -o build/<your-program>.nes --nametable-tiles <your-tile-map>.tiles --nametable-attributes <your-attribute-table>.attributes
 ```
 
 The options are mutually exclusive forms. Split options must appear together.

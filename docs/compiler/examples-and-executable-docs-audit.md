@@ -252,10 +252,10 @@ The following doc claims were verified against actual compiler output:
 ### Mismatches found (P2)
 
 1. **`cpu-memory.md` memory-map excerpt is stale (P2).** The doc (lines
-   191–208) presents a map excerpt for the `zero_page` "focused example" that
-   shows a `Compiler caches` row of 1 byte at `$0010`, `Runtime data` of 0
+   191–208) presented a map excerpt for the `zero_page` "focused example" that
+   showed a `Compiler caches` row of 1 byte at `$0010`, `Runtime data` of 0
    bytes at `$0200`, and the user variable at `$0200` with 1535 free bytes,
-   and states the example prints `Other compiler caches: 1 byte`. The current
+   and stated the example prints `Other compiler caches: 1 byte`. The current
    compiler emits, for `zero_page.nsp`:
 
    ```text
@@ -269,13 +269,20 @@ The following doc claims were verified against actual compiler output:
    `Expression temporary reservation: 0 bytes` and `Other compiler caches: 0
    bytes` are printed for this example. The 1-byte cache and `$0011-$001F` free
    recovery appear only in the `memory_layout` example, and even there the
-   runtime-data row is 4 bytes at `$0200-$0203`. The excerpt is therefore a
-   blend that matches neither example today. It should be regenerated from the
-   actual output of one of the two focused examples.
+   runtime-data row is 4 bytes at `$0200-$0203`. The excerpt was therefore a
+   blend that matched neither example. **Resolved by
+   `chore/examples-docs-p2-hardening`:** `docs/runtime/cpu-memory.md` and its
+   PT-BR mirror now present the regions table regenerated from the real
+   `examples/zero_page.nsp` output, including the runtime-data row at
+   `$0200-$0203`, the correct `0`-byte cache and `0`-byte temporary rows, the
+   `$0205-$07FF` free region, and the matching
+   `Expression temporary reservation: 0 bytes (maximum simultaneously live)` /
+   `Other compiler caches: 0 bytes` lines. The prose now states the output
+   comes from `examples/zero_page.nsp`.
 
 2. **`game.nsp` and `assets/screen.tiles`/`assets/screen.attributes` do not
-   exist (P2).** Three durable docs reference a program and assets that are not
-   in the repository:
+   exist (P2).** Three durable docs referenced a program and assets that are
+   not in the repository:
 
    - `docs/getting-started/building-and-running.md:163` —
      `python -m nes_pascal.cli game.nsp -o build/game.nes --nametable-tiles assets/screen.tiles --nametable-attributes assets/screen.attributes`;
@@ -292,11 +299,20 @@ The following doc claims were verified against actual compiler output:
    `--nametable-attributes` split options and `--mirroring vertical` are real
    and validated (the split form is tested at `tests/test_integration.py`
    `test_split_nametable_assets_build_as_one_complete_asset` and was probe
-   compiled), but the commands shown cannot be run as written. The
-   `gameplay_full_stack.nsp` example is the intended full-stack program and
-   compiles with `--nametable assets/nametable_loading.nam`; `scrolling_ppu_state.nsp`
-   is the mirroring example. The doc commands should reference real examples
-   and real assets (or be marked as illustrative with existing names).
+   compiled), but the commands shown could not be run as written.
+
+   **Resolved by `chore/examples-docs-p2-hardening`:** the mirroring command
+   in `docs/runtime/scrolling-and-ppu-state.md` (EN and PT-BR) now uses the
+   real `examples/scrolling_ppu_state.nsp` program with `--mirroring vertical`
+   and was probe-compiled. The split-asset commands in
+   `docs/getting-started/building-and-running.md` and
+   `docs/runtime/background-loading.md` (EN and PT-BR) were rewritten as
+   clearly-marked illustrative placeholder commands (no real `.tiles`/
+   `.attributes` assets exist in the repository, so none were invented), while
+   the bundled `examples/nametable_loading.nsp` combined `--nametable`
+   example remains the executable reference and the split options remain
+   documented separately. The placeholder split command was probe-compiled
+   with real derived assets to confirm the CLI form works.
 
 3. **`gameplay_full_stack` is missing from the example command list (P3).**
    `docs/getting-started/building-and-running.md` lists every other example in
@@ -372,20 +388,26 @@ No diagnostic doc example produced a different code than documented.
 | --- | --- | --- |
 | **P0** | 0 | No example fails to build; no doc presents a non-compiling complete program. |
 | **P1** | 0 | No broken example, broken complete-program snippet, or runtime-defeating doc claim found. |
-| **P2** | 2 | (1) `cpu-memory.md` memory-map excerpt is stale (does not match either focused example); (2) three docs reference nonexistent `game.nsp` and `assets/screen.tiles`/`assets/screen.attributes` (split-option commands cannot run as written). |
+| **P2** | 2 | (1) `cpu-memory.md` memory-map excerpt was stale (did not match either focused example) — **resolved** by `chore/examples-docs-p2-hardening` (regenerated from real `zero_page` output, EN and PT-BR); (2) three docs referenced nonexistent `game.nsp` and `assets/screen.tiles`/`assets/screen.attributes` — **resolved** (mirroring now uses `scrolling_ppu_state.nsp`; split-asset commands are clearly-marked illustrative placeholders; EN and PT-BR). |
 | **P3** | 2 | (1) `gameplay_full_stack` was missing from the building-and-running example list — **resolved** (EN and PT-BR updated); (2) `gameplay_full_stack` has no headless Mesen runtime script (aggregate-pressure only; subsystems covered individually). |
+
+**No P0, P1, or P2 findings remain.** All three documentation findings
+reported by this audit (two P2, one P3) have been resolved by
+`chore/examples-docs-p2-hardening`; the only outstanding item is the P3
+optional full-stack runtime script.
 
 ### Recommendations
 
 **P2 backlog**
-1. Regenerate the `cpu-memory.md` map excerpt from real output (either
+1. ~~Regenerate the `cpu-memory.md` map excerpt from real output (either
    `zero_page` or `memory_layout`), including the runtime-data row and the
-   correct cache/free accounting.
-2. Fix the three `game.nsp` command examples to use real programs and assets:
-   point the split-asset background-loading example at a real example with
-   actual `.tiles`/`.attributes` files (or add a tiny example that uses the
-   split options), and point the mirroring example at `scrolling_ppu_state.nsp`.
-   Apply the same fix to the PT-BR mirrors.
+   correct cache/free accounting.~~ **Resolved** by `chore/examples-docs-p2-hardening`
+   using `examples/zero_page.nsp`.
+2. ~~Fix the three `game.nsp` command examples to use real programs and assets.~~
+   **Resolved** by `chore/examples-docs-p2-hardening`: mirroring uses
+   `scrolling_ppu_state.nsp`; split-asset commands are clearly-marked
+   illustrative placeholders (no `.tiles`/`.attributes` assets exist), with
+   the combined `--nametable` example remaining executable.
 
 **P3 backlog**
 1. Optionally add a headless Mesen script for `gameplay_full_stack` that
@@ -422,6 +444,13 @@ The pushed branch's CI run is triggered by the push. Per project policy this
 audit does not claim remote CI success from this environment; the aggregate
 `ci-gate` on the pushed branch is the authoritative confirmation.
 
+**Follow-up hardening (`chore/examples-docs-p2-hardening`):** both P2 findings
+and the P3 example-listing gap are resolved on a dedicated branch (see
+sections 6 and 10). The follow-up branch runs the full `make test` and
+`make validate` (`PYTHON=python3`) suites plus probe compiles of every changed
+command, and verifies the final `ci-gate` on the authoritative pipeline before
+merging.
+
 ---
 
 ## Conclusion
@@ -429,7 +458,12 @@ audit does not claim remote CI success from this environment; the aggregate
 The example corpus is healthy: all 28 programs build to valid NROM images, all
 28 are compiled by tests or Mesen, 23 have dedicated runtime scripts, and
 every example is referenced in the documentation. The documentation carries no
-non-compiling complete program. Two P2 documentation defects were found — a
-stale memory-map excerpt and three commands referencing nonexistent files —
-plus a P3 example-listing gap (resolved) and a P3 missing full-stack runtime
-script. No compiler, example, or test changes were made.
+non-compiling complete program. The audit originally reported two P2
+documentation defects — a stale memory-map excerpt and three commands
+referencing nonexistent files — plus a P3 example-listing gap. All three were
+resolved by the follow-up branch `chore/examples-docs-p2-hardening`: the
+memory-map excerpt now matches real `zero_page` output, the mirroring command
+uses `scrolling_ppu_state.nsp`, and the split-asset commands are truthful
+illustrative placeholders. **No P0, P1, or P2 findings remain.** The only
+outstanding item is the optional P3 full-stack runtime script. No compiler,
+example, or test changes were made.
