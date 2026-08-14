@@ -3118,7 +3118,7 @@ class SemanticAnalyzer:
             DiagnosticCode.INCOMPATIBLE_TYPES,
             f"{description} has type {actual_type.value}, but "
             f"{expected_type.value} is required.",
-            "Use the expression only where a boolean value is expected.",
+            f"Use the expression only where a {expected_type.value} value is expected.",
         )
 
     def _require_matching_type(

@@ -377,6 +377,17 @@ class Parser:
             )
             self._expect(TokenKind.COLON, "Expected ':' after the parameter name.")
             type_token = self._current()
+            if (
+                type_token.kind is TokenKind.IDENTIFIER
+                and type_token.text.lower() in self.enum_types
+            ):
+                self._error(
+                    type_token,
+                    DiagnosticCode.UNSUPPORTED_PARAMETER_TYPE,
+                    f"Enumeration type {type_token.text} is not supported for "
+                    "procedure parameters.",
+                    "Use byte or boolean for a value parameter.",
+                )
             declared_type = self._parse_builtin_type()
             parameters.append(
                 ProcedureParameter(

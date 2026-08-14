@@ -1,0 +1,11 @@
+program EnumIncDec;
+type
+    GameState = (Title, Playing, Paused);
+var
+    State: GameState;
+begin
+    State := Title;
+    inc(State);
+    nes.set_background_color($0F);
+    nes.run;
+end.

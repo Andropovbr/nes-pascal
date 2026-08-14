@@ -1,0 +1,10 @@
+program EnumProcedureParameter;
+type
+    GameState = (Title, Playing);
+procedure Transition(Next: GameState);
+begin
+end;
+begin
+    nes.set_background_color($0F);
+    nes.run;
+end.
