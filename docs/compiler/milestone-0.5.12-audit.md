@@ -292,16 +292,20 @@ for every applicable tier. No map correction is warranted.
 
 ## 14. GitHub Actions run
 
-Pushed `audit/0.5.12-validation` (`db741b7`). The authoritative CI pipeline
-(`.github/workflows/ci.yml`) ran against the pushed branch: GitHub Actions run
-`31772705402` (run number 55, event `push`, head `db741b7`).
+Pushed `audit/0.5.12-validation`. The authoritative CI pipeline
+(`.github/workflows/ci.yml`) ran against the pushed branch. The final
+validation run (after the record-keeping commit `a5add38`) is GitHub Actions
+run `31772718704` (run number 56, event `push`, head `a5add38`).
 
-[Results to be recorded in section 15 after the run completes.]
+- `compiler-toolchain` job: **completed / success**
+- `mesen-runtime` job: **completed / success**
+- `ci-gate` job: **completed / success**
 
 ## 15. Final ci-gate
 
-The aggregated `ci-gate` job status is reported in this section after the push.
-Local evidence (section 13) agrees with the expected remote result.
+The aggregated `ci-gate` job **passed** for the pushed branch, confirming the
+compiler-toolchain and Mesen runtime jobs and the overall gate remotely. Local
+evidence (section 13) agrees with the remote result.
 
 ---
 
