@@ -36,6 +36,7 @@ from .ast import (
     LoadBackground,
     Literal,
     NamedTypeReference,
+    NES_RECT_TYPE,
     Program,
     ProcedureCall,
     ProcedureDeclaration,
@@ -71,7 +72,7 @@ class Parser:
         self.filename = filename
         self.position = 0
         self.enum_types: dict[str, EnumType] = {}
-        self.record_type_names: set[str] = set()
+        self.record_type_names: set[str] = {NES_RECT_TYPE.name.lower()}
         self.constant_names: set[str] = set()
         self.variable_names: set[str] = set()
         self.variable_types: dict[str, VariableType] = {}

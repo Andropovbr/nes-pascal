@@ -58,9 +58,11 @@ operandos ca65 diretos como `variable_Player + 2`; não existe cálculo de
 ponteiro, descritor, tabela de reflexão, objeto de inicialização, heap ou rotina
 de runtime para records.
 
-Records inteiros não são valores de expressão nesta milestone. Atribuição,
-comparação, argumentos e retornos de records inteiros são rejeitados; opere em
-campos individuais.
+Records inteiros não são valores gerais de expressão. Atribuição, comparação,
+argumentos e retornos de records inteiros são rejeitados; opere em campos
+individuais. O record predefinido `nes_rect` é aceito pelos builtins de colisão
+como referência direta e nominalmente tipada. Esse contrato restrito não cria
+semântica geral de valores record.
 
 A análise de atribuição definida segue a regra existente para agregados usada
 por arrays: após a atribuição de um campo, a variável record é considerada

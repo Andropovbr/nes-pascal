@@ -70,7 +70,8 @@ O compilador aceita metadados do PNG2CHR Studio `png2chr-studio-animation` vers�
 Ele valida a estrutura exigida de objetos/arrays, tamanho de tile de origem 8 por 8,
 dimensões do quadro, origem dos metadados, contagem de componentes, coordenadas com
 sinal, intervalo de tiles, byte de atributos, bits de paleta, booleanos de flip,
-capacidade declarada de 256 tiles e declaração de 8 KiB de CHR NROM.
+capacidade declarada de 256 tiles, declaração de 8 KiB de CHR NROM e um objeto
+opcional `collision_box` por quadro.
 
 Cada quadro é armazenado como uma lista de componentes. Layouts podem ser retangulares,
 esparsos, assimétricos ou utilizar deslocamentos negativos relativos à origem. Índices
@@ -82,6 +83,9 @@ Existe uma única representação imutável de quadro. Seleção manual de quadr
 [animação de sprites](sprite-animation.md) referenciam os mesmos IDs de quadros e as
 mesmas listas de componentes; o estado de animação nunca cria uma segunda geometria,
 pivô, flip ou caminho de recorte.
+A caixa opcional e o fallback derivado dos componentes usados por
+[`nes.metasprite_bounds`](collision-helpers.md) também são metadados imutáveis
+por quadro e não adicionam estado de colisão por instância.
 
 O PNG2CHR Studio versão 2 define a `origin` raiz como a âncora lógica configurada nas
 coordenadas de pixels do quadro de origem. Ele subtrai essa âncora durante a exportação,
@@ -108,9 +112,9 @@ como identidade.
 
 Coordenadas do quadro de origem utilizam o canto superior esquerdo da imagem como `(0, 0)`.
 `width` e `height` do quadro descrevem essa extensão de origem e são retidos para
-representação em tempo de compilação e futuros trabalhos com caixas delimitadoras
-(bounding boxes). Eles não implicam uma grade retangular de componentes e não são
-copiados para a RAM em runtime.
+representação em tempo de compilação e validação de bounds de colisão. Eles não
+implicam uma grade retangular de componentes e não são copiados para a RAM em
+runtime.
 
 A `origin` nos metadados raiz seleciona um ponto nesse sistema de coordenadas de origem
 tanto como âncora lógica quanto como pivô de flip de todo o metasprite. O PNG2CHR Studio

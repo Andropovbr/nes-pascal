@@ -70,7 +70,8 @@ The compiler accepts PNG2CHR Studio `png2chr-studio-animation` metadata version
 2. It validates the required object/array structure, 8-by-8 source tile size,
 frame dimensions, metadata origin, component count, signed coordinates, tile
 range, attribute byte, palette bits, flip booleans, 256-tile declared
-capacity, and 8 KiB NROM CHR declaration.
+capacity, 8 KiB NROM CHR declaration, and an optional per-frame
+`collision_box` object.
 
 Every frame is stored as a component list. Layouts may be rectangular, sparse,
 asymmetric, or use negative origin-relative offsets. Repeated and
@@ -82,6 +83,9 @@ There is one immutable frame representation. Manual frame selection and
 [sprite animation](sprite-animation.md) reference the same frame IDs and the
 same component lists; animation state never creates a second geometry,
 pivot, flip, or clipping path.
+The optional box and component-derived fallback used by
+[`nes.metasprite_bounds`](collision-helpers.md) are also immutable per-frame
+metadata and add no per-instance collision state.
 
 PNG2CHR Studio version 2 defines root `origin` as the configured logical anchor
 in source-frame pixel coordinates. It subtracts that anchor during export, so
@@ -107,8 +111,8 @@ the compiler therefore does not treat the tooling output filename as identity.
 
 Source-frame coordinates use the image frame's top-left as `(0, 0)`. Frame
 `width` and `height` describe that source extent and are retained for
-compile-time representation and future bounding-box work. They do not imply a
-rectangular component grid and are not copied to runtime RAM.
+compile-time representation and collision-bound validation. They do not imply
+a rectangular component grid and are not copied to runtime RAM.
 
 The root metadata `origin` selects one point in that source coordinate system
 as both the logical anchor and whole-metasprite flip pivot. PNG2CHR Studio

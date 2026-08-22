@@ -132,6 +132,10 @@ class DiagnosticCode(StrEnum):
     INVALID_METASPRITE_METADATA = "E6016"
     INCOMPATIBLE_METASPRITE_CHR = "E6017"
     INVALID_METASPRITE_CONFIGURATION = "E6018"
+    COLLISION_ASSET_NOT_FOUND = "E6019"
+    COLLISION_ASSET_READ_FAILURE = "E6020"
+    INVALID_COLLISION_ASSET = "E6021"
+    INVALID_COLLISION_CONFIGURATION = "E6022"
 
 
 @dataclass(frozen=True, slots=True)
@@ -500,6 +504,18 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.INVALID_METASPRITE_CONFIGURATION: DiagnosticDefinition(
         DiagnosticCategory.RUNTIME, "Invalid metasprite asset configuration"
+    ),
+    DiagnosticCode.COLLISION_ASSET_NOT_FOUND: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Collision-map asset not found"
+    ),
+    DiagnosticCode.COLLISION_ASSET_READ_FAILURE: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Collision-map asset read failure"
+    ),
+    DiagnosticCode.INVALID_COLLISION_ASSET: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Invalid collision-map asset"
+    ),
+    DiagnosticCode.INVALID_COLLISION_CONFIGURATION: DiagnosticDefinition(
+        DiagnosticCategory.RUNTIME, "Invalid collision-map configuration"
     ),
 }
 

@@ -39,6 +39,7 @@ from .ast import (
     MetaspriteFrame,
     MetaspriteInstance,
     NamedTypeReference,
+    NES_RECT_TYPE,
     OamOwnerKind,
     OamReservation,
     Program,
@@ -74,6 +75,7 @@ from .ast import (
     ResolvedRepeatStatement,
     ResolvedRecordField,
     ResolvedRecordFieldAssignment,
+    ResolvedRecordReference,
     ResolvedProgram,
     ResolvedProcedure,
     ResolvedProcedureCall,
@@ -127,6 +129,7 @@ SPRITE_OPERATION_IDS = frozenset(
         BuiltinId.SPRITE_SET_FLIP_HORIZONTAL,
         BuiltinId.SPRITE_SET_FLIP_VERTICAL,
         BuiltinId.SPRITE_SET_BEHIND_BACKGROUND,
+        BuiltinId.SPRITE_BOUNDS,
     }
 )
 METASPRITE_OPERATION_IDS = frozenset(
@@ -139,6 +142,7 @@ METASPRITE_OPERATION_IDS = frozenset(
         BuiltinId.METASPRITE_SHOW,
         BuiltinId.METASPRITE_SET_FLIP_HORIZONTAL,
         BuiltinId.METASPRITE_SET_FLIP_VERTICAL,
+        BuiltinId.METASPRITE_BOUNDS,
     }
 )
 CONTROLLER_QUERY_IDS = frozenset(
@@ -146,6 +150,13 @@ CONTROLLER_QUERY_IDS = frozenset(
         BuiltinId.CONTROLLER_DOWN,
         BuiltinId.CONTROLLER_PRESSED,
         BuiltinId.CONTROLLER_RELEASED,
+    }
+)
+COLLISION_QUERY_IDS = frozenset(
+    {
+        BuiltinId.POINT_IN_RECT,
+        BuiltinId.COLLIDES,
+        BuiltinId.BACKGROUND_COLLISION,
     }
 )
 
@@ -256,7 +267,7 @@ class SemanticAnalyzer:
                     BuiltInType.METASPRITE_FRAME,
                     frame.id,
                 )
-        declared_names: set[str] = set()
+        declared_names: set[str] = {NES_RECT_TYPE.name.lower()}
         for declaration in program.enum_types:
             enum_type = declaration.type
             self._ensure_unique_name(
@@ -755,6 +766,9 @@ class SemanticAnalyzer:
                 tuple(fields_),
                 len(fields_),
             )
+        # Preserve source declaration order in ResolvedProgram.record_types;
+        # the predefined record follows user declarations and costs no RAM.
+        resolved[NES_RECT_TYPE.name.lower()] = NES_RECT_TYPE
         return resolved
 
     def _resolve_variable_type(
@@ -1887,7 +1901,7 @@ class SemanticAnalyzer:
         if (
             isinstance(value, BuiltinCall)
             and _parsed_builtin_id(value)
-            in (*CONTROLLER_QUERY_IDS, BuiltinId.GET_TILE)
+            in (*CONTROLLER_QUERY_IDS, *COLLISION_QUERY_IDS, BuiltinId.GET_TILE)
         ):
             return False
         if isinstance(value, (BinaryExpression, ComparisonExpression)):
@@ -1928,6 +1942,17 @@ class SemanticAnalyzer:
                 f"VBlank callback path through {owner} queries {command}.",
                 "Query controller state from main code or the update callback; "
                 "controller polling runs outside NMI.",
+                len(command),
+            )
+        collision_query = self._first_collision_query(value)
+        if collision_query is not None:
+            command = collision_query.name
+            self._error(
+                collision_query.position,
+                DiagnosticCode.VBLANK_UNSAFE_OPERATION,
+                f"VBlank callback path through {owner} queries {command}.",
+                "Run collision queries from main code or the update callback; "
+                "collision helpers use shared runtime scratch.",
                 len(command),
             )
         self._error(
@@ -1988,6 +2013,35 @@ class SemanticAnalyzer:
         if isinstance(value, BuiltinCall):
             for argument in value.arguments:
                 found = self._first_get_tile(argument)
+                if found is not None:
+                    return found
+        return None
+
+    def _first_collision_query(
+        self,
+        value: ValueExpression,
+    ) -> BuiltinCall | None:
+        if (
+            isinstance(value, BuiltinCall)
+            and _parsed_builtin_id(value) in COLLISION_QUERY_IDS
+        ):
+            return value
+        if isinstance(value, (UnaryExpression, BooleanNotExpression)):
+            return self._first_collision_query(value.operand)
+        if isinstance(value, ArrayIndexExpression):
+            return self._first_collision_query(value.index)
+        if isinstance(value, RecordFieldExpression) and value.index is not None:
+            return self._first_collision_query(value.index)
+        if isinstance(
+            value,
+            (BinaryExpression, BooleanBinaryExpression, ComparisonExpression),
+        ):
+            return self._first_collision_query(
+                value.left
+            ) or self._first_collision_query(value.right)
+        if isinstance(value, (BuiltinCall, FunctionCall)):
+            for argument in value.arguments:
+                found = self._first_collision_query(argument)
                 if found is not None:
                     return found
         return None
@@ -2458,7 +2512,19 @@ class SemanticAnalyzer:
                 variables,
                 assigned_variables,
             )
+        elif hook is SemanticHook.COLLISION:
+            arguments = self._resolve_collision_builtin_arguments(
+                call,
+                descriptor,
+                constants,
+                variables,
+                assigned_variables,
+            )
         else:
+            assert all(
+                isinstance(expected_type, (BuiltInType, EnumType))
+                for expected_type in descriptor.parameter_types
+            )
             arguments = tuple(
                 self._resolve_value(
                     argument,
@@ -2526,6 +2592,98 @@ class SemanticAnalyzer:
             tuple(arguments),
             queued and bool(descriptor.queued_runtime_features),
         )
+
+    def _resolve_collision_builtin_arguments(
+        self,
+        call: BuiltinCall,
+        descriptor: BuiltinDescriptor,
+        constants: dict[str, TypedConstant],
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+    ) -> tuple[ResolvedValue | ResolvedRecordReference, ...]:
+        output_index = (
+            len(descriptor.parameter_types) - 1
+            if descriptor.id
+            in (BuiltinId.SPRITE_BOUNDS, BuiltinId.METASPRITE_BOUNDS)
+            else None
+        )
+        arguments: list[ResolvedValue | ResolvedRecordReference] = []
+        for index, (argument, expected_type) in enumerate(
+            zip(call.arguments, descriptor.parameter_types, strict=True)
+        ):
+            if isinstance(expected_type, RecordType):
+                arguments.append(
+                    self._resolve_collision_rect_argument(
+                        argument,
+                        variables,
+                        assigned_variables,
+                        descriptor.public_name,
+                        output=index == output_index,
+                    )
+                )
+                continue
+            arguments.append(
+                self._resolve_value(
+                    argument,
+                    expected_type,
+                    constants,
+                    variables,
+                    assigned_variables,
+                )
+            )
+        return tuple(arguments)
+
+    def _resolve_collision_rect_argument(
+        self,
+        argument: ValueExpression,
+        variables: dict[str, ResolvedVariable],
+        assigned_variables: set[str],
+        builtin_name: str,
+        *,
+        output: bool,
+    ) -> ResolvedRecordReference:
+        if not isinstance(argument, VariableReference):
+            self._error(
+                argument.position,
+                DiagnosticCode.INCOMPATIBLE_TYPES,
+                f"{builtin_name} requires a standalone nes_rect variable for "
+                f"its {'output' if output else 'rectangle'} argument.",
+                "Declare a variable of type nes_rect and pass its name directly.",
+            )
+        variable = variables.get(argument.name.lower())
+        if variable is None:
+            self._error(
+                argument.position,
+                DiagnosticCode.UNKNOWN_IDENTIFIER,
+                f"Unknown identifier: {argument.name}.",
+                "Declare a nes_rect variable before using it.",
+                len(argument.name),
+            )
+        if variable.type is not NES_RECT_TYPE:
+            self._error(
+                argument.position,
+                DiagnosticCode.INCOMPATIBLE_TYPES,
+                f"{builtin_name} requires nes_rect, but {variable.name} has "
+                f"type {variable.type.value}.",
+                "Pass a standalone variable declared as nes_rect.",
+                len(argument.name),
+            )
+        normalized_name = argument.name.lower()
+        if output:
+            assigned_variables.add(normalized_name)
+        elif normalized_name not in assigned_variables:
+            if self.required_variables is not None:
+                self.required_variables.add(normalized_name)
+                assigned_variables.add(normalized_name)
+            else:
+                self._error(
+                    argument.position,
+                    DiagnosticCode.VARIABLE_READ_BEFORE_ASSIGNMENT,
+                    f"Variable {argument.name} is read before assignment.",
+                    "Assign its X, Y, Width, and Height fields before the collision query.",
+                    len(argument.name),
+                )
+        return ResolvedRecordReference(variable, output)
 
     def _resolve_metasprite_builtin_arguments(
         self,

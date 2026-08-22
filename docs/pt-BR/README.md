@@ -59,6 +59,7 @@ Esta pasta contém a tradução completa da documentação do **NES Pascal** par
 - [x] `docs/runtime/wait-frame.md` -> `docs/pt-BR/runtime/wait-frame.md`
 - [x] `docs/runtime/vblank-cycle-budget.md` -> `docs/pt-BR/runtime/vblank-cycle-budget.md`
 - [x] `docs/runtime/cpu-memory.md` -> `docs/pt-BR/runtime/cpu-memory.md`
+- [x] `docs/runtime/collision-helpers.md` -> `docs/pt-BR/runtime/collision-helpers.md`
 
 ### Reference (Referência)
 - [x] `docs/reference/index.md` -> `docs/pt-BR/reference/index.md`
@@ -81,6 +82,7 @@ Esta pasta contém a tradução completa da documentação do **NES Pascal** par
 - [x] `docs/compiler/records-0.5.10.md` -> `docs/pt-BR/compiler/records-0.5.10.md`
 - [x] `docs/compiler/expression-temporaries-0.5.11.md` -> `docs/pt-BR/compiler/expression-temporaries-0.5.11.md`
 - [x] `docs/compiler/functions-0.5.12.md` -> `docs/pt-BR/compiler/functions-0.5.12.md`
+- [x] `docs/compiler/collision-helpers-0.5.13.md` -> `docs/pt-BR/compiler/collision-helpers-0.5.13.md`
 - [x] `docs/compiler/milestone-0.5.10-audit.md` -> `docs/pt-BR/compiler/milestone-0.5.10-audit.md`
 - [x] `docs/compiler/milestone-0.5.11-audit.md` -> `docs/pt-BR/compiler/milestone-0.5.11-audit.md`
 - [x] `docs/compiler/milestone-0.5.12-audit.md` -> `docs/pt-BR/compiler/milestone-0.5.12-audit.md`

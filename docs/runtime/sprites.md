@@ -106,6 +106,10 @@ setters. For a dynamic sprite value, its OAM offset is calculated once before
 both coordinates are written. The operation also updates the runtime's cached
 OAM Y without implicitly showing a hidden sprite.
 
+[`nes.sprite_bounds`](collision-helpers.md) can copy this current raw X/Y
+position into a `nes_rect` with explicit unsigned offsets and dimensions. It
+reuses the OAM shadow and logical-Y cache and does not duplicate sprite state.
+
 ## Attribute byte
 
 The runtime follows the NES OAM attribute format:

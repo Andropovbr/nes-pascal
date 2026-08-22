@@ -40,6 +40,9 @@ python -m nes_pascal.cli examples/palette_support.nsp -o build/palette_support.n
 python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
 python -m nes_pascal.cli examples/background_updates.nsp -o build/background_updates.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
 python -m nes_pascal.cli examples/scrolling_ppu_state.nsp -o build/scrolling_ppu_state.nes --mirroring horizontal
+python -m nes_pascal.cli examples/collision_rectangles.nsp -o build/collision_rectangles.nes --chr assets/game.chr --metasprite assets/player_idle.json
+python -m nes_pascal.cli examples/collision_background.nsp -o build/collision_background.nes --collision-map assets/collision_map.cmap
+python -m nes_pascal.cli examples/collision_helpers.nsp -o build/collision_helpers.nes --chr assets/game.chr --metasprite assets/player_idle.json --collision-map assets/collision_map.cmap
 python -m nes_pascal.cli examples/gameplay_full_stack.nsp -o build/gameplay_full_stack.nes --chr assets/game.chr --nametable assets/nametable_loading.nam --metasprite assets/player_consolidated.json
 ```
 
@@ -101,6 +104,13 @@ The examples demonstrate:
 - `background_updates.nsp`: bounded and repeated tile writes, confirmed-shadow
   reads, rejected tile and attribute overflow, pending cancellation, explicit
   overflow clearing, and one raw attribute update after runtime starts.
+- `collision_rectangles.nsp`: half-open point/rectangle and rectangle/rectangle
+  queries plus bounds generated from one hardware sprite and one metasprite.
+- `collision_background.nsp`: immutable packed collision-map lookups at tile,
+  screen, and logical-index boundaries without the confirmed tile shadow.
+- `collision_helpers.nsp`: every collision API together, including custom
+  bounds, wrap-safe edge behavior, sprite/metasprite integration, and the
+  configured background map.
 - `gameplay_full_stack.nsp`: the full-stack example that combines background
   loading, controller input, palettes, a moving metasprite player with
   animation, and combined RAM pressure in one program.
@@ -175,6 +185,22 @@ After `nes.run`, use `nes.set_tile`, `nes.get_tile`, `nes.set_attribute`,
 `nes.clear_background_update_overflow` as described in
 [Runtime background updates](../runtime/background-updates.md). At most four
 tile or attribute bytes are uploaded during each VBlank.
+
+## Collision-map assets
+
+Programs that call `nes.background_collision` must configure one text map with
+`--collision-map`:
+
+```text
+python -m nes_pascal.cli examples/collision_background.nsp -o build/collision_background.nes --collision-map assets/collision_map.cmap
+```
+
+The UTF-8 file contains exactly 30 rows of 32 `0`/`1` characters. The compiler
+packs the 960 flags into 120 immutable PRG-ROM bytes. It rejects a missing,
+unreadable, malformed, or unused configured map with a stable diagnostic.
+Paths follow the same source-relative rules as other assets. See
+[Collision helpers](../runtime/collision-helpers.md) for coordinates, bit
+order, edge behavior, and interaction with background updates.
 
 ## Running in Mesen
 

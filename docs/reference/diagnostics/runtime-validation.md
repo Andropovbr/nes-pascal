@@ -192,3 +192,38 @@ Runtime-validation diagnostics use the E6000-E6999 range.
   identifier capacity.
 - **Expected compiler output:** `E6018` identifies the conflicting setup.
 - **Suggested fix:** Use unique asset roots and split the program's asset set.
+
+## E6019 - Collision-map asset not found
+
+- **Category:** Runtime Validation
+- **Explanation:** The `--collision-map` path does not identify an existing
+  file relative to the Pascal source directory.
+- **Trigger:** Configure a missing collision-map file.
+- **Expected compiler output:** `E6019` includes the original and resolved paths.
+- **Suggested fix:** Correct the path or add the map file.
+
+## E6020 - Collision-map asset read failure
+
+- **Category:** Runtime Validation
+- **Explanation:** The configured path exists, but its UTF-8 text cannot be read.
+- **Trigger:** Configure an unreadable file or a directory.
+- **Expected compiler output:** `E6020` includes the operating-system error.
+- **Suggested fix:** Provide a readable UTF-8 text file.
+
+## E6021 - Invalid collision-map asset
+
+- **Category:** Runtime Validation
+- **Explanation:** Collision maps require exactly 30 rows of 32 `0`/`1` flags.
+- **Trigger:** Use a wrong row count, wrong width, or any other character.
+- **Expected compiler output:** `E6021` identifies the violated dimension or value.
+- **Suggested fix:** Export a 32-by-30 binary text grid with no header.
+
+## E6022 - Invalid collision-map configuration
+
+- **Category:** Runtime Validation
+- **Explanation:** A background-collision query has no configured map, or a map
+  was configured for a program that does not use the query.
+- **Trigger:** Omit the required option or configure an unused map.
+- **Expected compiler output:** `E6022` identifies the configuration mismatch.
+- **Suggested fix:** Pair one `--collision-map` with a program that calls
+  `nes.background_collision`.

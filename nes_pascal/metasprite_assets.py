@@ -368,6 +368,13 @@ def _load_one_asset(
                 )
                 for component_index, component_value in enumerate(sprite_values)
             )
+            (
+                collision_x,
+                collision_y,
+                collision_width,
+                collision_height,
+                collision_custom,
+            ) = _collision_box(frame, frame_path, components, source_path, source)
             frames.append(
                 MetaspriteFrame(
                     frame_id,
@@ -380,6 +387,11 @@ def _load_one_asset(
                     origin_x,
                     origin_y,
                     components,
+                    collision_x,
+                    collision_y,
+                    collision_width,
+                    collision_height,
+                    collision_custom,
                 )
             )
             animation_frame_ids.append(frame_id)
@@ -478,6 +490,61 @@ def _component(
             f"{path}.vertical_flip disagrees with attributes bit 7.",
         )
     return MetaspriteComponent(x_offset, y_offset, tile, attributes)
+
+
+def _collision_box(
+    frame: dict[str, Any],
+    frame_path: str,
+    components: tuple[MetaspriteComponent, ...],
+    source_path: Path,
+    source: str,
+) -> tuple[int, int, int, int, bool]:
+    """Resolve one immutable anchor-relative box, falling back to visuals."""
+
+    custom = "collision_box" in frame
+    if custom:
+        path = f"{frame_path}.collision_box"
+        box = _mapping(frame["collision_box"], path, source_path, source)
+        unsupported = sorted(set(box) - {"x", "y", "width", "height"})
+        if unsupported:
+            _invalid(
+                source_path,
+                source,
+                f"{path} contains unsupported field {unsupported[0]!r}.",
+            )
+        x = _integer(box, "x", path, source_path, source)
+        y = _integer(box, "y", path, source_path, source)
+        width = _positive_byte(box, "width", path, source_path, source)
+        height = _positive_byte(box, "height", path, source_path, source)
+    elif components:
+        x = min(component.x_offset for component in components)
+        y = min(component.y_offset for component in components)
+        right = max(component.x_offset + 8 for component in components)
+        bottom = max(component.y_offset + 8 for component in components)
+        width = right - x
+        height = bottom - y
+    else:
+        return 0, 0, 0, 0, False
+
+    if not 1 <= width <= 0xFF or not 1 <= height <= 0xFF:
+        _invalid(
+            source_path,
+            source,
+            f"{frame_path} collision bounds must have width and height in 1..255.",
+        )
+    for name, offset, size in (
+        ("x", x, width),
+        ("y", y, height),
+    ):
+        flipped = -offset - size
+        if not -128 <= offset <= 127 or not -128 <= flipped <= 127:
+            _invalid(
+                source_path,
+                source,
+                f"{frame_path} collision {name} offset {offset} produces "
+                f"flipped offset {flipped}; both must fit signed 8-bit range.",
+            )
+    return x, y, width, height, custom
 
 
 def _mapping(

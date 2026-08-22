@@ -83,6 +83,21 @@ class RecordType:
         )
 
 
+# Public collision rectangles use the ordinary record implementation.  Keeping
+# one canonical nominal instance lets builtin signatures remain strongly typed
+# without adding a collision-specific scalar or runtime object representation.
+NES_RECT_TYPE = RecordType(
+    "nes_rect",
+    (
+        RecordField("X", BuiltInType.BYTE, 0),
+        RecordField("Y", BuiltInType.BYTE, 1),
+        RecordField("Width", BuiltInType.BYTE, 2),
+        RecordField("Height", BuiltInType.BYTE, 3),
+    ),
+    4,
+)
+
+
 @dataclass(frozen=True, slots=True)
 class ArrayType:
     """A fixed-size, zero-based global array type."""
@@ -541,9 +556,17 @@ class ResolvedBooleanBinaryExpression:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedRecordReference:
+    """One standalone record passed by address to a specialized builtin."""
+
+    variable: ResolvedVariable
+    output: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedBuiltinCall:
     builtin: BuiltinId
-    arguments: tuple[ResolvedValue, ...]
+    arguments: tuple[ResolvedValue | ResolvedRecordReference, ...]
     queued: bool = False
 
 
@@ -697,6 +720,11 @@ class MetaspriteFrame:
     origin_x: int
     origin_y: int
     components: tuple[MetaspriteComponent, ...]
+    collision_x_offset: int = 0
+    collision_y_offset: int = 0
+    collision_width: int = 0
+    collision_height: int = 0
+    collision_box_custom: bool = False
 
 
 @dataclass(frozen=True, slots=True)

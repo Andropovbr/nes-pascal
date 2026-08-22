@@ -103,6 +103,10 @@ Para um valor de sprite dinâmico, seu deslocamento na OAM é calculado uma vez 
 ambas as coordenadas serem escritas. A operação também atualiza o Y de OAM em cache do
 runtime sem exibir implicitamente um sprite oculto.
 
+[`nes.sprite_bounds`](collision-helpers.md) pode copiar essa posição X/Y bruta
+atual para um `nes_rect` com offsets e dimensões unsigned explícitos. Ele
+reutiliza o shadow de OAM e o cache de Y lógico sem duplicar estado do sprite.
+
 ## Byte de atributos
 
 O runtime segue o formato de atributos de OAM do NES:

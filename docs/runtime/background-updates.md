@@ -73,6 +73,10 @@ configured background, generated RESET code zeroes both nametable 0 and the
 shadow while rendering and NMI are disabled. Thus the first `get_tile` result
 always represents the compiler-established PPU state.
 
+The immutable map queried by
+[`nes.background_collision`](collision-helpers.md) is separate from this
+confirmed visual shadow. Runtime tile writes do not modify collision flags.
+
 Write-only background programs omit the shadow. A tile-only program reserves
 26 bytes: 22 bytes for queue state and helpers plus four shared PPU
 restoration bytes. Attribute-only writes need 24 bytes because they do not use

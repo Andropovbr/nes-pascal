@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 from . import __version__
-from .assets import load_background_data, load_chr_rom
+from .assets import load_background_data, load_chr_rom, load_collision_map
 from .ast import ResolvedLoadBackground
 from .backend_ca65 import generate
 from .diagnostics import CompilerError, DiagnosticCode, SourceLocation
@@ -16,9 +16,11 @@ from .memory_layout import (
     DEFAULT_MEMORY_LAYOUT_SETTINGS,
     MemoryLayoutSettings,
     build_memory_layout,
+    collect_runtime_features,
     generate_linker_config,
     generate_memory_map,
 )
+from .builtins import RuntimeFeature
 from .metasprite_assets import load_metasprite_assets
 from .parser import parse
 from .semantic import analyze
@@ -39,6 +41,7 @@ def compile_source(
     nametable_attributes_path: str | Path | None = None,
     mirroring: str | None = None,
     metasprite_paths: tuple[str | Path, ...] = (),
+    collision_map_path: str | Path | None = None,
 ) -> tuple[Path, Path]:
     source_path = source_path.resolve()
     output_path = output_path.resolve()
@@ -71,6 +74,30 @@ def compile_source(
         str(source_path),
         metasprite_assets=metasprite_assets,
     )
+    collision_map = load_collision_map(collision_map_path, source_path, source)
+    uses_background_collision = (
+        RuntimeFeature.COLLISION_BACKGROUND
+        in collect_runtime_features(resolved_program)
+    )
+    if uses_background_collision and collision_map is None:
+        raise CompilerError(
+            DiagnosticCode.INVALID_COLLISION_CONFIGURATION,
+            "nes.background_collision() requires a configured collision map.",
+            SourceLocation(str(source_path), 1, 1),
+            source.splitlines()[0] if source.splitlines() else "",
+            suggestion="Pass --collision-map with one 32x30 text flag map.",
+        )
+    if collision_map is not None and not uses_background_collision:
+        raise CompilerError(
+            DiagnosticCode.INVALID_COLLISION_CONFIGURATION,
+            "A collision map was configured, but the program does not call "
+            "nes.background_collision().",
+            SourceLocation(str(source_path), 1, 1),
+            source.splitlines()[0] if source.splitlines() else "",
+            suggestion=(
+                "Add a background collision query or remove --collision-map."
+            ),
+        )
     background_data = load_background_data(
         nametable_path,
         nametable_tiles_path,
@@ -113,6 +140,7 @@ def compile_source(
         layout,
         chr_rom=chr_rom,
         background_data=background_data,
+        collision_map=collision_map,
     )
     linker_config = generate_linker_config(layout)
     memory_map = generate_memory_map(layout)
@@ -204,6 +232,14 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="64-byte attribute table used with --nametable-tiles",
     )
     parser.add_argument(
+        "--collision-map",
+        type=str,
+        help=(
+            "32x30 text collision flags (0 passable, 1 solid); "
+            "relative paths use the source file directory"
+        ),
+    )
+    parser.add_argument(
         "--mirroring",
         type=str,
         default="horizontal",
@@ -224,6 +260,7 @@ def main(argv: list[str] | None = None) -> int:
             nametable_attributes_path=arguments.nametable_attributes,
             mirroring=arguments.mirroring,
             metasprite_paths=tuple(arguments.metasprite),
+            collision_map_path=arguments.collision_map,
         )
     except (CompilerError, ToolchainError) as error:
         print(error, file=sys.stderr)

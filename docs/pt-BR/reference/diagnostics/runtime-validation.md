@@ -179,3 +179,38 @@ Diagnósticos de validação em runtime utilizam o intervalo E6000-E6999.
   identificador.
 - **Saída esperada do compilador:** `E6018` identifica a configuração conflitante.
 - **Correção sugerida:** Utilize raízes de assets únicas e divida o conjunto de assets do programa.
+
+## E6019 - Asset de mapa de colisão não encontrado
+
+- **Categoria:** Runtime Validation
+- **Explicação:** O caminho de `--collision-map` não identifica um arquivo
+  existente relativo ao diretório do fonte Pascal.
+- **Gatilho:** Configurar um mapa de colisão ausente.
+- **Saída esperada:** `E6019` inclui os caminhos original e resolvido.
+- **Correção sugerida:** Corrija o caminho ou adicione o arquivo.
+
+## E6020 - Falha de leitura do mapa de colisão
+
+- **Categoria:** Runtime Validation
+- **Explicação:** O caminho existe, mas o texto UTF-8 não pode ser lido.
+- **Gatilho:** Configurar um arquivo ilegível ou diretório.
+- **Saída esperada:** `E6020` inclui o erro do sistema operacional.
+- **Correção sugerida:** Forneça um arquivo texto UTF-8 legível.
+
+## E6021 - Asset de mapa de colisão inválido
+
+- **Categoria:** Runtime Validation
+- **Explicação:** O mapa exige exatamente 30 linhas de 32 flags `0`/`1`.
+- **Gatilho:** Usar quantidade de linhas, largura ou caractere incorreto.
+- **Saída esperada:** `E6021` identifica a dimensão ou valor inválido.
+- **Correção sugerida:** Exporte uma grade binária 32 por 30 sem cabeçalho.
+
+## E6022 - Configuração inválida do mapa de colisão
+
+- **Categoria:** Runtime Validation
+- **Explicação:** Uma consulta de fundo não possui mapa configurado ou o mapa
+  foi configurado em programa que não usa a consulta.
+- **Gatilho:** Omitir a opção necessária ou configurar um mapa sem uso.
+- **Saída esperada:** `E6022` identifica a incompatibilidade.
+- **Correção sugerida:** Combine um `--collision-map` com um programa que chama
+  `nes.background_collision`.

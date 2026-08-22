@@ -1,0 +1,16 @@
+program CollisionBackground;
+
+var
+    TopEdge: boolean;
+    Center: boolean;
+    HighIndex: boolean;
+    BottomEdge: boolean;
+
+begin
+    TopEdge := nes.background_collision($00, $00);
+    Center := nes.background_collision($08, $08);
+    HighIndex := nes.background_collision($08, $A0);
+    BottomEdge := nes.background_collision($FF, $EF);
+    nes.set_background_color($0F);
+    nes.run;
+end.

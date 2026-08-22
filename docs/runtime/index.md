@@ -34,6 +34,8 @@ APIs are:
   ownership.
 - [Sprite animation](sprite-animation.md) advances symbolic metasprite frame
   sequences on the frame-synchronized main thread.
+- [Collision helpers](collision-helpers.md) provide point/rectangle predicates,
+  sprite and metasprite bounds, and immutable background-tile collision lookup.
 - `nes.set_sprite_zero` is the fixed, example-only OAM staging helper described
   in the controller documentation; it remains as a compatibility helper.
 
