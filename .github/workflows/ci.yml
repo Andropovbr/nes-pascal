@@ -78,7 +78,7 @@ jobs:
       - name: Install wheel in a fresh virtual environment
         run: |
           python -m venv /tmp/nes-pkg-env
-          /tmp/nes-pkg-env/bin/python -m pip install dist/nes_pascal-0.5.12-*.whl
+          /tmp/nes-pkg-env/bin/python -m pip install dist/nes_pascal-0.5.13-*.whl
 
       - name: Smoke-test console script and module invocation
         run: |
