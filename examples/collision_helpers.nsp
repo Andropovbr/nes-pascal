@@ -1,0 +1,40 @@
+program CollisionHelpers;
+
+var
+    PlayerSprite: sprite;
+    PlayerMeta: metasprite;
+    PlayerBounds: nes_rect;
+    EnemyBounds: nes_rect;
+    SpriteBounds: nes_rect;
+    MetaBounds: nes_rect;
+    PointHit: boolean;
+    EnemyHit: boolean;
+    WallHit: boolean;
+
+begin
+    nes.import_metasprite(player);
+
+    PlayerBounds.X := $20;
+    PlayerBounds.Y := $28;
+    PlayerBounds.Width := $08;
+    PlayerBounds.Height := $08;
+    EnemyBounds.X := $26;
+    EnemyBounds.Y := $2C;
+    EnemyBounds.Width := $08;
+    EnemyBounds.Height := $08;
+
+    PlayerSprite := nes.sprite_create();
+    nes.sprite_set_position(PlayerSprite, $20, $28);
+    nes.sprite_bounds(PlayerSprite, $01, $02, $06, $05, SpriteBounds);
+
+    PlayerMeta := nes.metasprite_create(player.idle_0);
+    nes.metasprite_set_position(PlayerMeta, $70, $68);
+    nes.metasprite_bounds(PlayerMeta, MetaBounds);
+
+    PointHit := nes.point_in_rect($21, $29, PlayerBounds);
+    EnemyHit := nes.collides(PlayerBounds, EnemyBounds);
+    WallHit := nes.background_collision($04, $04);
+
+    nes.set_background_color($0F);
+    nes.run;
+end.

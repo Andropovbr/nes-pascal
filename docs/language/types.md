@@ -6,6 +6,9 @@ NES Pascal provides five built-in types. Each occupies one byte, but the
 types are distinct and are not implicitly converted. It also supports
 [user-defined enumerations](enumerations.md), which are nominal one-byte types,
 and named [records](records.md), which are nominal fixed-layout aggregate types.
+The runtime also predefines the ordinary four-byte `nes_rect` record used by
+the [collision helpers](../runtime/collision-helpers.md); it is not a sixth
+scalar built-in type.
 
 ## `nes_color`
 

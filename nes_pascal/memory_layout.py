@@ -28,6 +28,7 @@ from .ast import (
     ResolvedRepeatStatement,
     ResolvedRecordField,
     ResolvedRecordFieldAssignment,
+    ResolvedRecordReference,
     ResolvedStatement,
     ResolvedUnaryExpression,
     ResolvedValue,
@@ -145,7 +146,8 @@ DEFAULT_MEMORY_LAYOUT_SETTINGS = MemoryLayoutSettings()
 # reserves:
 #   - 4 bytes of runtime-internal `JSR` frames reachable from a user statement
 #     (`runtime_set_tile` -> `runtime_prepare_tile_index` or
-#     `runtime_queue_background_write`); the up-to-two user-staged `pha` bytes
+#     `runtime_queue_background_write`, or a collision entry point -> its
+#     rectangle validator); the up-to-two user-staged `pha` bytes
 #     (indexed writes, `set_tile`/`set_attribute`) are consumed before those
 #     frames and never coincide with them;
 #   - 6 bytes of NMI headroom (3 auto-pushed bytes plus 3 pushed registers),
@@ -240,6 +242,36 @@ class SpriteRuntimeFeatures:
     @property
     def runtime_size(self) -> int:
         return self.individual_runtime_size + self.metasprite_runtime_size
+
+
+@dataclass(frozen=True, slots=True)
+class CollisionRuntimeFeatures:
+    """Collision entry points and their shared feature-gated scratch state."""
+
+    point_in_rect: bool = False
+    collides: bool = False
+    sprite_bounds: bool = False
+    metasprite_bounds: bool = False
+    background_collision: bool = False
+
+    @property
+    def geometry(self) -> bool:
+        return (
+            self.point_in_rect
+            or self.collides
+            or self.sprite_bounds
+            or self.metasprite_bounds
+        )
+
+    @property
+    def enabled(self) -> bool:
+        return self.geometry or self.background_collision
+
+    @property
+    def runtime_size(self) -> int:
+        if self.geometry:
+            return 10
+        return 2 if self.background_collision else 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -418,6 +450,7 @@ def build_memory_layout(
     palette_runtime_enabled = _uses_runtime_palette(program)
     scroll_runtime_enabled = _uses_set_scroll(program)
     background_features = detect_background_runtime_features(program)
+    collision_features = detect_collision_runtime_features(program)
     background_queue_enabled = background_features.queue
     background_shadow_enabled = background_features.shadow
     sprite_zero_runtime_size = 5 if sprite_zero_enabled else 0
@@ -435,6 +468,7 @@ def build_memory_layout(
         + (1 if background_features.queue_writer else 0)
         + (2 if background_features.tile_index else 0)
     )
+    collision_runtime_size = collision_features.runtime_size
     required_runtime_size = (
         sprite_runtime_size
         + palette_runtime_size
@@ -442,6 +476,7 @@ def build_memory_layout(
         + scroll_staging_size
         + background_shadow_size
         + background_runtime_size
+        + collision_runtime_size
     )
     if settings.runtime_data_size < required_runtime_size:
         settings = replace(settings, runtime_data_size=required_runtime_size)
@@ -590,6 +625,36 @@ def build_memory_layout(
             page_purpose,
         )
 
+    collision_runtime_symbols: list[MemorySymbol] = []
+    next_collision_address = next_background_address
+
+    def add_collision_symbol(name: str, purpose: str) -> None:
+        nonlocal next_collision_address
+        collision_runtime_symbols.append(
+            MemorySymbol(
+                name,
+                next_collision_address,
+                1,
+                SymbolKind.RUNTIME,
+                runtime_data.name,
+                purpose,
+            )
+        )
+        next_collision_address += 1
+
+    if collision_features.geometry:
+        for side in ("left", "right"):
+            for field in ("x", "y", "width", "height"):
+                add_collision_symbol(
+                    f"runtime_collision_{side}_{field}",
+                    f"shared collision {side} rectangle {field}",
+                )
+        add_collision_symbol("runtime_collision_point_x", "collision point or instance input")
+        add_collision_symbol("runtime_collision_point_y", "collision point Y input")
+    elif collision_features.background_collision:
+        add_collision_symbol("runtime_collision_point_x", "background collision pixel X input")
+        add_collision_symbol("runtime_collision_point_y", "background collision pixel Y input")
+
     metasprite_base = runtime_data.start + individual_sprite_runtime_size
     metasprite_count = sprite_features.metasprite_instances
     metasprite_animation_base = metasprite_base + metasprite_count * 4
@@ -690,6 +755,20 @@ def build_memory_layout(
                 ),
             )
             if metasprite_api_enabled
+            else ()
+        ),
+        *(
+            (
+                MemorySymbol(
+                    "runtime_collision_pointer",
+                    zero_page_runtime.start + 13,
+                    2,
+                    SymbolKind.RUNTIME,
+                    zero_page_runtime.name,
+                    "indirect pointer into a rectangle or immutable collision map",
+                ),
+            )
+            if collision_features.enabled
             else ()
         ),
         *(
@@ -1009,6 +1088,7 @@ def build_memory_layout(
             else ()
         ),
         *background_runtime_symbols,
+        *collision_runtime_symbols,
     )
     expression_storage = MemoryRange(
         "Expression temporaries",
@@ -1793,6 +1873,23 @@ def detect_background_runtime_features(
     )
 
 
+def detect_collision_runtime_features(
+    program: ResolvedProgram,
+) -> CollisionRuntimeFeatures:
+    """Derive collision storage solely from declarative builtin dependencies."""
+
+    features = collect_runtime_features(program)
+    return CollisionRuntimeFeatures(
+        point_in_rect=RuntimeFeature.COLLISION_POINT in features,
+        collides=RuntimeFeature.COLLISION_RECTS in features,
+        sprite_bounds=RuntimeFeature.COLLISION_SPRITE_BOUNDS in features,
+        metasprite_bounds=(
+            RuntimeFeature.COLLISION_METASPRITE_BOUNDS in features
+        ),
+        background_collision=RuntimeFeature.COLLISION_BACKGROUND in features,
+    )
+
+
 def _count_statement_variable_references(
     statement: ResolvedStatement,
     counts: dict[str, int],
@@ -1849,7 +1946,9 @@ def _count_value_variable_references(
     value: ResolvedValue,
     counts: dict[str, int],
 ) -> None:
-    if isinstance(value, ResolvedRecordField):
+    if isinstance(value, ResolvedRecordReference):
+        _count_variable(value.variable, counts)
+    elif isinstance(value, ResolvedRecordField):
         _count_variable(value.variable, counts)
         if value.index is not None:
             _count_value_variable_references(value.index, counts)

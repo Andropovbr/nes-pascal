@@ -33,6 +33,8 @@ de quadros e controles são:
   listas de componentes residentes em PRG com uma posição lógica e posse compartilhada de OAM;
 - [Animação de sprites](sprite-animation.md) avança sequências simbólicas de quadros
   de metasprites na thread principal sincronizada por quadros;
+- [Helpers de colisão](collision-helpers.md) fornecem predicados de ponto/retângulo,
+  bounds de sprites e metasprites e consulta imutável de colisão por tile de fundo;
 - `nes.set_sprite_zero` é o helper fixo de preparação de OAM, exclusivo para exemplos,
   descrito na documentação de controles; ele permanece como um helper de compatibilidade.
 

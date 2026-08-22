@@ -33,6 +33,16 @@ from .ast import (
     ResolvedWhileStatement,
     VariableValue,
 )
+from .builtins import BuiltinId
+
+
+_BUILTINS_WITH_CALL_SENSITIVE_ARGUMENT_STAGING = frozenset(
+    {
+        BuiltinId.POINT_IN_RECT,
+        BuiltinId.BACKGROUND_COLLISION,
+        BuiltinId.SPRITE_BOUNDS,
+    }
+)
 
 
 class TemporaryPoolExhausted(RuntimeError):
@@ -209,11 +219,26 @@ def analyze_expression_temporaries(
         analyze_expression_temporaries(value.right, pool)
         return
     if isinstance(value, ResolvedBuiltinCall):
-        # Arguments are evaluated sequentially. Existing builtins stage values
-        # in runtime bytes or on the hardware stack, outside this ZP pool.
+        # Arguments are evaluated sequentially. Collision calls preserve an
+        # earlier runtime-scratch input when a later user function could call
+        # another collision helper and overwrite it.
         with pool.call_scope():
-            for argument in value.arguments:
-                analyze_expression_temporaries(argument, pool)
+            leases: list[TemporarySlot] = []
+            try:
+                for index, argument in enumerate(value.arguments):
+                    analyze_expression_temporaries(argument, pool)
+                    if (
+                        value.builtin
+                        in _BUILTINS_WITH_CALL_SENSITIVE_ARGUMENT_STAGING
+                        and any(
+                            value_contains_function_call(later)
+                            for later in value.arguments[index + 1 :]
+                        )
+                    ):
+                        leases.append(pool.acquire())
+            finally:
+                for lease in reversed(leases):
+                    lease.release()
         return
     if isinstance(value, ResolvedFunctionCall):
         leases: list[TemporarySlot] = []
@@ -351,8 +376,7 @@ class _ProgramTemporaryAnalyzer:
             self._call(value.label, value.arguments, depth)
             return
         if isinstance(value, ResolvedBuiltinCall):
-            for argument in value.arguments:
-                self._value(argument, depth)
+            self._builtin(value, depth)
             return
         if isinstance(value, ResolvedArrayElement):
             self._value(value.index, depth)
@@ -377,8 +401,7 @@ class _ProgramTemporaryAnalyzer:
             ):
                 self._value(statement.value, depth)
             elif isinstance(statement, ResolvedBuiltinCall):
-                for argument in statement.arguments:
-                    self._value(argument, depth)
+                self._builtin(statement, depth)
             elif isinstance(
                 statement, (ResolvedIncrementStatement, ResolvedDecrementStatement)
             ):
@@ -407,6 +430,24 @@ class _ProgramTemporaryAnalyzer:
                 self._statements(statement.body, depth)
             elif isinstance(statement, ResolvedProcedureCall):
                 self._call(statement.label, statement.arguments, depth)
+
+    def _builtin(self, value: ResolvedBuiltinCall, depth: int) -> None:
+        leases: list[TemporarySlot] = []
+        try:
+            for index, argument in enumerate(value.arguments):
+                self._value(argument, depth)
+                if (
+                    value.builtin
+                    in _BUILTINS_WITH_CALL_SENSITIVE_ARGUMENT_STAGING
+                    and any(
+                        value_contains_function_call(later)
+                        for later in value.arguments[index + 1 :]
+                    )
+                ):
+                    leases.append(self.pool.acquire())
+        finally:
+            for lease in reversed(leases):
+                lease.release()
 
 def _count_for_statements(statement: ResolvedStatement) -> int:
     if isinstance(statement, ResolvedForStatement):

@@ -130,3 +130,7 @@ diagnostics section.
 | E6016 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
 | E6017 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
 | E6018 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6019 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6020 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6021 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |
+| E6022 | Runtime Validation | [Runtime-validation diagnostics](reference/diagnostics/runtime-validation.md) |

@@ -61,6 +61,10 @@ relevante.
 - [Implementação de funções e ABI](functions-0.5.12.md) — relatório de implementação.
 - [Milestone 0.5.12 — Funções: auditoria de completude e qualidade](milestone-0.5.12-audit.md) — auditoria independente de marco.
 
+### 0.5.13 — Helpers de colisão
+
+- [Implementação e medições dos helpers de colisão](collision-helpers-0.5.13.md) — relatório de implementação.
+
 Para material durável do compilador que não é específico de um marco, consulte
 o [Mapa de cobertura de testes semânticos](test-coverage-map.md) e a seção
 [Referência](../reference/index.md).

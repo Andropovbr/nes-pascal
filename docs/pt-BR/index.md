@@ -45,6 +45,7 @@ O trabalho planejado é acompanhado separadamente no
 - [Sprites de hardware](runtime/sprites.md)
 - [Metasprites](runtime/metasprites.md)
 - [Animação de sprites](runtime/sprite-animation.md)
+- [Helpers de colisão](runtime/collision-helpers.md)
 
 ## Referência
 

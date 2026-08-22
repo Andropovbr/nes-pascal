@@ -74,6 +74,10 @@ fundo configurado, o código de RESET gerado preenche tanto a nametable 0 quanto
 com zeros enquanto a renderização e a NMI estiverem desabilitadas. Assim, o primeiro
 resultado de `get_tile` sempre representa o estado da PPU estabelecido pelo compilador.
 
+O mapa imutável consultado por
+[`nes.background_collision`](collision-helpers.md) é separado desse shadow
+visual confirmado. Escritas de tiles em runtime não alteram flags de colisão.
+
 Programas de fundo apenas para escrita omitem o shadow. Um programa apenas para tiles
 reserva 26 bytes: 22 bytes para o estado da fila e helpers mais quatro bytes compartilhados
 de restauração da PPU. Escritas apenas de atributos necessitam de 24 bytes porque não

@@ -279,6 +279,25 @@ end.
         self.assertIn("runtime_background_queue_ready", memory_map)
         self.assertIn("runtime_background_queue_overflow", memory_map)
 
+    def test_collision_example_builds_with_packed_rom_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            rom_path = Path(temporary_directory) / "collision_helpers.nes"
+            assembly_path, _ = compile_source(
+                ROOT / "examples" / "collision_helpers.nsp",
+                rom_path,
+                chr_path="assets/game.chr",
+                metasprite_paths=("assets/player_idle.json",),
+                collision_map_path="assets/collision_map.cmap",
+            )
+            rom = rom_path.read_bytes()
+            assembly = assembly_path.read_text(encoding="utf-8")
+            memory_map = rom_path.with_suffix(".map").read_text(encoding="utf-8")
+
+        self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
+        self.assertIn("collision_map_data:", assembly)
+        self.assertIn("runtime_collision_background:", assembly)
+        self.assertNotIn("runtime_background_shadow", memory_map)
+
     def test_gameplay_full_stack_example_builds_with_cumulative_runtime_state(self) -> None:
         from tools.measure_benchmarks import (
             BENCHMARKS,
@@ -601,6 +620,7 @@ class MesenIntegrationTests(unittest.TestCase):
         chr_path: str | Path | None = None,
         nametable_path: str | Path | None = None,
         metasprite_paths: tuple[str | Path, ...] = (),
+        collision_map_path: str | Path | None = None,
         source_path: Path | None = None,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -613,6 +633,7 @@ class MesenIntegrationTests(unittest.TestCase):
                     chr_path=chr_path,
                     nametable_path=nametable_path,
                     metasprite_paths=metasprite_paths,
+                    collision_map_path=collision_map_path,
                 )
             else:
                 compile_source(
@@ -622,6 +643,7 @@ class MesenIntegrationTests(unittest.TestCase):
                     chr_path=chr_path,
                     nametable_path=nametable_path,
                     metasprite_paths=metasprite_paths,
+                    collision_map_path=collision_map_path,
                 )
             result = subprocess.run(
                 [
@@ -674,6 +696,18 @@ class MesenIntegrationTests(unittest.TestCase):
             source_path=(
                 ROOT / "tests" / "fixtures" / "runtime" / "functions.nsp"
             ),
+        )
+
+    def test_collision_helpers_preserve_geometry_bounds_and_packed_map_lookup(self) -> None:
+        self._run_mesen_test(
+            "collisions",
+            "verify_collisions.lua",
+            chr_path=ROOT / "examples" / "assets" / "game.chr",
+            metasprite_paths=(
+                ROOT / "tests" / "fixtures" / "runtime" / "collision_metasprite.json",
+            ),
+            collision_map_path=ROOT / "examples" / "assets" / "collision_map.cmap",
+            source_path=ROOT / "tests" / "fixtures" / "runtime" / "collisions.nsp",
         )
 
     def test_arrays_preserve_indexed_storage_and_boolean_branching(self) -> None:

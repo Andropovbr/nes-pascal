@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from types import MappingProxyType
 
-from .ast import BuiltInType
+from .ast import BuiltInType, NES_RECT_TYPE, RecordType
 from .diagnostics import DiagnosticCode
 
 
@@ -55,6 +55,11 @@ class BuiltinId(Enum):
     CONTROLLER_DOWN = auto()
     CONTROLLER_PRESSED = auto()
     CONTROLLER_RELEASED = auto()
+    POINT_IN_RECT = auto()
+    COLLIDES = auto()
+    SPRITE_BOUNDS = auto()
+    METASPRITE_BOUNDS = auto()
+    BACKGROUND_COLLISION = auto()
 
 
 class BuiltinKind(Enum):
@@ -78,6 +83,7 @@ class SemanticHook(Enum):
     SPRITE_OPERATION = auto()
     METASPRITE_CREATE = auto()
     METASPRITE_OPERATION = auto()
+    COLLISION = auto()
 
 
 class BackendEmitter(Enum):
@@ -99,6 +105,11 @@ class BackendEmitter(Enum):
     METASPRITE_OPERATION = auto()
     METASPRITE_ANIMATION_FINISHED = auto()
     CONTROLLER_QUERY = auto()
+    POINT_IN_RECT = auto()
+    COLLIDES = auto()
+    SPRITE_BOUNDS = auto()
+    METASPRITE_BOUNDS = auto()
+    BACKGROUND_COLLISION = auto()
 
 
 class RuntimeFeature(Enum):
@@ -116,6 +127,11 @@ class RuntimeFeature(Enum):
     BACKGROUND_INSPECT_OVERFLOW = auto()
     BACKGROUND_CLEAR_OVERFLOW = auto()
     SCROLL = auto()
+    COLLISION_POINT = auto()
+    COLLISION_RECTS = auto()
+    COLLISION_SPRITE_BOUNDS = auto()
+    COLLISION_METASPRITE_BOUNDS = auto()
+    COLLISION_BACKGROUND = auto()
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,7 +139,7 @@ class BuiltinDescriptor:
     id: BuiltinId
     public_name: str
     kind: BuiltinKind
-    parameter_types: tuple[BuiltInType, ...]
+    parameter_types: tuple[BuiltInType | RecordType, ...]
     return_type: BuiltInType | None
     semantic_hook: SemanticHook
     emitter: BackendEmitter
@@ -139,7 +155,7 @@ class BuiltinDescriptor:
 def _statement(
     id: BuiltinId,
     public_name: str,
-    parameters: tuple[BuiltInType, ...],
+    parameters: tuple[BuiltInType | RecordType, ...],
     emitter: BackendEmitter,
     *,
     hook: SemanticHook = SemanticHook.DEFAULT,
@@ -168,7 +184,7 @@ def _statement(
 def _value(
     id: BuiltinId,
     public_name: str,
-    parameters: tuple[BuiltInType, ...],
+    parameters: tuple[BuiltInType | RecordType, ...],
     return_type: BuiltInType,
     emitter: BackendEmitter,
     *,
@@ -238,6 +254,11 @@ _DESCRIPTORS = (
     _value(BuiltinId.CONTROLLER_DOWN, "nes.controller_down", (_BYTE, _BYTE), _BOOLEAN, BackendEmitter.CONTROLLER_QUERY, hook=SemanticHook.CONTROLLER_QUERY, features=(RuntimeFeature.CONTROLLER_QUERY,), count_code=DiagnosticCode.INVALID_CONTROLLER_ARGUMENT_COUNT),
     _value(BuiltinId.CONTROLLER_PRESSED, "nes.controller_pressed", (_BYTE, _BYTE), _BOOLEAN, BackendEmitter.CONTROLLER_QUERY, hook=SemanticHook.CONTROLLER_QUERY, features=(RuntimeFeature.CONTROLLER_QUERY,), count_code=DiagnosticCode.INVALID_CONTROLLER_ARGUMENT_COUNT),
     _value(BuiltinId.CONTROLLER_RELEASED, "nes.controller_released", (_BYTE, _BYTE), _BOOLEAN, BackendEmitter.CONTROLLER_QUERY, hook=SemanticHook.CONTROLLER_QUERY, features=(RuntimeFeature.CONTROLLER_QUERY,), count_code=DiagnosticCode.INVALID_CONTROLLER_ARGUMENT_COUNT),
+    _value(BuiltinId.POINT_IN_RECT, "nes.point_in_rect", (_BYTE, _BYTE, NES_RECT_TYPE), _BOOLEAN, BackendEmitter.POINT_IN_RECT, hook=SemanticHook.COLLISION, features=(RuntimeFeature.COLLISION_POINT,), count_suggestion="Pass pixel X, pixel Y, and one nes_rect variable."),
+    _value(BuiltinId.COLLIDES, "nes.collides", (NES_RECT_TYPE, NES_RECT_TYPE), _BOOLEAN, BackendEmitter.COLLIDES, hook=SemanticHook.COLLISION, features=(RuntimeFeature.COLLISION_RECTS,), count_suggestion="Pass exactly two nes_rect variables."),
+    _statement(BuiltinId.SPRITE_BOUNDS, "nes.sprite_bounds", (_SPRITE, _BYTE, _BYTE, _BYTE, _BYTE, NES_RECT_TYPE), BackendEmitter.SPRITE_BOUNDS, hook=SemanticHook.COLLISION, features=(RuntimeFeature.SPRITE_API, RuntimeFeature.COLLISION_SPRITE_BOUNDS), count_suggestion="Pass sprite, unsigned X/Y offsets, width, height, and an output nes_rect variable."),
+    _statement(BuiltinId.METASPRITE_BOUNDS, "nes.metasprite_bounds", (_METASPRITE, NES_RECT_TYPE), BackendEmitter.METASPRITE_BOUNDS, hook=SemanticHook.COLLISION, features=(RuntimeFeature.METASPRITE_API, RuntimeFeature.COLLISION_METASPRITE_BOUNDS), count_suggestion="Pass a metasprite and an output nes_rect variable."),
+    _value(BuiltinId.BACKGROUND_COLLISION, "nes.background_collision", (_BYTE, _BYTE), _BOOLEAN, BackendEmitter.BACKGROUND_COLLISION, features=(RuntimeFeature.COLLISION_BACKGROUND,), count_suggestion="Pass screen pixel X and Y as byte values."),
 )
 
 

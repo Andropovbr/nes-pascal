@@ -45,6 +45,7 @@ Planned work is tracked separately in the
 - [Hardware sprites](runtime/sprites.md)
 - [Metasprites](runtime/metasprites.md)
 - [Sprite animation](runtime/sprite-animation.md)
+- [Collision helpers](runtime/collision-helpers.md)
 
 ## Reference
 

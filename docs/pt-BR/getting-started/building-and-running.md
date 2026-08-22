@@ -39,6 +39,9 @@ python -m nes_pascal.cli examples/palette_support.nsp -o build/palette_support.n
 python -m nes_pascal.cli examples/nametable_loading.nsp -o build/nametable_loading.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
 python -m nes_pascal.cli examples/background_updates.nsp -o build/background_updates.nes --chr assets/chr_asset.chr --nametable assets/nametable_loading.nam
 python -m nes_pascal.cli examples/scrolling_ppu_state.nsp -o build/scrolling_ppu_state.nes --mirroring horizontal
+python -m nes_pascal.cli examples/collision_rectangles.nsp -o build/collision_rectangles.nes --chr assets/game.chr --metasprite assets/player_idle.json
+python -m nes_pascal.cli examples/collision_background.nsp -o build/collision_background.nes --collision-map assets/collision_map.cmap
+python -m nes_pascal.cli examples/collision_helpers.nsp -o build/collision_helpers.nes --chr assets/game.chr --metasprite assets/player_idle.json --collision-map assets/collision_map.cmap
 python -m nes_pascal.cli examples/gameplay_full_stack.nsp -o build/gameplay_full_stack.nes --chr assets/game.chr --nametable assets/nametable_loading.nam --metasprite assets/player_consolidated.json
 ```
 
@@ -111,6 +114,12 @@ Os exemplos demonstram:
   com shadow confirmado, rejeição de estouro de tiles e atributos, cancelamento
   de pendências, limpeza explícita de estouro e uma atualização de atributos
   brutos após a inicialização do runtime.
+- `collision_rectangles.nsp`: consultas semiabertas de ponto/retângulo e entre
+  retângulos, além de bounds de um sprite de hardware e um metasprite.
+- `collision_background.nsp`: consultas no mapa imutável compactado em limites
+  de tile, tela e índice lógico, sem o shadow confirmado de tiles.
+- `collision_helpers.nsp`: todas as APIs de colisão em conjunto, incluindo
+  bounds customizados, bordas seguras contra wrap, sprites/metasprites e mapa.
 - `gameplay_full_stack.nsp`: o exemplo full-stack que combina carregamento de
   background, entrada de controle, paletas, um jogador metasprite em movimento
   com animação e pressão combinada de RAM em um único programa.
@@ -188,6 +197,22 @@ Após `nes.run`, use `nes.set_tile`, `nes.get_tile`, `nes.set_attribute`,
 `nes.clear_background_update_overflow` conforme descrito em
 [Atualizações de fundo em runtime](../../runtime/background-updates.md). No máximo
 quatro bytes de tiles ou atributos são transferidos durante cada VBlank.
+
+## Assets de mapa de colisão
+
+Programas que chamam `nes.background_collision` devem configurar um mapa texto
+com `--collision-map`:
+
+```text
+python -m nes_pascal.cli examples/collision_background.nsp -o build/collision_background.nes --collision-map assets/collision_map.cmap
+```
+
+O arquivo UTF-8 contém exatamente 30 linhas de 32 caracteres `0`/`1`. O
+compilador compacta as 960 flags em 120 bytes imutáveis de PRG-ROM. Um mapa
+ausente, ilegível, malformado ou configurado sem uso é rejeitado por um
+diagnóstico estável. Os caminhos seguem as mesmas regras relativas ao fonte
+dos outros assets. Consulte [Helpers de colisão](../runtime/collision-helpers.md)
+para coordenadas, ordem de bits, bordas e interação com atualizações de fundo.
 
 ## Executando no Mesen
 

@@ -1,5 +1,7 @@
 """ca65 Assembly generation for an NROM-256 image."""
 
+from .assets import COLLISION_MAP_PACKED_SIZE
+
 from .ast import (
     BinaryOperator,
     BooleanOperator,
@@ -34,6 +36,7 @@ from .ast import (
     ResolvedProcedureCall,
     ResolvedRecordField,
     ResolvedRecordFieldAssignment,
+    ResolvedRecordReference,
     ResolvedRepeatStatement,
     ResolvedStatement,
     ResolvedUnaryExpression,
@@ -60,9 +63,11 @@ from .codegen_analysis import (
 )
 from .memory_layout import (
     BackgroundRuntimeFeatures,
+    CollisionRuntimeFeatures,
     ProgramMemoryLayout,
     build_memory_layout,
     detect_background_runtime_features,
+    detect_collision_runtime_features,
     detect_sprite_runtime_features,
 )
 
@@ -72,6 +77,7 @@ def generate(
     layout: ProgramMemoryLayout | None = None,
     chr_rom: bytes | None = None,
     background_data: bytes | None = None,
+    collision_map: bytes | None = None,
 ) -> str:
     layout = layout or build_memory_layout(program)
     color_commands = [
@@ -164,6 +170,11 @@ def generate(
         else ""
     )
     background_features = detect_background_runtime_features(program)
+    collision_features = detect_collision_runtime_features(program)
+    if collision_features.background_collision != (collision_map is not None):
+        raise ValueError(
+            "background collision use and configured collision-map data must match"
+        )
     background_shadow_enabled = background_features.shadow
     background_queue_enabled = background_features.queue
     ppu_state_enabled = any(
@@ -252,6 +263,11 @@ def generate(
     background_storage = (
         _generate_background_storage(background_data)
         if background_data is not None
+        else ""
+    )
+    collision_storage = (
+        _generate_collision_storage(collision_map)
+        if collision_map is not None
         else ""
     )
     settings = layout.settings
@@ -418,6 +434,11 @@ def generate(
         if background_queue_enabled or background_shadow_enabled
         else ""
     )
+    collision_runtime_routines = (
+        _generate_collision_runtime_routines(program, collision_features)
+        if collision_features.enabled
+        else ""
+    )
     sprite_runtime_routines = (
         _generate_sprite_runtime_routines(sprite_features.set_position)
         if sprite_api_enabled
@@ -443,6 +464,7 @@ def generate(
         + metasprite_runtime_routines
         + palette_runtime_routine
         + background_runtime_routines
+        + collision_runtime_routines
     )
     chr_storage = _generate_chr_storage(
         settings.chr_rom_size,
@@ -577,7 +599,7 @@ runtime_read_controller_ports:
     dex
     bne @read_controller_bits
     rts{runtime_routines}
-{procedures}{functions}{metasprite_storage}{background_storage}
+{procedures}{functions}{metasprite_storage}{background_storage}{collision_storage}
 
 .segment "VECTORS"
     .word NMI
@@ -1113,6 +1135,94 @@ def _emit_metasprite_operation(
     )
 
 
+def _collision_pointer_lines(reference: ResolvedRecordReference) -> list[str]:
+    return [
+        f"    lda #<{reference.variable.label}",
+        "    sta runtime_collision_pointer",
+        f"    lda #>{reference.variable.label}",
+        "    sta runtime_collision_pointer + 1",
+    ]
+
+
+def _load_collision_arguments(
+    arguments: tuple[ResolvedValue, ...],
+    targets: tuple[str, ...],
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+) -> list[str]:
+    """Stage collision inputs left-to-right across nested user calls."""
+
+    assert len(arguments) == len(targets)
+    lines: list[str] = []
+    preserved: list[tuple[str, TemporarySlot]] = []
+    try:
+        for index, (argument, target) in enumerate(zip(arguments, targets)):
+            lines.extend(_load_value(argument, label_counter, temporary_pool))
+            if any(
+                value_contains_function_call(later)
+                for later in arguments[index + 1 :]
+            ):
+                slot = temporary_pool.acquire()
+                preserved.append((target, slot))
+                lines.append(f"    sta {slot.name} ; preserve across later call")
+            else:
+                lines.append(f"    sta {target}")
+        for target, slot in preserved:
+            lines.extend([f"    lda {slot.name}", f"    sta {target}"])
+    finally:
+        for _, slot in reversed(preserved):
+            slot.release()
+    return lines
+
+
+def _emit_sprite_bounds(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    del palette_runtime_enabled
+    sprite, offset_x, offset_y, width, height, output = statement.arguments
+    assert isinstance(output, ResolvedRecordReference) and output.output
+    return [
+        "",
+        "; Source: nes.sprite_bounds(sprite, offset_x, offset_y, width, height, output)",
+        *_load_collision_arguments(
+            (sprite, offset_x, offset_y, width, height),
+            (
+                "runtime_collision_point_x",
+                "runtime_collision_left_x",
+                "runtime_collision_left_y",
+                "runtime_collision_left_width",
+                "runtime_collision_left_height",
+            ),
+            label_counter,
+            temporary_pool,
+        ),
+        *_collision_pointer_lines(output),
+        "    jsr runtime_collision_sprite_bounds",
+    ]
+
+
+def _emit_metasprite_bounds(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    del palette_runtime_enabled
+    instance, output = statement.arguments
+    assert isinstance(output, ResolvedRecordReference) and output.output
+    return [
+        "",
+        "; Source: nes.metasprite_bounds(instance, output)",
+        *_load_value(instance, label_counter, temporary_pool),
+        "    sta runtime_collision_point_x",
+        *_collision_pointer_lines(output),
+        "    jsr runtime_collision_metasprite_bounds",
+    ]
+
+
 def _emit_set_palette(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
@@ -1259,6 +1369,8 @@ _BUILTIN_STATEMENT_EMITTERS = {
     BackendEmitter.SET_SPRITE_ZERO: _emit_set_sprite_zero,
     BackendEmitter.SPRITE_OPERATION: _emit_sprite_operation,
     BackendEmitter.METASPRITE_OPERATION: _emit_metasprite_operation,
+    BackendEmitter.SPRITE_BOUNDS: _emit_sprite_bounds,
+    BackendEmitter.METASPRITE_BOUNDS: _emit_metasprite_bounds,
 }
 
 
@@ -1663,6 +1775,9 @@ def _generate_metasprite_storage(program: ResolvedProgram) -> str:
         for index, asset in enumerate(program.metasprite_assets)
     }
     animation_enabled = detect_sprite_runtime_features(program).metasprite_animation
+    collision_bounds_enabled = (
+        detect_collision_runtime_features(program).metasprite_bounds
+    )
     animations = sorted(
         (
             animation
@@ -1705,6 +1820,27 @@ def _generate_metasprite_storage(program: ResolvedProgram) -> str:
             for instance in program.metasprite_instances
         ),
     ]
+    if collision_bounds_enabled:
+        lines.extend(
+            [
+                "metasprite_collision_x:",
+                "    .byte "
+                + ", ".join(
+                    f"${frame.collision_x_offset & 0xFF:02X}" for frame in frames
+                ),
+                "metasprite_collision_y:",
+                "    .byte "
+                + ", ".join(
+                    f"${frame.collision_y_offset & 0xFF:02X}" for frame in frames
+                ),
+                "metasprite_collision_width:",
+                "    .byte "
+                + ", ".join(f"${frame.collision_width:02X}" for frame in frames),
+                "metasprite_collision_height:",
+                "    .byte "
+                + ", ".join(f"${frame.collision_height:02X}" for frame in frames),
+            ]
+        )
     if animation_enabled:
         lines.extend(
             [
@@ -2231,6 +2367,408 @@ def _generate_metasprite_runtime_routines(program: ResolvedProgram) -> str:
             "    rts",
         ]
     )
+    return "\n".join(lines)
+
+
+def _generate_collision_runtime_routines(
+    program: ResolvedProgram,
+    features: CollisionRuntimeFeatures,
+) -> str:
+    lines = [
+        "",
+        "",
+        "; Runtime: feature-gated unsigned half-open collision helpers",
+    ]
+    if features.point_in_rect or features.collides:
+        lines.extend(
+            [
+                "runtime_collision_load_left:",
+                "    ldy #$00",
+                "    lda (runtime_collision_pointer), y",
+                "    sta runtime_collision_left_x",
+                "    iny",
+                "    lda (runtime_collision_pointer), y",
+                "    sta runtime_collision_left_y",
+                "    iny",
+                "    lda (runtime_collision_pointer), y",
+                "    sta runtime_collision_left_width",
+                "    iny",
+                "    lda (runtime_collision_pointer), y",
+                "    sta runtime_collision_left_height",
+                "    rts",
+            ]
+        )
+    if features.collides:
+        lines.extend(
+            [
+                "",
+                "runtime_collision_load_right:",
+                "    ldy #$00",
+                "    lda (runtime_collision_pointer), y",
+                "    sta runtime_collision_right_x",
+                "    iny",
+                "    lda (runtime_collision_pointer), y",
+                "    sta runtime_collision_right_y",
+                "    iny",
+                "    lda (runtime_collision_pointer), y",
+                "    sta runtime_collision_right_width",
+                "    iny",
+                "    lda (runtime_collision_pointer), y",
+                "    sta runtime_collision_right_height",
+                "    rts",
+            ]
+        )
+    if features.point_in_rect or features.collides or features.sprite_bounds or features.metasprite_bounds:
+        lines.extend(
+            [
+                "",
+                "; A box is valid when non-empty and each widened end is <= 256.",
+                "runtime_collision_validate_left:",
+                "    lda runtime_collision_left_width",
+                "    beq @collision_left_invalid",
+                "    clc",
+                "    adc runtime_collision_left_x",
+                "    bcc @collision_left_x_valid",
+                "    bne @collision_left_invalid ; carry plus nonzero low byte means > 256",
+                "@collision_left_x_valid:",
+                "    lda runtime_collision_left_height",
+                "    beq @collision_left_invalid",
+                "    clc",
+                "    adc runtime_collision_left_y",
+                "    bcc @collision_left_valid",
+                "    bne @collision_left_invalid",
+                "@collision_left_valid:",
+                "    lda #$01",
+                "    rts",
+                "@collision_left_invalid:",
+                "    lda #$00",
+                "    rts",
+            ]
+        )
+    if features.collides:
+        lines.extend(
+            [
+                "",
+                "runtime_collision_validate_right:",
+                "    lda runtime_collision_right_width",
+                "    beq @collision_right_invalid",
+                "    clc",
+                "    adc runtime_collision_right_x",
+                "    bcc @collision_right_x_valid",
+                "    bne @collision_right_invalid",
+                "@collision_right_x_valid:",
+                "    lda runtime_collision_right_height",
+                "    beq @collision_right_invalid",
+                "    clc",
+                "    adc runtime_collision_right_y",
+                "    bcc @collision_right_valid",
+                "    bne @collision_right_invalid",
+                "@collision_right_valid:",
+                "    lda #$01",
+                "    rts",
+                "@collision_right_invalid:",
+                "    lda #$00",
+                "    rts",
+            ]
+        )
+    if features.point_in_rect:
+        lines.extend(
+            [
+                "",
+                "runtime_collision_point_in_rect:",
+                "    jsr runtime_collision_validate_left",
+                "    beq @collision_point_false",
+                "    lda runtime_collision_point_x",
+                "    cmp runtime_collision_left_x",
+                "    bcc @collision_point_false",
+                "    sec",
+                "    sbc runtime_collision_left_x",
+                "    cmp runtime_collision_left_width",
+                "    bcs @collision_point_false",
+                "    lda runtime_collision_point_y",
+                "    cmp runtime_collision_left_y",
+                "    bcc @collision_point_false",
+                "    sec",
+                "    sbc runtime_collision_left_y",
+                "    cmp runtime_collision_left_height",
+                "    bcs @collision_point_false",
+                "    lda #$01",
+                "    rts",
+                "@collision_point_false:",
+                "    lda #$00",
+                "    rts",
+            ]
+        )
+    if features.collides:
+        lines.extend(
+            [
+                "",
+                "runtime_collision_rects:",
+                "    jsr runtime_collision_validate_left",
+                "    beq @collision_rects_false",
+                "    jsr runtime_collision_validate_right",
+                "    beq @collision_rects_false",
+                "    lda runtime_collision_left_x",
+                "    cmp runtime_collision_right_x",
+                "    bcc @collision_left_starts_first_x",
+                "    sec",
+                "    sbc runtime_collision_right_x",
+                "    cmp runtime_collision_right_width",
+                "    bcs @collision_rects_false",
+                "    jmp @collision_rects_y",
+                "@collision_left_starts_first_x:",
+                "    lda runtime_collision_right_x",
+                "    sec",
+                "    sbc runtime_collision_left_x",
+                "    cmp runtime_collision_left_width",
+                "    bcs @collision_rects_false",
+                "@collision_rects_y:",
+                "    lda runtime_collision_left_y",
+                "    cmp runtime_collision_right_y",
+                "    bcc @collision_left_starts_first_y",
+                "    sec",
+                "    sbc runtime_collision_right_y",
+                "    cmp runtime_collision_right_height",
+                "    bcs @collision_rects_false",
+                "    lda #$01",
+                "    rts",
+                "@collision_left_starts_first_y:",
+                "    lda runtime_collision_right_y",
+                "    sec",
+                "    sbc runtime_collision_left_y",
+                "    cmp runtime_collision_left_height",
+                "    bcs @collision_rects_false",
+                "    lda #$01",
+                "    rts",
+                "@collision_rects_false:",
+                "    lda #$00",
+                "    rts",
+            ]
+        )
+    if features.sprite_bounds or features.metasprite_bounds:
+        lines.extend(
+            [
+                "",
+                "runtime_collision_store_left_bounds:",
+                "    ldx #$00",
+                "    ldy #$00",
+                "@collision_store_bounds_loop:",
+                "    lda runtime_collision_left_x, x",
+                "    sta (runtime_collision_pointer), y",
+                "    inx",
+                "    iny",
+                "    cpx #$04",
+                "    bne @collision_store_bounds_loop",
+                "    rts",
+                "",
+                "runtime_collision_store_invalid_bounds:",
+                "    lda #$00",
+                "    sta runtime_collision_left_x",
+                "    sta runtime_collision_left_y",
+                "    sta runtime_collision_left_width",
+                "    sta runtime_collision_left_height",
+                "    jmp runtime_collision_store_left_bounds",
+            ]
+        )
+    if features.sprite_bounds:
+        lines.extend(
+            [
+                "",
+                "runtime_collision_sprite_bounds:",
+                "    lda runtime_collision_point_x",
+                "    cmp #$40",
+                "    bcs runtime_collision_store_invalid_bounds",
+                "    tax",
+                "    lda runtime_sprite_logical_y, x",
+                "    clc",
+                "    adc runtime_collision_left_y",
+                "    bcs runtime_collision_store_invalid_bounds",
+                "    sta runtime_collision_left_y",
+                "    txa",
+                "    asl a",
+                "    asl a",
+                "    tax",
+                "    lda runtime_oam_shadow + 3, x",
+                "    clc",
+                "    adc runtime_collision_left_x",
+                "    bcs runtime_collision_store_invalid_bounds",
+                "    sta runtime_collision_left_x",
+                "    jsr runtime_collision_validate_left",
+                "    beq runtime_collision_store_invalid_bounds",
+                "    jmp runtime_collision_store_left_bounds",
+            ]
+        )
+    if features.metasprite_bounds:
+        instance_count = len(program.metasprite_instances)
+        instance_check = (
+            []
+            if instance_count == 256
+            else [
+                f"    cmp #${instance_count:02X}",
+                "    bcc @collision_metasprite_instance_valid",
+                "    jmp runtime_collision_store_invalid_bounds",
+                "@collision_metasprite_instance_valid:",
+            ]
+        )
+        lines.extend(
+            [
+                "",
+                "runtime_collision_metasprite_bounds:",
+                "    lda runtime_collision_point_x",
+                *instance_check,
+                "    tax",
+                "    lda runtime_metasprite_x, x",
+                "    sta runtime_collision_left_x",
+                "    lda runtime_metasprite_y, x",
+                "    sta runtime_collision_left_y",
+                "    lda runtime_metasprite_frame, x",
+                "    tay",
+                "    lda metasprite_collision_x, y",
+                "    sta runtime_collision_right_x",
+                "    lda metasprite_collision_y, y",
+                "    sta runtime_collision_right_y",
+                "    lda metasprite_collision_width, y",
+                "    sta runtime_collision_left_width",
+                "    sta runtime_collision_right_width",
+                "    lda metasprite_collision_height, y",
+                "    sta runtime_collision_left_height",
+                "    sta runtime_collision_right_height",
+                "    lda runtime_metasprite_flags, x",
+                "    and #$02",
+                "    beq @collision_metasprite_x_offset_ready",
+                "    lda runtime_collision_right_x",
+                "    eor #$FF",
+                "    clc",
+                "    adc #$01",
+                "    sec",
+                "    sbc runtime_collision_right_width",
+                "    sta runtime_collision_right_x",
+                "@collision_metasprite_x_offset_ready:",
+                "    lda runtime_collision_right_x",
+                "    bmi @collision_metasprite_x_negative",
+                "    clc",
+                "    adc runtime_collision_left_x",
+                "    bcc @collision_metasprite_x_positive_valid",
+                "    jmp runtime_collision_store_invalid_bounds",
+                "@collision_metasprite_x_positive_valid:",
+                "    sta runtime_collision_left_x",
+                "    jmp @collision_metasprite_x_done",
+                "@collision_metasprite_x_negative:",
+                "    eor #$FF",
+                "    clc",
+                "    adc #$01",
+                "    sta runtime_collision_right_x",
+                "    lda runtime_collision_left_x",
+                "    cmp runtime_collision_right_x",
+                "    bcs @collision_metasprite_x_negative_valid",
+                "    jmp runtime_collision_store_invalid_bounds",
+                "@collision_metasprite_x_negative_valid:",
+                "    sec",
+                "    sbc runtime_collision_right_x",
+                "    sta runtime_collision_left_x",
+                "@collision_metasprite_x_done:",
+                "    ldx runtime_collision_point_x",
+                "    lda runtime_metasprite_flags, x",
+                "    and #$04",
+                "    beq @collision_metasprite_y_offset_ready",
+                "    lda runtime_collision_right_y",
+                "    eor #$FF",
+                "    clc",
+                "    adc #$01",
+                "    sec",
+                "    sbc runtime_collision_right_height",
+                "    sta runtime_collision_right_y",
+                "@collision_metasprite_y_offset_ready:",
+                "    lda runtime_collision_right_y",
+                "    bmi @collision_metasprite_y_negative",
+                "    clc",
+                "    adc runtime_collision_left_y",
+                "    bcc @collision_metasprite_y_positive_valid",
+                "    jmp runtime_collision_store_invalid_bounds",
+                "@collision_metasprite_y_positive_valid:",
+                "    sta runtime_collision_left_y",
+                "    jmp @collision_metasprite_y_done",
+                "@collision_metasprite_y_negative:",
+                "    eor #$FF",
+                "    clc",
+                "    adc #$01",
+                "    sta runtime_collision_right_y",
+                "    lda runtime_collision_left_y",
+                "    cmp runtime_collision_right_y",
+                "    bcs @collision_metasprite_y_negative_valid",
+                "    jmp runtime_collision_store_invalid_bounds",
+                "@collision_metasprite_y_negative_valid:",
+                "    sec",
+                "    sbc runtime_collision_right_y",
+                "    sta runtime_collision_left_y",
+                "@collision_metasprite_y_done:",
+                "    jsr runtime_collision_validate_left",
+                "    bne @collision_metasprite_bounds_valid",
+                "    jmp runtime_collision_store_invalid_bounds",
+                "@collision_metasprite_bounds_valid:",
+                "    jmp runtime_collision_store_left_bounds",
+            ]
+        )
+    if features.background_collision:
+        lines.extend(
+            [
+                "",
+                "runtime_collision_background:",
+                "    lda runtime_collision_point_y",
+                "    cmp #$F0                ; rows 0..29 occupy pixels 0..239",
+                "    bcs @collision_background_false",
+                "    and #$F8",
+                "    lsr a                   ; (pixel_y >> 3) * 4 packed bytes per row",
+                "    sta runtime_collision_point_y",
+                "    lda runtime_collision_point_x",
+                "    lsr a",
+                "    lsr a",
+                "    lsr a",
+                "    lsr a",
+                "    lsr a",
+                "    lsr a                   ; packed-byte column 0..3",
+                "    clc",
+                "    adc runtime_collision_point_y",
+                "    clc",
+                "    adc #<collision_map_data",
+                "    sta runtime_collision_pointer",
+                "    lda #>collision_map_data",
+                "    adc #$00                ; retain carry across a ROM page",
+                "    sta runtime_collision_pointer + 1",
+                "    lda runtime_collision_point_x",
+                "    lsr a",
+                "    lsr a",
+                "    lsr a",
+                "    and #$07                ; logical tile index bit within packed byte",
+                "    tax",
+                "    ldy #$00",
+                "    lda (runtime_collision_pointer), y",
+                "    and collision_bit_masks, x",
+                "    beq @collision_background_false",
+                "    lda #$01",
+                "    rts",
+                "@collision_background_false:",
+                "    lda #$00",
+                "    rts",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def _generate_collision_storage(collision_map: bytes) -> str:
+    if len(collision_map) != COLLISION_MAP_PACKED_SIZE:
+        raise ValueError("packed collision map must contain exactly 120 bytes")
+    lines = [
+        "",
+        "",
+        "; Asset: immutable bit-packed 32x30 collision map in PRG-ROM",
+        "collision_bit_masks:",
+        "    .byte $01, $02, $04, $08, $10, $20, $40, $80",
+        "collision_map_data:",
+    ]
+    for offset in range(0, len(collision_map), 16):
+        chunk = collision_map[offset : offset + 16]
+        lines.append("    .byte " + ", ".join(f"${value:02X}" for value in chunk))
     return "\n".join(lines)
 
 
@@ -3183,6 +3721,64 @@ def _load_get_tile(
     ]
 
 
+def _load_point_in_rect(
+    query: ResolvedBuiltinCall,
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+) -> list[str]:
+    x, y, rectangle = query.arguments
+    assert isinstance(rectangle, ResolvedRecordReference)
+    return [
+        "    ; nes.point_in_rect(x, y, rectangle): half-open unsigned bounds",
+        *_load_collision_arguments(
+            (x, y),
+            ("runtime_collision_point_x", "runtime_collision_point_y"),
+            label_counter,
+            temporary_pool,
+        ),
+        *_collision_pointer_lines(rectangle),
+        "    jsr runtime_collision_load_left",
+        "    jsr runtime_collision_point_in_rect",
+    ]
+
+
+def _load_collides(
+    query: ResolvedBuiltinCall,
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+) -> list[str]:
+    del label_counter, temporary_pool
+    left, right = query.arguments
+    assert isinstance(left, ResolvedRecordReference)
+    assert isinstance(right, ResolvedRecordReference)
+    return [
+        "    ; nes.collides(left, right): half-open AABB overlap",
+        *_collision_pointer_lines(left),
+        "    jsr runtime_collision_load_left",
+        *_collision_pointer_lines(right),
+        "    jsr runtime_collision_load_right",
+        "    jsr runtime_collision_rects",
+    ]
+
+
+def _load_background_collision(
+    query: ResolvedBuiltinCall,
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+) -> list[str]:
+    x, y = query.arguments
+    return [
+        "    ; nes.background_collision(x, y): screen pixels -> 32x30 solid map",
+        *_load_collision_arguments(
+            (x, y),
+            ("runtime_collision_point_x", "runtime_collision_point_y"),
+            label_counter,
+            temporary_pool,
+        ),
+        "    jsr runtime_collision_background",
+    ]
+
+
 _BUILTIN_VALUE_LOADERS = {
     BackendEmitter.SPRITE_CREATE: _load_sprite_create,
     BackendEmitter.METASPRITE_CREATE: _load_metasprite_create,
@@ -3194,6 +3790,9 @@ _BUILTIN_VALUE_LOADERS = {
         _load_background_updates_overflowed
     ),
     BackendEmitter.GET_TILE: _load_get_tile,
+    BackendEmitter.POINT_IN_RECT: _load_point_in_rect,
+    BackendEmitter.COLLIDES: _load_collides,
+    BackendEmitter.BACKGROUND_COLLISION: _load_background_collision,
 }
 
 
@@ -3472,6 +4071,9 @@ _BOOLEAN_LOADS_WITH_VALID_ZERO_FLAG = {
     BuiltinId.CONTROLLER_DOWN,
     BuiltinId.CONTROLLER_PRESSED,
     BuiltinId.CONTROLLER_RELEASED,
+    BuiltinId.POINT_IN_RECT,
+    BuiltinId.COLLIDES,
+    BuiltinId.BACKGROUND_COLLISION,
 }
 
 

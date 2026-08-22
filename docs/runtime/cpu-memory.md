@@ -20,6 +20,7 @@ and are never treated as additional storage.
 | from `$0200` without sprites, otherwise `$0300` | 0 or 5 bytes | Runtime | Legacy fixed sprite-0 staging record, allocated only when used |
 | after earlier runtime blocks | 0, 65, or 66 bytes | Runtime | General sprite logical-Y table and one or two helper bytes |
 | after earlier runtime blocks | `4N + 8` or `8N + 8` bytes | Runtime | Static or animation-enabled metasprite state plus shared renderer scratch |
+| after background runtime state | 0, 2, or 10 bytes | Runtime | Feature-gated shared collision input and rectangle scratch |
 | after earlier runtime blocks | 4 bytes | Runtime | Authoritative PPUCTRL, PPUMASK, and scroll state |
 | after earlier runtime blocks | 0 or 41 bytes | Runtime | Palette shadow and atomic dirty flags, allocated only for runtime palette calls |
 | after earlier runtime blocks | 0 or 960 bytes | Runtime | Confirmed tile shadow, linked only by `nes.get_tile` |
@@ -96,6 +97,16 @@ index, frame timer, and playback flags. The resulting regular-RAM cost is
 `8N + 8`; the OAM shadow, shared scratch, and Zero Page pointers do not grow.
 Programs limited to static frame selection retain `4N + 8` and omit all
 animation state and routines.
+
+Collision predicates and bounds helpers share ten regular-RAM bytes for two
+rectangles and a point or instance input. A program that uses only
+`nes.background_collision` needs two of those bytes for pixel/index input.
+Either path links the two-byte `runtime_collision_pointer` at `$000D-$000E`
+inside the existing 16-byte runtime Zero Page partition. The immutable packed
+background map and metasprite per-frame collision boxes live in PRG-ROM.
+Programs without collision calls omit all of these symbols and routines.
+Sprite/metasprite bounds still require their normal OAM and instance state;
+background collision does not require the 960-byte confirmed tile shadow.
 
 Programs without individual sprite, metasprite, or OAM operations omit the OAM symbol, Assembly
 segment, linker region, DMA code, and sprite state. Their regular runtime and

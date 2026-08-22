@@ -1,0 +1,36 @@
+program CollisionRectangles;
+
+var
+    HardwareSprite: sprite;
+    ActorMeta: metasprite;
+    Actor: nes_rect;
+    Target: nes_rect;
+    SpriteBox: nes_rect;
+    MetaBox: nes_rect;
+    PointHit: boolean;
+    RectHit: boolean;
+
+begin
+    nes.import_metasprite(player);
+    Actor.X := $30;
+    Actor.Y := $40;
+    Actor.Width := $08;
+    Actor.Height := $08;
+    Target.X := $37;
+    Target.Y := $47;
+    Target.Width := $08;
+    Target.Height := $08;
+    PointHit := nes.point_in_rect($31, $41, Actor);
+    RectHit := nes.collides(Actor, Target);
+
+    HardwareSprite := nes.sprite_create();
+    nes.sprite_set_position(HardwareSprite, $30, $40);
+    nes.sprite_bounds(HardwareSprite, $01, $01, $06, $06, SpriteBox);
+
+    ActorMeta := nes.metasprite_create(player.idle_0);
+    nes.metasprite_set_position(ActorMeta, $70, $68);
+    nes.metasprite_bounds(ActorMeta, MetaBox);
+
+    nes.set_background_color($0F);
+    nes.run;
+end.

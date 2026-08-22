@@ -1,0 +1,103 @@
+program CollisionRuntime;
+
+var
+    A: nes_rect;
+    B: nes_rect;
+    SpriteBox: nes_rect;
+    MetaNormal: nes_rect;
+    MetaFlipped: nes_rect;
+    TestSprite: sprite;
+    TestMeta: metasprite;
+    PointInside: boolean;
+    PointRightEdge: boolean;
+    PointBottomEdge: boolean;
+    PointCorner: boolean;
+    RectOverlap: boolean;
+    RectTouch: boolean;
+    RectZero: boolean;
+    WrappedPoint: boolean;
+    WrappedRect: boolean;
+    EndAt256: boolean;
+    BackgroundTopLeft: boolean;
+    BackgroundCenter: boolean;
+    BackgroundTopRight: boolean;
+    BackgroundBottomLeft: boolean;
+    BackgroundAboveRow20: boolean;
+    BackgroundRow20: boolean;
+    BackgroundOutside: boolean;
+    FunctionCollision: boolean;
+    AliveCalls: byte;
+
+function Alive: boolean;
+begin
+    AliveCalls := AliveCalls + $01;
+    Alive := true;
+end;
+
+function OverlapAndAlive: boolean;
+begin
+    OverlapAndAlive := nes.collides(A, B) and Alive();
+end;
+
+begin
+    nes.import_metasprite(collision_shape);
+
+    A.X := $10;
+    A.Y := $20;
+    A.Width := $08;
+    A.Height := $08;
+    B.X := $17;
+    B.Y := $27;
+    B.Width := $08;
+    B.Height := $08;
+
+    PointInside := nes.point_in_rect($10, $20, A);
+    PointRightEdge := nes.point_in_rect($18, $20, A);
+    PointBottomEdge := nes.point_in_rect($10, $28, A);
+    PointCorner := nes.point_in_rect($17, $27, A);
+    RectOverlap := nes.collides(A, B);
+    AliveCalls := $00;
+    FunctionCollision := OverlapAndAlive();
+
+    B.X := $18;
+    B.Y := $20;
+    B.Width := $08;
+    B.Height := $08;
+    RectTouch := nes.collides(A, B);
+
+    B.Width := $00;
+    RectZero := nes.collides(A, B);
+
+    B.X := $FA;
+    B.Y := $20;
+    B.Width := $10;
+    B.Height := $08;
+    WrappedPoint := nes.point_in_rect($FB, $21, B);
+    WrappedRect := nes.collides(A, B);
+
+    B.X := $F8;
+    B.Width := $08;
+    EndAt256 := nes.point_in_rect($FF, $21, B);
+
+    TestSprite := nes.sprite_create();
+    nes.sprite_set_position(TestSprite, $F0, $E0);
+    nes.sprite_bounds(TestSprite, $01, $02, $06, $05, SpriteBox);
+
+    TestMeta := nes.metasprite_create(collision_shape.idle_0);
+    nes.metasprite_set_position(TestMeta, $40, $50);
+    nes.metasprite_bounds(TestMeta, MetaNormal);
+    nes.metasprite_set_flip_horizontal(TestMeta, true);
+    nes.metasprite_set_flip_vertical(TestMeta, true);
+    nes.metasprite_bounds(TestMeta, MetaFlipped);
+
+    BackgroundTopLeft := nes.background_collision($00, $00);
+    BackgroundCenter := nes.background_collision($08, $08);
+    BackgroundTopRight := nes.background_collision($FF, $00);
+    BackgroundBottomLeft := nes.background_collision($00, $E8);
+    BackgroundAboveRow20 := nes.background_collision($08, $9F);
+    BackgroundRow20 := nes.background_collision($08, $A0);
+    BackgroundOutside := nes.background_collision($08, $F0);
+
+    nes.set_background_color($0F);
+    nes.run;
+end.

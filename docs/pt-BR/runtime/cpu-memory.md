@@ -20,6 +20,7 @@ e nunca são tratados como armazenamento adicional.
 | de `$0200` sem sprites, senão `$0300` | 0 ou 5 bytes | Runtime | Registro legado de preparação do sprite 0, alocado apenas quando usado |
 | após blocos anteriores de runtime | 0, 65 ou 66 bytes | Runtime | Tabela de Y lógico de sprites gerais e um ou dois bytes auxiliares |
 | após blocos anteriores de runtime | `4N + 8` ou `8N + 8` bytes | Runtime | Estado estático ou com animação de metasprites mais rascunho compartilhado do renderizador |
+| após o estado de runtime do fundo | 0, 2 ou 10 bytes | Runtime | Entrada e rascunho compartilhado de retângulos ativados por helpers de colisão |
 | após blocos anteriores de runtime | 4 bytes | Runtime | Estado autoritativo de PPUCTRL, PPUMASK e rolagem |
 | após blocos anteriores de runtime | 0 ou 41 bytes | Runtime | Shadow de paleta e flags atômicas de dirty, alocado apenas para chamadas de paleta em runtime |
 | após blocos anteriores de runtime | 0 ou 960 bytes | Runtime | Shadow de tiles confirmados, incluído apenas por `nes.get_tile` |
@@ -97,6 +98,16 @@ de sequência, temporizador de quadro e flags de reprodução. O custo resultant
 comum é `8N + 8`; o shadow de OAM, o rascunho compartilhado e os ponteiros na Zero Page
 não aumentam. Programas limitados à seleção estática de quadros mantêm `4N + 8` e omitem
 todo o estado e rotinas de animação.
+
+Predicados e helpers de bounds compartilham dez bytes de RAM comum para dois
+retângulos e um ponto ou instância. Um programa que usa apenas
+`nes.background_collision` necessita de dois desses bytes como entrada de
+pixel/índice. Qualquer caminho inclui o `runtime_collision_pointer` de dois
+bytes em `$000D-$000E`, dentro da partição Zero Page existente de 16 bytes do
+runtime. O mapa de fundo compactado e imutável e as caixas por frame de
+metasprites residem na PRG-ROM. Sem chamadas de colisão, todos esses símbolos e
+rotinas são omitidos. Bounds de sprite/metasprite ainda exigem seu estado normal
+de OAM/instância; colisão de fundo não exige o shadow confirmado de 960 bytes.
 
 Programas sem operações individuais de sprites, metasprites ou OAM omitem o símbolo de
 OAM, segmento no Assembly, região no linker, código de DMA e estado de sprites. Sua

@@ -58,9 +58,11 @@ ca65 operands such as `variable_Player + 2`; there is no pointer calculation,
 descriptor, reflection table, implicit initialization object, heap allocation,
 or record runtime routine.
 
-Whole records are not expression values in this milestone. Whole-record
-assignment, comparison, procedure arguments, and return values are rejected;
-operate on individual fields instead.
+Whole records are not general expression values. Whole-record assignment,
+comparison, procedure/function arguments, and returns are rejected; operate on
+individual fields instead. The predefined `nes_rect` record is accepted by the
+collision builtins as a direct, nominally typed reference. This narrow builtin
+contract does not add general record value semantics.
 
 Definite-assignment analysis follows the existing aggregate rule used for
 arrays: after one field is assigned, the record variable is considered

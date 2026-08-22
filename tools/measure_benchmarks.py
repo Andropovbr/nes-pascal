@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from nes_pascal.assets import load_background_data, load_chr_rom
+from nes_pascal.assets import load_background_data, load_chr_rom, load_collision_map
 from nes_pascal.ast import (
     ResolvedArrayElement,
     ResolvedArrayElementAssignment,
@@ -82,6 +82,7 @@ class BenchmarkSpec:
     chr_path: str | None = None
     nametable_path: str | None = None
     metasprite_paths: tuple[str, ...] = ()
+    collision_map_path: str | None = None
 
 
 BENCHMARKS: tuple[BenchmarkSpec, ...] = (
@@ -156,6 +157,19 @@ BENCHMARKS: tuple[BenchmarkSpec, ...] = (
         "functions",
         "Typed Functions",
         "examples/functions.nsp",
+    ),
+    BenchmarkSpec(
+        "collision_rectangles",
+        "Point, Rectangle, Sprite and Metasprite Bounds",
+        "examples/collision_rectangles.nsp",
+        chr_path="assets/game.chr",
+        metasprite_paths=("assets/player_idle.json",),
+    ),
+    BenchmarkSpec(
+        "collision_background",
+        "Bit-Packed Background Collision",
+        "examples/collision_background.nsp",
+        collision_map_path="assets/collision_map.cmap",
     ),
     BenchmarkSpec(
         "gameplay_full_stack",
@@ -339,6 +353,7 @@ class BenchmarkMetrics:
     max_call_depth: int
     max_call_stack_bytes: int
     runtime_features: tuple[str, ...]
+    collision_data_bytes: int = 0
     emitted_runtime_symbols: list[str] = field(default_factory=list)
     emitted_runtime_routines: list[str] = field(default_factory=list)
     ram_symbol_breakdown: dict[str, int] = field(default_factory=dict)
@@ -764,6 +779,13 @@ def measure_benchmark(spec: BenchmarkSpec) -> BenchmarkMetrics:
         str(source_path),
         metasprite_assets=metasprite_assets,
     )
+    collision_map = load_collision_map(
+        ROOT / "examples" / spec.collision_map_path
+        if spec.collision_map_path
+        else None,
+        source_path,
+        source,
+    )
 
     tree_depth, live_temps = collect_program_metrics(resolved)
 
@@ -777,6 +799,7 @@ def measure_benchmark(spec: BenchmarkSpec) -> BenchmarkMetrics:
             if spec.nametable_path
             else None
         ),
+        collision_map=collision_map,
     )
     linker_config = generate_linker_config(layout)
 
@@ -842,6 +865,7 @@ def measure_benchmark(spec: BenchmarkSpec) -> BenchmarkMetrics:
         max_call_depth=layout.temporary_requirements.max_call_depth,
         max_call_stack_bytes=layout.temporary_requirements.max_call_depth * 2,
         runtime_features=runtime_features,
+        collision_data_bytes=len(collision_map or b""),
         emitted_runtime_symbols=symbols,
         emitted_runtime_routines=routines,
         ram_symbol_breakdown=ram_breakdown,
@@ -858,7 +882,7 @@ def run_all_benchmarks() -> list[BenchmarkMetrics]:
 
 def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
     lines: list[str] = [
-        "# NES Pascal Compiler Benchmark Results (through 0.5.12 Functions)",
+        "# NES Pascal Compiler Benchmark Results (through 0.5.13 Collision Helpers)",
         "",
         "## 1. CPU RAM Accounting",
         "",
@@ -949,7 +973,19 @@ def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
         lines.append(f"| `{m.spec.name}` | {features} |")
     lines.extend([
         "",
-        "## 5. Inefficient Assembly Pattern Frequency",
+        "## 5. Collision Asset ROM",
+        "",
+        "| Benchmark | Packed collision-map data |",
+        "| :--- | :---: |",
+    ])
+    for m in metrics_list:
+        lines.append(f"| `{m.spec.name}` | {m.collision_data_bytes} B |")
+    lines.extend([
+        "",
+        "The packed figure covers immutable map payload only. Background lookup "
+        "also emits one shared 8-byte bit-mask table in PRG-ROM.",
+        "",
+        "## 6. Inefficient Assembly Pattern Frequency",
         "",
         "| Benchmark | Redundant Temp Stores | Boolean Materializations ($00/$01) | Redundant CMP #$00 | STA->LDA Roundtrips | Total Instructions |",
         "| :--- | :---: | :---: | :---: | :---: | :---: |",
