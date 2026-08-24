@@ -90,6 +90,7 @@ devem utilizar o intervalo reservado para a sua categoria.
 | [E3061](semantic.md) | Semantic Analysis | Função usada como instrução |
 | [E3062](semantic.md) | Semantic Analysis | Procedimento usado como expressão |
 | [E3063](semantic.md) | Semantic Analysis | Resultado de função indefinido |
+| [E3064](semantic.md) | Semantic Analysis | Range aleatório inválido |
 | [E4001](type-system.md) | Type System | Tipo desconhecido |
 | [E4002](type-system.md) | Type System | Valor inválido para `nes_color` |
 | [E4003](type-system.md) | Type System | Valor inválido para `byte` |

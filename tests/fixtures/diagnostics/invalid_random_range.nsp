@@ -1,0 +1,10 @@
+program InvalidRandomRange;
+
+var
+    Value: byte;
+
+begin
+    Value := nes.random_range($20, $10);
+    nes.set_background_color($0F);
+    nes.run;
+end.

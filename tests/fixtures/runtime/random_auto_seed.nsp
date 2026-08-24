@@ -1,0 +1,23 @@
+program RandomAutoSeed;
+
+var
+    Captured: boolean;
+    AutoValue: byte;
+
+procedure Update;
+begin
+    if nes.controller_pressed($01, nes.button_start) then
+        if not Captured then
+        begin
+            AutoValue := nes.random_byte();
+            Captured := true;
+        end;
+end;
+
+begin
+    Captured := false;
+    AutoValue := $00;
+    nes.on_update(Update);
+    nes.set_background_color($0F);
+    nes.run;
+end.

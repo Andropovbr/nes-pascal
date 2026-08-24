@@ -35,6 +35,8 @@ de quadros e controles são:
   de metasprites na thread principal sincronizada por quadros;
 - [Helpers de colisão](collision-helpers.md) fornecem predicados de ponto/retângulo,
   bounds de sprites e metasprites e consulta imutável de colisão por tile de fundo;
+- [Números aleatórios](random-numbers.md) fornecem bytes determinísticos e ranges
+  inclusivos com viés controlado e seed explícita opcional;
 - `nes.set_sprite_zero` é o helper fixo de preparação de OAM, exclusivo para exemplos,
   descrito na documentação de controles; ele permanece como um helper de compatibilidade.
 

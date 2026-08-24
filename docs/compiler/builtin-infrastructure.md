@@ -32,6 +32,7 @@ the public name and by `BuiltinId`. Each `BuiltinDescriptor` records:
 - backend emitter identity;
 - argument-count diagnostic and correction text;
 - the exceptional bare-statement syntax used by `nes.wait_frame`.
+- explicit side-effect classification for stateful value calls such as RNG.
 
 The parser does not construct operation-specific node families. It preserves
 the qualified name, arguments, and call location in `BuiltinCall`. Semantic
@@ -65,7 +66,8 @@ string matching.
 | Ordinary frame/scroll statements | `nes.wait_frame`, `nes.set_scroll` | `BuiltinCall` / `ResolvedBuiltinCall` |
 | Ordinary sprite statements | `nes.set_sprite_zero`, `nes.sprite_set_position`, `nes.sprite_set_x`, `nes.sprite_set_y`, `nes.sprite_set_tile`, `nes.sprite_set_palette`, `nes.sprite_set_attributes`, `nes.sprite_hide`, `nes.sprite_show`, `nes.sprite_set_flip_horizontal`, `nes.sprite_set_flip_vertical`, `nes.sprite_set_behind_background` | `BuiltinCall` / `ResolvedBuiltinCall` |
 | Ordinary metasprite/animation statements | `nes.metasprite_set_position`, `nes.metasprite_set_frame`, `nes.metasprite_set_animation`, `nes.metasprite_restart_animation`, `nes.metasprite_hide`, `nes.metasprite_show`, `nes.metasprite_set_flip_horizontal`, `nes.metasprite_set_flip_vertical` | `BuiltinCall` / `ResolvedBuiltinCall` |
-| Ordinary value builtins | `nes.controller_down`, `nes.controller_pressed`, `nes.controller_released`, `nes.sprite_create`, `nes.metasprite_create`, `nes.metasprite_animation_finished`, `nes.get_tile`, `nes.background_updates_overflowed` | `BuiltinCall` / `ResolvedBuiltinCall` |
+| Ordinary RNG statements | `nes.seed_random` | `BuiltinCall` / `ResolvedBuiltinCall` |
+| Ordinary value builtins | `nes.controller_down`, `nes.controller_pressed`, `nes.controller_released`, `nes.sprite_create`, `nes.metasprite_create`, `nes.metasprite_animation_finished`, `nes.get_tile`, `nes.background_updates_overflowed`, `nes.random_byte`, `nes.random_range` | `BuiltinCall` / `ResolvedBuiltinCall` |
 | Compile-time asset construct | `nes.import_metasprite` | Specialized: validates configured asset identity and contributes no runtime call |
 | Compile-time background asset construct | `nes.load_background` | Specialized: coordinates configured nametable data and pre-render program order |
 | Callback/program-structure constructs | `nes.on_update`, `nes.on_vblank` | Specialized: register procedure identities and validate call graphs |

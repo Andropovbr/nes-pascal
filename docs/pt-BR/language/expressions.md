@@ -81,6 +81,12 @@ curto-circuito (short-circuit). O operando direito de `and` é ignorado quando o
 operando esquerdo é `false`; o operando direito de `or` é ignorado quando o operando
 esquerdo é `true`.
 
+Chamadas de valores aleatórios são expressões com efeito colateral.
+`nes.random_byte()` e `nes.random_range(minimum, maximum)` avançam somente
+quando realmente avaliadas; um operando ignorado pelo curto-circuito não consome
+valor aleatório. Aritmética complexa mantém a ordem de lowering documentada em
+[Funções](functions.md). Consulte [Números aleatórios](../runtime/random-numbers.md).
+
 As consultas de controle `nes.controller_down`, `nes.controller_pressed` e
 `nes.controller_released` são expressões booleanas embutidas. Elas aceitam um índice
 de controle em tempo de compilação e exatamente uma constante `nes.button_*`.

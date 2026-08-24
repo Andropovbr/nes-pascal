@@ -1,0 +1,87 @@
+program RandomRuntime;
+
+var
+    Sequence: array[$00..$0F] of byte;
+    Index: byte;
+    RangeThree: byte;
+    RangeHundred: byte;
+    FullRange: byte;
+    Singleton: byte;
+    AfterSingleton: byte;
+    DynamicMinimum: byte;
+    DynamicMaximum: byte;
+    InvalidRange: byte;
+    AfterInvalid: byte;
+    ZeroSeedFirst: byte;
+    ArithmeticOrder: byte;
+    ArgumentOrder: byte;
+    FunctionValue: byte;
+    ShortCircuitAnd: boolean;
+    ShortCircuitOr: boolean;
+    AfterShortCircuitAnd: byte;
+    AfterShortCircuitOr: byte;
+    TemporaryIntegration: byte;
+
+function Difference(First: byte; Second: byte): byte;
+begin
+    Difference := First - Second;
+end;
+
+function Roll: byte;
+begin
+    Roll := nes.random_byte();
+end;
+
+begin
+    nes.seed_random($2A);
+    for Index := $00 to $0F do
+        Sequence[Index] := nes.random_byte();
+
+    nes.seed_random($2A);
+    RangeThree := nes.random_range($00, $02);
+    RangeHundred := nes.random_range($0A, $6D);
+
+    nes.seed_random($2A);
+    FullRange := nes.random_range($00, $FF);
+
+    nes.seed_random($2A);
+    Singleton := nes.random_range($33, $33);
+    AfterSingleton := nes.random_byte();
+
+    DynamicMinimum := $20;
+    DynamicMaximum := $10;
+    nes.seed_random($2A);
+    InvalidRange := nes.random_range(DynamicMinimum, DynamicMaximum);
+    AfterInvalid := nes.random_byte();
+
+    nes.seed_random($00);
+    ZeroSeedFirst := nes.random_byte();
+
+    nes.seed_random($2A);
+    ArithmeticOrder := nes.random_byte() - nes.random_byte();
+
+    nes.seed_random($2A);
+    ArgumentOrder := Difference(nes.random_byte(), nes.random_byte());
+
+    nes.seed_random($2A);
+    FunctionValue := Roll();
+
+    ShortCircuitAnd := false;
+    nes.seed_random($2A);
+    if ShortCircuitAnd and (nes.random_byte() = $15) then
+        ShortCircuitAnd := true;
+    AfterShortCircuitAnd := nes.random_byte();
+
+    ShortCircuitOr := true;
+    nes.seed_random($2A);
+    if ShortCircuitOr or (nes.random_byte() = $15) then
+        ShortCircuitOr := true;
+    AfterShortCircuitOr := nes.random_byte();
+
+    nes.seed_random($2A);
+    TemporaryIntegration := Difference(nes.random_byte(), $00)
+        + nes.random_range($00, $07);
+
+    nes.set_background_color($0F);
+    nes.run;
+end.

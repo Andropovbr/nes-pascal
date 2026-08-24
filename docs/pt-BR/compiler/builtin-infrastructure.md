@@ -32,6 +32,7 @@ nome público quanto por `BuiltinId`. Cada `BuiltinDescriptor` registra:
 - identidade do emissor do backend;
 - diagnóstico de contagem de argumentos e texto de correção;
 - a sintaxe excepcional de instrução direta utilizada por `nes.wait_frame`.
+- classificação explícita de efeito colateral para valores com estado, como RNG.
 
 O analisador sintático (parser) não constrói famílias de nós específicas para cada operação.
 Ele preserva o nome qualificado, argumentos e local da chamada em `BuiltinCall`. A análise
@@ -63,7 +64,8 @@ de strings com o nome público.
 | Instruções comuns de quadro/rolagem | `nes.wait_frame`, `nes.set_scroll` | `BuiltinCall` / `ResolvedBuiltinCall` |
 | Instruções comuns de sprites | `nes.set_sprite_zero`, `nes.sprite_set_position`, `nes.sprite_set_x`, `nes.sprite_set_y`, `nes.sprite_set_tile`, `nes.sprite_set_palette`, `nes.sprite_set_attributes`, `nes.sprite_hide`, `nes.sprite_show`, `nes.sprite_set_flip_horizontal`, `nes.sprite_set_flip_vertical`, `nes.sprite_set_behind_background` | `BuiltinCall` / `ResolvedBuiltinCall` |
 | Instruções comuns de metasprites/animação | `nes.metasprite_set_position`, `nes.metasprite_set_frame`, `nes.metasprite_set_animation`, `nes.metasprite_restart_animation`, `nes.metasprite_hide`, `nes.metasprite_show`, `nes.metasprite_set_flip_horizontal`, `nes.metasprite_set_flip_vertical` | `BuiltinCall` / `ResolvedBuiltinCall` |
-| Builtins comuns de valor | `nes.controller_down`, `nes.controller_pressed`, `nes.controller_released`, `nes.sprite_create`, `nes.metasprite_create`, `nes.metasprite_animation_finished`, `nes.get_tile`, `nes.background_updates_overflowed` | `BuiltinCall` / `ResolvedBuiltinCall` |
+| Instruções comuns de RNG | `nes.seed_random` | `BuiltinCall` / `ResolvedBuiltinCall` |
+| Builtins comuns de valor | `nes.controller_down`, `nes.controller_pressed`, `nes.controller_released`, `nes.sprite_create`, `nes.metasprite_create`, `nes.metasprite_animation_finished`, `nes.get_tile`, `nes.background_updates_overflowed`, `nes.random_byte`, `nes.random_range` | `BuiltinCall` / `ResolvedBuiltinCall` |
 | Construção de asset em tempo de compilação | `nes.import_metasprite` | Especializada: valida a identidade do asset configurado e não gera chamada em runtime |
 | Construção de asset de fundo em tempo de compilação | `nes.load_background` | Especializada: coordena dados de nametable configurados e ordem pré-renderização no programa |
 | Construções de callback/estrutura do programa | `nes.on_update`, `nes.on_vblank` | Especializada: registra identidades de procedimento e valida grafos de chamada |

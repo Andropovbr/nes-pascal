@@ -65,6 +65,10 @@ relevante.
 
 - [Implementação e medições dos helpers de colisão](collision-helpers-0.5.13.md) — relatório de implementação.
 
+### 0.5.14 — Geração de números aleatórios
+
+- [Implementação e medições de geração de números aleatórios](random-number-generation-0.5.14.md) — relatório de implementação.
+
 Para material durável do compilador que não é específico de um marco, consulte
 o [Mapa de cobertura de testes semânticos](test-coverage-map.md) e a seção
 [Referência](../reference/index.md).

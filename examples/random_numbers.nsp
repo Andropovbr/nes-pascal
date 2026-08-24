@@ -1,0 +1,20 @@
+program RandomNumbers;
+
+var
+    RawValue: byte;
+    EnemyX: byte;
+    Direction: byte;
+
+function RollDirection: byte;
+begin
+    RollDirection := nes.random_range($00, $03);
+end;
+
+begin
+    nes.seed_random($2A);
+    RawValue := nes.random_byte();
+    EnemyX := nes.random_range($08, $F7);
+    Direction := RollDirection();
+    nes.set_background_color($0F);
+    nes.run;
+end.

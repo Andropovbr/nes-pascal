@@ -96,6 +96,9 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_functions_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("functions")
 
+    def test_random_numbers_example_builds_valid_nrom_image(self) -> None:
+        self._assert_valid_nrom_image("random_numbers")
+
     def test_enumerations_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("enumerations")
 
@@ -708,6 +711,24 @@ class MesenIntegrationTests(unittest.TestCase):
             ),
             collision_map_path=ROOT / "examples" / "assets" / "collision_map.cmap",
             source_path=ROOT / "tests" / "fixtures" / "runtime" / "collisions.nsp",
+        )
+
+    def test_random_numbers_preserve_seed_sequence_ranges_and_call_order(self) -> None:
+        self._run_mesen_test(
+            "random_numbers",
+            "verify_random_numbers.lua",
+            source_path=(
+                ROOT / "tests" / "fixtures" / "runtime" / "random_numbers.nsp"
+            ),
+        )
+
+    def test_random_auto_seed_mixes_delayed_frame_and_existing_controller_state(self) -> None:
+        self._run_mesen_test(
+            "random_auto_seed",
+            "verify_random_auto_seed.lua",
+            source_path=(
+                ROOT / "tests" / "fixtures" / "runtime" / "random_auto_seed.nsp"
+            ),
         )
 
     def test_arrays_preserve_indexed_storage_and_boolean_branching(self) -> None:

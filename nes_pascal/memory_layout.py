@@ -275,6 +275,20 @@ class CollisionRuntimeFeatures:
 
 
 @dataclass(frozen=True, slots=True)
+class RandomRuntimeFeatures:
+    """PRNG entry points and their feature-gated regular-RAM storage."""
+
+    enabled: bool = False
+    bounded_range: bool = False
+
+    @property
+    def runtime_size(self) -> int:
+        if not self.enabled:
+            return 0
+        return 2 + (2 if self.bounded_range else 0)
+
+
+@dataclass(frozen=True, slots=True)
 class ProgramMemoryLayout:
     """Validated regions and concrete symbol allocations for one program."""
 
@@ -451,6 +465,7 @@ def build_memory_layout(
     scroll_runtime_enabled = _uses_set_scroll(program)
     background_features = detect_background_runtime_features(program)
     collision_features = detect_collision_runtime_features(program)
+    random_features = detect_random_runtime_features(program)
     background_queue_enabled = background_features.queue
     background_shadow_enabled = background_features.shadow
     sprite_zero_runtime_size = 5 if sprite_zero_enabled else 0
@@ -469,6 +484,7 @@ def build_memory_layout(
         + (2 if background_features.tile_index else 0)
     )
     collision_runtime_size = collision_features.runtime_size
+    random_runtime_size = random_features.runtime_size
     required_runtime_size = (
         sprite_runtime_size
         + palette_runtime_size
@@ -477,6 +493,7 @@ def build_memory_layout(
         + background_shadow_size
         + background_runtime_size
         + collision_runtime_size
+        + random_runtime_size
     )
     if settings.runtime_data_size < required_runtime_size:
         settings = replace(settings, runtime_data_size=required_runtime_size)
@@ -654,6 +671,42 @@ def build_memory_layout(
     elif collision_features.background_collision:
         add_collision_symbol("runtime_collision_point_x", "background collision pixel X input")
         add_collision_symbol("runtime_collision_point_y", "background collision pixel Y input")
+
+    random_runtime_symbols: list[MemorySymbol] = []
+    next_random_address = next_collision_address
+
+    def add_random_symbol(name: str, purpose: str) -> None:
+        nonlocal next_random_address
+        random_runtime_symbols.append(
+            MemorySymbol(
+                name,
+                next_random_address,
+                1,
+                SymbolKind.RUNTIME,
+                runtime_data.name,
+                purpose,
+            )
+        )
+        next_random_address += 1
+
+    if random_features.enabled:
+        add_random_symbol(
+            "runtime_random_state_low",
+            "low byte of the feature-gated 16-bit Galois LFSR state",
+        )
+        add_random_symbol(
+            "runtime_random_state_high",
+            "high byte of the feature-gated 16-bit Galois LFSR state",
+        )
+    if random_features.bounded_range:
+        add_random_symbol(
+            "runtime_random_span",
+            "inclusive random-range span used by bounded reduction",
+        )
+        add_random_symbol(
+            "runtime_random_cutoff",
+            "rejection cutoff used by unbiased bounded reduction",
+        )
 
     metasprite_base = runtime_data.start + individual_sprite_runtime_size
     metasprite_count = sprite_features.metasprite_instances
@@ -1089,6 +1142,7 @@ def build_memory_layout(
         ),
         *background_runtime_symbols,
         *collision_runtime_symbols,
+        *random_runtime_symbols,
     )
     expression_storage = MemoryRange(
         "Expression temporaries",
@@ -1887,6 +1941,18 @@ def detect_collision_runtime_features(
             RuntimeFeature.COLLISION_METASPRITE_BOUNDS in features
         ),
         background_collision=RuntimeFeature.COLLISION_BACKGROUND in features,
+    )
+
+
+def detect_random_runtime_features(
+    program: ResolvedProgram,
+) -> RandomRuntimeFeatures:
+    """Derive PRNG state and optional bounded-reduction scratch."""
+
+    features = collect_runtime_features(program)
+    return RandomRuntimeFeatures(
+        enabled=RuntimeFeature.RANDOM in features,
+        bounded_range=RuntimeFeature.RANDOM_RANGE in features,
     )
 
 

@@ -248,3 +248,8 @@ de estouro adicionam `runtime_background_queue_overflow`; cancelamento adiciona
 tiles são reportados apenas para pontos de entrada que os utilizam. Os símbolos de
 restauração da PPU são alocados para transferências de paleta ou fundo e compartilhados
 quando ambos os recursos estão presentes.
+
+Quando números aleatórios são vinculados, o mapa nomeia os dois bytes regulares
+`runtime_random_state_low` e `runtime_random_state_high`. Programas com
+`nes.random_range` também nomeiam `runtime_random_span` e
+`runtime_random_cutoff`; programas sem RNG não contêm esses símbolos.

@@ -90,6 +90,7 @@ the range reserved for their category.
 | [E3061](semantic.md) | Semantic Analysis | Function used as statement |
 | [E3062](semantic.md) | Semantic Analysis | Procedure used as expression |
 | [E3063](semantic.md) | Semantic Analysis | Undefined function result |
+| [E3064](semantic.md) | Semantic Analysis | Invalid random range |
 | [E4001](type-system.md) | Type System | Unknown type |
 | [E4002](type-system.md) | Type System | Invalid `nes_color` value |
 | [E4003](type-system.md) | Type System | Invalid `byte` value |

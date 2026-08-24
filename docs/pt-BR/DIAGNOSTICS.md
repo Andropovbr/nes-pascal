@@ -79,6 +79,7 @@ apenas na nova seção de diagnósticos.
 | E3061 | Semantic Analysis | [Diagnósticos semânticos](reference/diagnostics/semantic.md) |
 | E3062 | Semantic Analysis | [Diagnósticos semânticos](reference/diagnostics/semantic.md) |
 | E3063 | Semantic Analysis | [Diagnósticos semânticos](reference/diagnostics/semantic.md) |
+| E3064 | Semantic Analysis | [Diagnósticos semânticos](reference/diagnostics/semantic.md) |
 | E4001 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E4002 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |
 | E4003 | Type System | [Diagnósticos do sistema de tipos](reference/diagnostics/type-system.md) |

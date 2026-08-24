@@ -80,6 +80,12 @@ InRange := (Counter >= Minimum) and (Counter <= Maximum);
 of `and` is skipped when the left operand is `false`; the right operand of `or`
 is skipped when the left operand is `true`.
 
+Random value calls are stateful expressions. `nes.random_byte()` and
+`nes.random_range(minimum, maximum)` advance only when actually evaluated, so a
+skipped short-circuit operand consumes no random value. Complex arithmetic
+keeps the established lowering order documented for [Functions](functions.md).
+See [Random numbers](../runtime/random-numbers.md).
+
 The controller queries `nes.controller_down`, `nes.controller_pressed`, and
 `nes.controller_released` are built-in boolean expressions. They accept a
 compile-time controller index and exactly one `nes.button_*` constant. See
