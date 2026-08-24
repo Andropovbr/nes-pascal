@@ -2,7 +2,7 @@
 
 [English](../../compiler/test-coverage-map.md) | Português (Brasil)
 
-Este documento fornece um mapa abrangente de cobertura de testes semânticos em todos os 32 subsistemas implementados no NES Pascal. Ele cataloga o nível atual de proteção automatizada através das fases do compilador, diagnósticos, testes de golden assembly, builds na cadeia de ferramentas, verificação em runtime no emulador Mesen, medições do corpus de benchmark e documentação/exemplos.
+Este documento fornece um mapa abrangente de cobertura de testes semânticos em todos os 35 subsistemas implementados no NES Pascal. Ele cataloga o nível atual de proteção automatizada através das fases do compilador, diagnósticos, testes de golden assembly, builds na cadeia de ferramentas, verificação em runtime no emulador Mesen, medições do corpus de benchmark e documentação/exemplos.
 
 ---
 
@@ -44,10 +44,13 @@ A matriz adota os seguintes níveis de verificação semântica:
 | 26 | **Infraestrutura de builtins** | Forte | Forte | Forte | Forte | Forte | Parcial | Forte | Forte | Forte | Registro unificado e validação |
 | 27 | **Otimizações de codegen de baixo risco** | N/A | N/A | N/A | Forte | Forte | Forte | Forte | Forte | Forte | Operandos diretos, branch em flags |
 | 28 | **Arrays** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | 1D fixo, indexação, limites |
-| 29 | **Records** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Layouts fixos nominais, campos tipados, arrays de records |
-| 30 | **Alocação de temporários de expressão** | N/A | N/A | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Pool com escopo por pico de uso, caches separados, exaustão |
-| 31 | **Funções** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Retornos tipados, resultado definido, chamadas acíclicas e temporários seguros |
-| 32 | **Helpers de colisão** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | AABB semiaberto, bounds de sprite/metasprite, mapa imutável compactado e bordas sem wrap |
+| 29 | **Enumerações** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Tipos nominais de um byte, igualdade e desigualdade de tipo exato |
+| 30 | **Records** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Layouts fixos nominais, campos tipados, arrays de records |
+| 31 | **Alocação de temporários de expressão** | N/A | N/A | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Pool com escopo por pico de uso, caches separados, exaustão |
+| 32 | **Funções** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Retornos tipados, resultado definido, chamadas acíclicas e temporários seguros |
+| 33 | **Helpers de colisão** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | AABB semiaberto, bounds de sprite/metasprite, mapa imutável compactado e bordas sem wrap |
+| 34 | **Geração de números aleatórios** | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | Forte | LFSR determinístico, ranges limitados, seed explícita/automática |
+| 35 | **Composição de estados de jogo** | Forte | Forte | N/A | Forte | Forte | Forte | Forte | Forte | Forte | Dispatch por enum, transições/reset explícitos, ciclo de pausa e reinício |
 
 ---
 
@@ -59,7 +62,7 @@ A matriz adota os seguintes níveis de verificação semântica:
 
 ### 2. Quais recursos voltados ao hardware dependem exclusivamente de testes estáticos/goldens?
 * **Embarque de CHR-ROM — ✅ Resolvido (P1):** Além da validação binária da ROM, `verify_chr_asset.lua` agora verifica o padrão CHR correto na tabela de padrões da PPU emulada em runtime.
-* Todos os demais recursos voltados ao hardware (Paletas, Nametables, Atualizações no VBlank, Rolagem/Scroll, Sprites de Hardware, Metasprites, Animação, Helpers de Colisão, Controles, Callbacks de NMI, Sincronização de Quadros) contam com testes comportamentais dedicados no Mesen headless via Lua.
+* Todos os demais recursos voltados ao hardware (Paletas, Nametables, Atualizações no VBlank, Rolagem/Scroll, Sprites de Hardware, Metasprites, Animação, Helpers de Colisão, Controles, Callbacks de NMI, Sincronização de Quadros) e o ciclo completo de estados contam com testes comportamentais dedicados no Mesen headless via Lua.
 
 ### 3. Quais recursos têm cobertura no Mesen mas possuem cobertura semântica/diagnóstica fraca?
 * **Rolagem e Estado da PPU — ✅ Resolvido (P1):** Dois fixtures negativos dedicados (`invalid_set_scroll_x_type.nsp`, `invalid_set_scroll_y_type.nsp`) agora verificam explicitamente que passar `boolean` no argumento `x` ou `y` de `nes.set_scroll` gera `E4004` (incompatibilidade de tipo), confirmando que `E3046` (contagem de argumentos) não toma precedência.
@@ -73,7 +76,7 @@ A matriz adota os seguintes níveis de verificação semântica:
 * `zero_page` / `memory_layout` (benchmarks puros de layout, embora todos os benchmarks reportem métricas de memória)
 
 ### 5. Quais exemplos não são exercitados por testes de toolchain ou de runtime?
-* **Nenhum.** Todos os programas de exemplo em `examples/` (`minimal.nsp`, `arithmetic.nsp`, `boolean_expressions.nsp`, `conditionals.nsp`, `loops.nsp`, `counting.nsp`, `procedures.nsp`, `procedure_parameters.nsp`, `controller_input.nsp`, `sprite_support.nsp`, `metasprite_player.nsp`, `sprite_animation.nsp`, `palette_support.nsp`, `background_updates.nsp`, `frame_callbacks.nsp`, `frame_synchronization.nsp`, `gameplay_full_stack.nsp`, `nametable_loading.nsp`, `scrolling_ppu_state.nsp`, `slow_update_callback.nsp`, `zero_page.nsp`, `memory_layout.nsp`, `metasprite_clipping.nsp`, `arrays.nsp`, `enumerations.nsp`, `records.nsp`, `functions.nsp`, `chr_asset.nsp`, `collision_rectangles.nsp`, `collision_background.nsp`, `collision_helpers.nsp`) são compilados, montados e validados em `tests/test_integration.py` e/ou `tools/measure_benchmarks.py`.
+* **Nenhum.** `ToolchainIntegrationTests.test_all_public_examples_assemble_and_link` descobre todo `.nsp` em `examples/` e o compila, monta e linka com os assets exigidos. Isso inclui `random_numbers.nsp` e a referência completa `game_state.nsp`; testes focados e o corpus de benchmark fornecem cobertura adicional.
 
 ### 6. Quais goldens protegem saídas amplas mas carecem de asserções focadas?
 * `tests/golden/minimal.asm`, `tests/golden/memory_layout.asm`, `tests/golden/zero_page.asm` e `tests/golden/frame_synchronization.asm` capturam o assembly completo gerado.
@@ -86,8 +89,8 @@ A matriz adota os seguintes níveis de verificação semântica:
 * `tests/test_integration.py` abriga atualmente três responsabilidades distintas:
   1. Testes de Integração da Cadeia de Ferramentas (validação de build `ca65`/`ld65`, cabeçalhos de ROM, parâmetros de CLI)
   2. Testes de Regressão de Golden Assembly (comparação de 15 fixtures `.asm`)
-  3. Testes de Integração de Runtime no Mesen (orquestrando 30 execuções
-     headless, incluindo a ROM dedicada dos helpers de colisão)
+  3. Testes de Integração de Runtime no Mesen (orquestrando 33 execuções
+     headless, incluindo ROMs dedicadas de colisão, RNG e ciclo de estados)
   Embora bem estruturado (~800 linhas), manter a separação será importante à medida que novas versões da linguagem expandirem os testes de runtime.
 
 ### 9. Há inconsistências óbvias de nomenclatura/histórico que valha a pena limpar posteriormente?

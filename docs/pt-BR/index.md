@@ -46,6 +46,8 @@ O trabalho planejado é acompanhado separadamente no
 - [Metasprites](runtime/metasprites.md)
 - [Animação de sprites](runtime/sprite-animation.md)
 - [Helpers de colisão](runtime/collision-helpers.md)
+- [Números aleatórios](runtime/random-numbers.md)
+- [Suporte a estados de jogo](runtime/game-state-support.md)
 
 ## Referência
 

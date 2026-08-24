@@ -37,6 +37,8 @@ de quadros e controles são:
   bounds de sprites e metasprites e consulta imutável de colisão por tile de fundo;
 - [Números aleatórios](random-numbers.md) fornecem bytes determinísticos e ranges
   inclusivos com viés controlado e seed explícita opcional;
+- [Suporte a estados de jogo](game-state-support.md) documenta o padrão oficial
+  com enum, helpers de transição, dispatcher, pausa, game over e reinício explícito;
 - `nes.set_sprite_zero` é o helper fixo de preparação de OAM, exclusivo para exemplos,
   descrito na documentação de controles; ele permanece como um helper de compatibilidade.
 

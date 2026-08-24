@@ -2,7 +2,7 @@
 
 English | [Português (Brasil)](../pt-BR/compiler/test-coverage-map.md)
 
-This document provides a comprehensive semantic coverage map across all 32 implemented subsystems in NES Pascal. It catalogs the current automated test protection across compiler phases, diagnostics, static assembly goldens, toolchain builds, Mesen emulator runtime verification, benchmark corpus measurement, and documentation/examples.
+This document provides a comprehensive semantic coverage map across all 35 implemented subsystems in NES Pascal. It catalogs the current automated test protection across compiler phases, diagnostics, static assembly goldens, toolchain builds, Mesen emulator runtime verification, benchmark corpus measurement, and documentation/examples.
 
 ---
 
@@ -44,10 +44,13 @@ The matrix uses semantic verification tiers:
 | 26 | **Builtin infrastructure** | Strong | Strong | Strong | Strong | Strong | Partial | Strong | Strong | Strong | Unified registry & validation |
 | 27 | **Low-risk codegen opts** | N/A | N/A | N/A | Strong | Strong | Strong | Strong | Strong | Strong | Direct operands, flag branching |
 | 28 | **Arrays** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Fixed 1D, indexed access, boundaries |
-| 29 | **Records** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Nominal fixed layouts, typed fields, record arrays |
-| 30 | **Expression temporary allocation** | N/A | N/A | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Scoped maximum-live pool, cache separation, exhaustion |
-| 31 | **Functions** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Typed returns, definite result, acyclic nested calls, call-safe temporaries |
-| 32 | **Collision helpers** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Half-open AABB, sprite/metasprite bounds, packed immutable map, wrap-safe edges |
+| 29 | **Enumerations** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Nominal one-byte types, exact-type equality and inequality |
+| 30 | **Records** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Nominal fixed layouts, typed fields, record arrays |
+| 31 | **Expression temporary allocation** | N/A | N/A | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Scoped maximum-live pool, cache separation, exhaustion |
+| 32 | **Functions** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Typed returns, definite result, acyclic nested calls, call-safe temporaries |
+| 33 | **Collision helpers** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Half-open AABB, sprite/metasprite bounds, packed immutable map, wrap-safe edges |
+| 34 | **Random number generation** | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Strong | Deterministic LFSR, bounded ranges, explicit/automatic seed |
+| 35 | **Game-state composition** | Strong | Strong | N/A | Strong | Strong | Strong | Strong | Strong | Strong | Enum dispatch, explicit transitions/reset, pause and restart lifecycle |
 
 ---
 
@@ -59,7 +62,7 @@ The matrix uses semantic verification tiers:
 
 ### 2. Which hardware-facing features rely only on static/golden tests?
 * **CHR-ROM embedding — ✅ Resolved (P1):** In addition to binary ROM validation, `verify_chr_asset.lua` now asserts the correct CHR pattern in the emulated PPU pattern table at runtime.
-* All other hardware-facing features (Palettes, Nametables, VBlank Updates, Scrolling, Hardware Sprites, Metasprites, Animation, Collision Helpers, Controllers, NMI Callbacks, Frame Synchronization) possess dedicated, headless Mesen Lua behavioral tests.
+* All other hardware-facing features (Palettes, Nametables, VBlank Updates, Scrolling, Hardware Sprites, Metasprites, Animation, Collision Helpers, Controllers, NMI Callbacks, Frame Synchronization) and the complete game-state lifecycle possess dedicated, headless Mesen Lua behavioral tests.
 
 ### 3. Which features have Mesen coverage but weak semantic/diagnostic coverage?
 * **Scrolling and PPU State — ✅ Resolved (P1):** Two dedicated negative fixtures (`invalid_set_scroll_x_type.nsp`, `invalid_set_scroll_y_type.nsp`) now explicitly assert that passing a `boolean` to the `x` or `y` argument of `nes.set_scroll` raises `E4004` (type mismatch) and that `E3046` (argument count) does not take precedence.
@@ -73,7 +76,7 @@ The matrix uses semantic verification tiers:
 * `zero_page` / `memory_layout` (pure layout benchmarks, although all benchmarks report memory layouts)
 
 ### 5. Which examples are not exercised by toolchain or runtime tests?
-* **None.** Every single example program in `examples/` (`minimal.nsp`, `arithmetic.nsp`, `boolean_expressions.nsp`, `conditionals.nsp`, `loops.nsp`, `counting.nsp`, `procedures.nsp`, `procedure_parameters.nsp`, `controller_input.nsp`, `sprite_support.nsp`, `metasprite_player.nsp`, `sprite_animation.nsp`, `palette_support.nsp`, `background_updates.nsp`, `frame_callbacks.nsp`, `frame_synchronization.nsp`, `gameplay_full_stack.nsp`, `nametable_loading.nsp`, `scrolling_ppu_state.nsp`, `slow_update_callback.nsp`, `zero_page.nsp`, `memory_layout.nsp`, `metasprite_clipping.nsp`, `arrays.nsp`, `enumerations.nsp`, `records.nsp`, `functions.nsp`, `chr_asset.nsp`, `collision_rectangles.nsp`, `collision_background.nsp`, `collision_helpers.nsp`) is actively compiled, assembled, and validated in `tests/test_integration.py` and/or `tools/measure_benchmarks.py`.
+* **None.** `ToolchainIntegrationTests.test_all_public_examples_assemble_and_link` discovers every `.nsp` in `examples/` and compiles, assembles, and links it with the required assets. This includes `random_numbers.nsp` and the complete `game_state.nsp` reference; focused tests and the benchmark corpus provide additional coverage.
 
 ### 6. Which goldens protect broad output but lack focused assertions?
 * `tests/golden/minimal.asm`, `tests/golden/memory_layout.asm`, `tests/golden/zero_page.asm`, and `tests/golden/frame_synchronization.asm` capture complete generated assembly files.
@@ -86,8 +89,8 @@ The matrix uses semantic verification tiers:
 * `tests/test_integration.py` currently houses three distinct concerns:
   1. Toolchain Integration Tests (`ca65`/`ld65` build validation, ROM headers, CLI parameters)
   2. Golden Assembly Regression Tests (comparing 15 `.asm` fixtures)
-  3. Mesen Runtime Integration Tests (orchestrating 30 headless Mesen runs,
-     including the dedicated collision-helper ROM)
+  3. Mesen Runtime Integration Tests (orchestrating 33 headless Mesen runs,
+     including dedicated collision, RNG, and game-state lifecycle ROMs)
   While well-structured (~800 lines), maintaining separation will be important as future language releases expand runtime testing.
 
 ### 9. Are there obvious test-name/history inconsistencies worth cleaning later?

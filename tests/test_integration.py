@@ -75,6 +75,67 @@ class ToolchainIntegrationTests(unittest.TestCase):
     def test_builds_valid_minimal_nrom_image(self) -> None:
         self._assert_valid_nrom_image("minimal")
 
+    def test_all_public_examples_assemble_and_link(self) -> None:
+        configured_assets = {
+            "background_updates": {
+                "chr_path": "assets/chr_asset.chr",
+                "nametable_path": "assets/nametable_loading.nam",
+            },
+            "chr_asset": {"chr_path": "assets/chr_asset.chr"},
+            "collision_background": {
+                "collision_map_path": "assets/collision_map.cmap"
+            },
+            "collision_helpers": {
+                "chr_path": "assets/game.chr",
+                "metasprite_paths": ("assets/player_idle.json",),
+                "collision_map_path": "assets/collision_map.cmap",
+            },
+            "collision_rectangles": {
+                "chr_path": "assets/game.chr",
+                "metasprite_paths": ("assets/player_idle.json",),
+            },
+            "game_state": {"chr_path": "assets/chr_asset.chr"},
+            "gameplay_full_stack": {
+                "chr_path": "assets/game.chr",
+                "nametable_path": "assets/nametable_loading.nam",
+                "metasprite_paths": ("assets/player_consolidated.json",),
+            },
+            "metasprite_clipping": {
+                "chr_path": "assets/game.chr",
+                "metasprite_paths": ("assets/player_idle.json",),
+            },
+            "metasprite_player": {
+                "chr_path": "assets/game.chr",
+                "metasprite_paths": ("assets/player_idle.json",),
+            },
+            "nametable_loading": {
+                "chr_path": "assets/chr_asset.chr",
+                "nametable_path": "assets/nametable_loading.nam",
+            },
+            "palette_support": {"chr_path": "assets/chr_asset.chr"},
+            "sprite_animation": {
+                "chr_path": "assets/game.chr",
+                "metasprite_paths": ("assets/player_consolidated.json",),
+            },
+            "sprite_support": {"chr_path": "assets/chr_asset.chr"},
+        }
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory)
+            examples = sorted((ROOT / "examples").glob("*.nsp"))
+            for source_path in examples:
+                with self.subTest(example=source_path.name):
+                    rom_path = output_directory / f"{source_path.stem}.nes"
+                    compile_source(
+                        source_path,
+                        rom_path,
+                        **configured_assets.get(source_path.stem, {}),
+                    )
+                    self.assertEqual(
+                        len(rom_path.read_bytes()),
+                        16 + 32 * 1024 + 8 * 1024,
+                    )
+
     def test_builds_valid_arithmetic_nrom_image(self) -> None:
         self._assert_valid_nrom_image("arithmetic")
 
@@ -98,6 +159,29 @@ class ToolchainIntegrationTests(unittest.TestCase):
 
     def test_random_numbers_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("random_numbers")
+
+    def test_game_state_example_builds_valid_nrom_image(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            rom_path = Path(temporary_directory) / "game_state.nes"
+            assembly_path, _ = compile_source(
+                ROOT / "examples" / "game_state.nsp",
+                rom_path,
+                chr_path="assets/chr_asset.chr",
+            )
+            rom = rom_path.read_bytes()
+            assembly = assembly_path.read_text(encoding="utf-8")
+            memory_map = rom_path.with_suffix(".map").read_text(encoding="utf-8")
+
+        self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
+        self.assertNotEqual(rom[-8 * 1024 :], bytes(8 * 1024))
+        self.assertRegex(
+            memory_map,
+            r"\$0080\s+1\s+Zero Page\s+GameState\s+State\s+variable_State",
+        )
+        self.assertIn("$0372             1  Regular RAM byte       Score", memory_map)
+        self.assertIn("$0375             1  Regular RAM byte       SessionStarts", memory_map)
+        self.assertIn("procedure_Update:", assembly)
+        self.assertNotIn("runtime_state_manager", assembly)
 
     def test_enumerations_example_builds_valid_nrom_image(self) -> None:
         self._assert_valid_nrom_image("enumerations")
@@ -729,6 +813,13 @@ class MesenIntegrationTests(unittest.TestCase):
             source_path=(
                 ROOT / "tests" / "fixtures" / "runtime" / "random_auto_seed.nsp"
             ),
+        )
+
+    def test_game_state_lifecycle_pauses_and_restarts_without_rom_reset(self) -> None:
+        self._run_mesen_test(
+            "game_state",
+            "verify_game_state.lua",
+            chr_path="assets/chr_asset.chr",
         )
 
     def test_arrays_preserve_indexed_storage_and_boolean_branching(self) -> None:

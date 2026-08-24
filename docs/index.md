@@ -46,6 +46,8 @@ Planned work is tracked separately in the
 - [Metasprites](runtime/metasprites.md)
 - [Sprite animation](runtime/sprite-animation.md)
 - [Collision helpers](runtime/collision-helpers.md)
+- [Random numbers](runtime/random-numbers.md)
+- [Game-state support](runtime/game-state-support.md)
 
 ## Reference
 

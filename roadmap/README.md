@@ -5,10 +5,10 @@ progression. Do not infer the current or next milestone from numbering alone.
 
 ## Current roadmap state
 
-- **Current release:** Release 0.5 — Sprites and Gameplay
-- **Last completed milestone:** [`0.5.14 — Random Number Generation`](0.md#random-number-generation)
-- **Next milestone:** [`0.5.15 — Game-State Support`](0.md#game-state-support)
-- **Next milestone file:** [Version 0 roadmap](0.md#game-state-support)
+- **Current release:** Release 0.6 — Audio
+- **Last completed milestone:** [`0.5.15 — Game-State Support`](0.md#game-state-support)
+- **Next milestone:** [`0.6.1 — Basic APU Sound Effects`](0.md#basic-apu-sound-effects)
+- **Next milestone file:** [Version 0 roadmap](0.md#basic-apu-sound-effects)
 
 ## Philosophy
 

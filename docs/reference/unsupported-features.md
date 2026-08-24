@@ -78,8 +78,9 @@ the supported language.
   component layouts, manual frame selection, whole-object position,
   visibility, flip, hardware-sprite clipping, and automatic looping or one-shot
   frame sequences. Runtime creation/destruction, variable playback speed,
-  animation blending, collision, sprite multiplexing/flickering, sorting, and
-  scanline-overflow mitigation are not supported.
+  animation blending, automatic collision attachment, sprite
+  multiplexing/flickering, sorting, and scanline-overflow mitigation are not
+  supported. Explicit collision helpers are available separately.
   `nes.set_sprite_zero` remains a legacy compatibility helper.
 - Callback registration is static. There is only one callback of each kind,
   with no parameters, return values, priorities, lists, removal, indirect

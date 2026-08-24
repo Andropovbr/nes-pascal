@@ -9,7 +9,7 @@ Esta pasta contém a tradução completa da documentação do **NES Pascal** par
 - **Fonte canônica:** A documentação em inglês (`docs/`) é a fonte oficial e autoritativa do projeto.
 - **Espelhamento de estrutura:** A estrutura de diretórios e os nomes de arquivos em `docs/pt-BR/` espelham exatamente a documentação em inglês para permitir comparações automatizadas e navegação consistente.
 - **Nomes de arquivos inalterados:** Caminhos e nomes de arquivos não são traduzidos.
-- **Sincronização:** Todas as 62 páginas de documentação estão 100% traduzidas e sincronizadas.
+- **Sincronização:** Todas as 67 páginas mantidas em `pt-BR` estão traduzidas e sincronizadas.
 
 ## Status da Tradução
 
@@ -60,6 +60,7 @@ Esta pasta contém a tradução completa da documentação do **NES Pascal** par
 - [x] `docs/runtime/vblank-cycle-budget.md` -> `docs/pt-BR/runtime/vblank-cycle-budget.md`
 - [x] `docs/runtime/cpu-memory.md` -> `docs/pt-BR/runtime/cpu-memory.md`
 - [x] `docs/runtime/collision-helpers.md` -> `docs/pt-BR/runtime/collision-helpers.md`
+- [x] `docs/runtime/game-state-support.md` -> `docs/pt-BR/runtime/game-state-support.md`
 
 ### Reference (Referência)
 - [x] `docs/reference/index.md` -> `docs/pt-BR/reference/index.md`
