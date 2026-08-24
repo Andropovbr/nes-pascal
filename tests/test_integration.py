@@ -465,6 +465,7 @@ end.
                 source_path,
                 rom_path,
                 chr_path="assets/game.chr",
+                nametable_path="assets/arena_blank.nam",
                 metasprite_paths=(
                     "assets/player.json",
                     "assets/sword.json",
@@ -486,6 +487,15 @@ end.
         self.assertIn("    .byte $01, $28", assembly)
         self.assertIn("runtime_collision_rects:", assembly)
         self.assertIn("runtime_random_range:", assembly)
+        self.assertIn("; Source: nes.load_background()", assembly)
+        self.assertIn(
+            "; Initialization: upload one complete nametable while rendering is disabled",
+            assembly,
+        )
+        self.assertLess(
+            assembly.index("; Source: nes.load_background()"),
+            assembly.index("; Source: nes.run"),
+        )
         self.assertIn("runtime_metasprite_animation", memory_map)
         self.assertIn("variable_Enemies", memory_map)
         self.assertIn("variable_Gems", memory_map)
@@ -868,6 +878,7 @@ class MesenIntegrationTests(unittest.TestCase):
                 / "nes_survivor_vertical_slice.nsp"
             ),
             chr_path="assets/game.chr",
+            nametable_path="assets/arena_blank.nam",
             metasprite_paths=(
                 "assets/player.json",
                 "assets/sword.json",

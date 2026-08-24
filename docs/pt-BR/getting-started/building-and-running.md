@@ -137,7 +137,7 @@ Os exemplos demonstram:
 Compile o vertical slice com os assets locais congelados:
 
 ```text
-python -m nes_pascal.cli examples/nes_survivor/nes_survivor_vertical_slice.nsp -o build/nes_survivor_vertical_slice.nes --chr assets/game.chr --metasprite assets/player.json --metasprite assets/sword.json --metasprite assets/bat.json --metasprite assets/gem.json
+python -m nes_pascal.cli examples/nes_survivor/nes_survivor_vertical_slice.nsp -o build/nes_survivor_vertical_slice.nes --chr assets/game.chr --nametable assets/arena_blank.nam --metasprite assets/player.json --metasprite assets/sword.json --metasprite assets/bat.json --metasprite assets/gem.json
 ```
 
 Os caminhos são relativos ao `.nsp` aninhado. Proveniência, hashes, pattern

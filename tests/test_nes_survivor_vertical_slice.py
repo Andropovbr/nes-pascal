@@ -95,7 +95,20 @@ class NesSurvivorVerticalSliceTests(unittest.TestCase):
         # 7 player + 2 sword + 12 two-tile Bats + 8 one-tile gems.
         self.assertEqual(7 + 2 + 12 * 2 + 8, 41)
 
+    def test_static_arena_uses_a_blank_pattern_table_zero_tile(self) -> None:
+        nametable = (ASSETS / "arena_blank.nam").read_bytes()
+        self.assertEqual(len(nametable), 1024)
+        self.assertEqual(
+            hashlib.sha256(nametable).hexdigest(),
+            "30a0c265f473bc034386a7d6c3f42b81ada1da6bccb03393602c2c240947896a",
+        )
+        self.assertEqual(nametable[:960], bytes((0x15,)) * 960)
+        self.assertEqual(nametable[960:], bytes(64))
+        self.assertEqual(self.chr_rom[0x15 * 16 : 0x16 * 16], bytes(16))
+
     def test_workload_exercises_the_expected_composed_runtime(self) -> None:
+        self.assertIn("DamageFlashFrames: byte = $0A;", self.source)
+        self.assertIn("nes.load_background();", self.source)
         self.assertEqual(
             self.metrics.runtime_features,
             (
@@ -108,10 +121,10 @@ class NesSurvivorVerticalSliceTests(unittest.TestCase):
                 "RANDOM_RANGE",
             ),
         )
-        self.assertEqual(self.metrics.prg_code_bytes, 5908)
-        self.assertEqual(self.metrics.prg_total_used_bytes, 5914)
-        self.assertEqual(self.metrics.pattern_stats.total_instructions, 2653)
-        self.assertEqual(self.metrics.estimated_static_base_cycles, 8099)
+        self.assertEqual(self.metrics.prg_code_bytes, 6991)
+        self.assertEqual(self.metrics.prg_total_used_bytes, 6997)
+        self.assertEqual(self.metrics.pattern_stats.total_instructions, 2678)
+        self.assertEqual(self.metrics.estimated_static_base_cycles, 8175)
         self.assertEqual(self.metrics.max_expression_tree_depth, 2)
         self.assertEqual(self.metrics.max_live_temporaries, 0)
 

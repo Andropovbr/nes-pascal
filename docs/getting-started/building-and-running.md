@@ -128,7 +128,7 @@ The examples demonstrate:
 Build the vertical slice with its frozen local assets:
 
 ```text
-python -m nes_pascal.cli examples/nes_survivor/nes_survivor_vertical_slice.nsp -o build/nes_survivor_vertical_slice.nes --chr assets/game.chr --metasprite assets/player.json --metasprite assets/sword.json --metasprite assets/bat.json --metasprite assets/gem.json
+python -m nes_pascal.cli examples/nes_survivor/nes_survivor_vertical_slice.nsp -o build/nes_survivor_vertical_slice.nes --chr assets/game.chr --nametable assets/arena_blank.nam --metasprite assets/player.json --metasprite assets/sword.json --metasprite assets/bat.json --metasprite assets/gem.json
 ```
 
 The asset paths are relative to the nested `.nsp` file. Provenance, hashes,

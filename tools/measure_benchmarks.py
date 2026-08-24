@@ -195,6 +195,7 @@ BENCHMARKS: tuple[BenchmarkSpec, ...] = (
         "NES Survivor Vertical Slice",
         "examples/nes_survivor/nes_survivor_vertical_slice.nsp",
         chr_path="nes_survivor/assets/game.chr",
+        nametable_path="nes_survivor/assets/arena_blank.nam",
         metasprite_paths=(
             "nes_survivor/assets/player.json",
             "nes_survivor/assets/sword.json",

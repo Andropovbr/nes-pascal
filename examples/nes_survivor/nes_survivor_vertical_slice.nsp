@@ -655,6 +655,7 @@ begin
     nes.set_sprite_palette($00, $0F, $00, $10, $37);
     nes.set_sprite_palette($01, $0F, $08, $19, $06);
     nes.set_sprite_palette($03, $0F, $03, $13, $23);
+    nes.load_background();
     nes.set_background_color(TitleColor);
     ResetGameplay;
     ShowTitle;
