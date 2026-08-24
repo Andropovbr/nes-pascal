@@ -81,6 +81,7 @@ class DiagnosticCode(StrEnum):
     FUNCTION_USED_AS_STATEMENT = "E3061"
     PROCEDURE_USED_AS_EXPRESSION = "E3062"
     UNDEFINED_FUNCTION_RESULT = "E3063"
+    INVALID_RANDOM_RANGE = "E3064"
     UNKNOWN_TYPE = "E4001"
     INVALID_NES_COLOR_VALUE = "E4002"
     INVALID_BYTE_VALUE = "E4003"
@@ -351,6 +352,9 @@ DIAGNOSTIC_CATALOG: dict[DiagnosticCode, DiagnosticDefinition] = {
     ),
     DiagnosticCode.UNDEFINED_FUNCTION_RESULT: DiagnosticDefinition(
         DiagnosticCategory.SEMANTIC, "Undefined function result"
+    ),
+    DiagnosticCode.INVALID_RANDOM_RANGE: DiagnosticDefinition(
+        DiagnosticCategory.SEMANTIC, "Invalid random range"
     ),
     DiagnosticCode.UNKNOWN_TYPE: DiagnosticDefinition(
         DiagnosticCategory.TYPE_SYSTEM, "Unknown type"

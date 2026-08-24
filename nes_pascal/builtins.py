@@ -60,6 +60,9 @@ class BuiltinId(Enum):
     SPRITE_BOUNDS = auto()
     METASPRITE_BOUNDS = auto()
     BACKGROUND_COLLISION = auto()
+    SEED_RANDOM = auto()
+    RANDOM_BYTE = auto()
+    RANDOM_RANGE = auto()
 
 
 class BuiltinKind(Enum):
@@ -84,6 +87,7 @@ class SemanticHook(Enum):
     METASPRITE_CREATE = auto()
     METASPRITE_OPERATION = auto()
     COLLISION = auto()
+    RANDOM_RANGE = auto()
 
 
 class BackendEmitter(Enum):
@@ -110,6 +114,9 @@ class BackendEmitter(Enum):
     SPRITE_BOUNDS = auto()
     METASPRITE_BOUNDS = auto()
     BACKGROUND_COLLISION = auto()
+    SEED_RANDOM = auto()
+    RANDOM_BYTE = auto()
+    RANDOM_RANGE = auto()
 
 
 class RuntimeFeature(Enum):
@@ -132,6 +139,8 @@ class RuntimeFeature(Enum):
     COLLISION_SPRITE_BOUNDS = auto()
     COLLISION_METASPRITE_BOUNDS = auto()
     COLLISION_BACKGROUND = auto()
+    RANDOM = auto()
+    RANDOM_RANGE = auto()
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,6 +159,7 @@ class BuiltinDescriptor:
     )
     argument_count_suggestion: str = "Pass the documented arguments."
     bare_statement: bool = False
+    side_effecting: bool = False
 
 
 def _statement(
@@ -178,6 +188,7 @@ def _statement(
         count_code,
         count_suggestion,
         bare,
+        True,
     )
 
 
@@ -192,6 +203,7 @@ def _value(
     features: tuple[RuntimeFeature, ...] = (),
     count_code: DiagnosticCode = DiagnosticCode.INVALID_BUILTIN_ARGUMENT_COUNT,
     count_suggestion: str = "Pass the documented arguments.",
+    side_effecting: bool = False,
 ) -> BuiltinDescriptor:
     return BuiltinDescriptor(
         id,
@@ -205,6 +217,8 @@ def _value(
         (),
         count_code,
         count_suggestion,
+        False,
+        side_effecting,
     )
 
 
@@ -259,6 +273,9 @@ _DESCRIPTORS = (
     _statement(BuiltinId.SPRITE_BOUNDS, "nes.sprite_bounds", (_SPRITE, _BYTE, _BYTE, _BYTE, _BYTE, NES_RECT_TYPE), BackendEmitter.SPRITE_BOUNDS, hook=SemanticHook.COLLISION, features=(RuntimeFeature.SPRITE_API, RuntimeFeature.COLLISION_SPRITE_BOUNDS), count_suggestion="Pass sprite, unsigned X/Y offsets, width, height, and an output nes_rect variable."),
     _statement(BuiltinId.METASPRITE_BOUNDS, "nes.metasprite_bounds", (_METASPRITE, NES_RECT_TYPE), BackendEmitter.METASPRITE_BOUNDS, hook=SemanticHook.COLLISION, features=(RuntimeFeature.METASPRITE_API, RuntimeFeature.COLLISION_METASPRITE_BOUNDS), count_suggestion="Pass a metasprite and an output nes_rect variable."),
     _value(BuiltinId.BACKGROUND_COLLISION, "nes.background_collision", (_BYTE, _BYTE), _BOOLEAN, BackendEmitter.BACKGROUND_COLLISION, features=(RuntimeFeature.COLLISION_BACKGROUND,), count_suggestion="Pass screen pixel X and Y as byte values."),
+    _statement(BuiltinId.SEED_RANDOM, "nes.seed_random", (_BYTE,), BackendEmitter.SEED_RANDOM, features=(RuntimeFeature.RANDOM,), count_suggestion="Pass exactly one byte seed."),
+    _value(BuiltinId.RANDOM_BYTE, "nes.random_byte", (), _BYTE, BackendEmitter.RANDOM_BYTE, features=(RuntimeFeature.RANDOM,), count_suggestion="Call nes.random_byte() without arguments.", side_effecting=True),
+    _value(BuiltinId.RANDOM_RANGE, "nes.random_range", (_BYTE, _BYTE), _BYTE, BackendEmitter.RANDOM_RANGE, hook=SemanticHook.RANDOM_RANGE, features=(RuntimeFeature.RANDOM, RuntimeFeature.RANDOM_RANGE), count_suggestion="Pass inclusive minimum and maximum byte values.", side_effecting=True),
 )
 
 

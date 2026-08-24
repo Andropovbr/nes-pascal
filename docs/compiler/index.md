@@ -63,6 +63,10 @@ written, with explicit historical notes added where relevant.
 
 - [Collision helpers implementation and measurements](collision-helpers-0.5.13.md) — implementation report.
 
+### 0.5.14 — Random number generation
+
+- [Random number generation implementation and measurements](random-number-generation-0.5.14.md) — implementation report.
+
 ## Cross-cutting audits
 
 - [Diagnostic catalog and error-message consistency audit](diagnostic-consistency-audit.md) — cross-cutting QA audit of the diagnostic catalog, coverage, message quality, precedence, and EN/PT-BR parity.

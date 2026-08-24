@@ -835,3 +835,12 @@ Diagnósticos de análise semântica utilizam o intervalo E3000-E3999.
 - **Explicação:** O resultado é lido antes de ser atribuído ou não recebe valor em todos os caminhos do corpo.
 - **Gatilho:** Compile `tests/fixtures/diagnostics/undefined_function_result.nsp`.
 - **Correção sugerida:** Atribua o nome da função em todos os caminhos antes do fim ou antes da leitura.
+
+## E3064 - Range aleatório inválido
+
+- **Categoria:** Análise Semântica
+- **Explicação:** Limites inclusivos constantes passados a `nes.random_range`
+  possuem mínimo maior que o máximo.
+- **Gatilho:** Compile `tests/fixtures/diagnostics/invalid_random_range.nsp`.
+- **Saída esperada do compilador:** `E3064` identifica o range constante invertido.
+- **Correção sugerida:** Use limites byte em que o mínimo seja menor ou igual ao máximo.

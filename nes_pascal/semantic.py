@@ -159,6 +159,12 @@ COLLISION_QUERY_IDS = frozenset(
         BuiltinId.BACKGROUND_COLLISION,
     }
 )
+RANDOM_QUERY_IDS = frozenset(
+    {
+        BuiltinId.RANDOM_BYTE,
+        BuiltinId.RANDOM_RANGE,
+    }
+)
 
 
 def _parsed_builtin_id(call: BuiltinCall) -> BuiltinId:
@@ -1901,7 +1907,12 @@ class SemanticAnalyzer:
         if (
             isinstance(value, BuiltinCall)
             and _parsed_builtin_id(value)
-            in (*CONTROLLER_QUERY_IDS, *COLLISION_QUERY_IDS, BuiltinId.GET_TILE)
+            in (
+                *CONTROLLER_QUERY_IDS,
+                *COLLISION_QUERY_IDS,
+                *RANDOM_QUERY_IDS,
+                BuiltinId.GET_TILE,
+            )
         ):
             return False
         if isinstance(value, (BinaryExpression, ComparisonExpression)):
@@ -1953,6 +1964,17 @@ class SemanticAnalyzer:
                 f"VBlank callback path through {owner} queries {command}.",
                 "Run collision queries from main code or the update callback; "
                 "collision helpers use shared runtime scratch.",
+                len(command),
+            )
+        random_query = self._first_random_query(value)
+        if random_query is not None:
+            command = random_query.name
+            self._error(
+                random_query.position,
+                DiagnosticCode.VBLANK_UNSAFE_OPERATION,
+                f"VBlank callback path through {owner} queries {command}.",
+                "Generate random values from main code or the update callback; "
+                "the PRNG owns shared mutable state and bounded-range scratch.",
                 len(command),
             )
         self._error(
@@ -2042,6 +2064,35 @@ class SemanticAnalyzer:
         if isinstance(value, (BuiltinCall, FunctionCall)):
             for argument in value.arguments:
                 found = self._first_collision_query(argument)
+                if found is not None:
+                    return found
+        return None
+
+    def _first_random_query(
+        self,
+        value: ValueExpression,
+    ) -> BuiltinCall | None:
+        if (
+            isinstance(value, BuiltinCall)
+            and _parsed_builtin_id(value) in RANDOM_QUERY_IDS
+        ):
+            return value
+        if isinstance(value, (UnaryExpression, BooleanNotExpression)):
+            return self._first_random_query(value.operand)
+        if isinstance(value, ArrayIndexExpression):
+            return self._first_random_query(value.index)
+        if isinstance(value, RecordFieldExpression) and value.index is not None:
+            return self._first_random_query(value.index)
+        if isinstance(
+            value,
+            (BinaryExpression, BooleanBinaryExpression, ComparisonExpression),
+        ):
+            return self._first_random_query(
+                value.left
+            ) or self._first_random_query(value.right)
+        if isinstance(value, (BuiltinCall, FunctionCall)):
+            for argument in value.arguments:
+                found = self._first_random_query(argument)
                 if found is not None:
                     return found
         return None
@@ -2520,6 +2571,31 @@ class SemanticAnalyzer:
                 variables,
                 assigned_variables,
             )
+        elif hook is SemanticHook.RANDOM_RANGE:
+            constant_minimum = self._constant_byte_value(call.arguments[0], constants)
+            constant_maximum = self._constant_byte_value(call.arguments[1], constants)
+            arguments = tuple(
+                self._resolve_value(
+                    argument,
+                    BuiltInType.BYTE,
+                    constants,
+                    variables,
+                    assigned_variables,
+                )
+                for argument in call.arguments
+            )
+            if (
+                constant_minimum is not None
+                and constant_maximum is not None
+                and constant_minimum > constant_maximum
+            ):
+                self._error(
+                    call.position,
+                    DiagnosticCode.INVALID_RANDOM_RANGE,
+                    "nes.random_range has a constant minimum greater than its maximum.",
+                    "Use inclusive byte bounds where minimum is less than or equal to maximum.",
+                    len(descriptor.public_name),
+                )
         else:
             assert all(
                 isinstance(expected_type, (BuiltInType, EnumType))

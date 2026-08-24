@@ -259,3 +259,8 @@ four-element `runtime_background_queue_ready`,
 helpers are reported only for entry points that use them. The PPU
 restoration symbols are allocated for palette or background uploads and shared
 when both features are present.
+
+When random-number support is linked, the map names the two regular-RAM bytes
+`runtime_random_state_low` and `runtime_random_state_high`. Programs using
+`nes.random_range` additionally name `runtime_random_span` and
+`runtime_random_cutoff`; programs without RNG contain none of these symbols.

@@ -36,6 +36,8 @@ APIs are:
   sequences on the frame-synchronized main thread.
 - [Collision helpers](collision-helpers.md) provide point/rectangle predicates,
   sprite and metasprite bounds, and immutable background-tile collision lookup.
+- [Random numbers](random-numbers.md) provide deterministic bytes and inclusive,
+  bias-controlled ranges with optional explicit seeding.
 - `nes.set_sprite_zero` is the fixed, example-only OAM staging helper described
   in the controller documentation; it remains as a compatibility helper.
 

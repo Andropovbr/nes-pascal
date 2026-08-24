@@ -53,6 +53,7 @@ from .builtins import (
     BackendEmitter,
     BuiltinId,
     PaletteKind,
+    RuntimeFeature,
     builtin_by_id,
 )
 from .codegen_analysis import (
@@ -66,10 +67,13 @@ from .memory_layout import (
     CollisionRuntimeFeatures,
     ProgramMemoryLayout,
     build_memory_layout,
+    collect_runtime_features,
     detect_background_runtime_features,
     detect_collision_runtime_features,
+    detect_random_runtime_features,
     detect_sprite_runtime_features,
 )
+from .random_runtime import LFSR16_XOR_MASK, ZERO_SEED_STATE
 
 
 def generate(
@@ -171,6 +175,7 @@ def generate(
     )
     background_features = detect_background_runtime_features(program)
     collision_features = detect_collision_runtime_features(program)
+    random_features = detect_random_runtime_features(program)
     if collision_features.background_collision != (collision_map is not None):
         raise ValueError(
             "background collision use and configured collision-map data must match"
@@ -439,6 +444,14 @@ def generate(
         if collision_features.enabled
         else ""
     )
+    random_runtime_routines = (
+        _generate_random_runtime_routines(
+            random_features.bounded_range,
+            RuntimeFeature.CONTROLLER_QUERY in collect_runtime_features(program),
+        )
+        if random_features.enabled
+        else ""
+    )
     sprite_runtime_routines = (
         _generate_sprite_runtime_routines(sprite_features.set_position)
         if sprite_api_enabled
@@ -465,6 +478,7 @@ def generate(
         + palette_runtime_routine
         + background_runtime_routines
         + collision_runtime_routines
+        + random_runtime_routines
     )
     chr_storage = _generate_chr_storage(
         settings.chr_rom_size,
@@ -1086,6 +1100,21 @@ def _emit_wait_frame(
     ]
 
 
+def _emit_seed_random(
+    statement: ResolvedBuiltinCall,
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+    palette_runtime_enabled: bool,
+) -> list[str]:
+    del palette_runtime_enabled
+    return [
+        "",
+        "; Source: nes.seed_random(seed)",
+        *_load_value(statement.arguments[0], label_counter, temporary_pool),
+        "    jsr runtime_seed_random",
+    ]
+
+
 def _emit_set_sprite_zero(
     statement: ResolvedBuiltinCall,
     label_counter: list[int],
@@ -1371,6 +1400,7 @@ _BUILTIN_STATEMENT_EMITTERS = {
     BackendEmitter.METASPRITE_OPERATION: _emit_metasprite_operation,
     BackendEmitter.SPRITE_BOUNDS: _emit_sprite_bounds,
     BackendEmitter.METASPRITE_BOUNDS: _emit_metasprite_bounds,
+    BackendEmitter.SEED_RANDOM: _emit_seed_random,
 }
 
 
@@ -1730,6 +1760,128 @@ def _generate_sprite_runtime_routines(set_position: bool) -> str:
                 f"    and #${0xFF ^ mask:02X}",
                 f"@sprite_{name}_store:",
                 "    sta runtime_oam_shadow + 2, x",
+                "    rts",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def _generate_random_runtime_routines(
+    bounded_range: bool,
+    mix_controllers: bool,
+) -> str:
+    """Generate the frozen 16-bit Galois LFSR and optional range helper."""
+
+    mask_high = (LFSR16_XOR_MASK >> 8) & 0xFF
+    zero_seed_low = ZERO_SEED_STATE & 0xFF
+    zero_seed_high = ZERO_SEED_STATE >> 8
+    controller_low_mix = (
+        [
+            "    eor runtime_controller_1_current",
+            "    eor runtime_controller_2_current",
+        ]
+        if mix_controllers
+        else []
+    )
+    lines = [
+        "",
+        "",
+        "; Runtime: 16-bit right-shifting Galois LFSR, polynomial mask $B400",
+        "; Active nonzero states have maximal period 65,535; output is new low byte.",
+        "runtime_seed_random:",
+        "    beq @random_seed_zero",
+        "    sta runtime_random_state_low  ; nonzero byte is replicated",
+        "    sta runtime_random_state_high",
+        "    rts",
+        "@random_seed_zero:",
+        f"    lda #${zero_seed_low:02X}                ; zero seed normalizes to ${ZERO_SEED_STATE:04X}",
+        "    sta runtime_random_state_low",
+        f"    lda #${zero_seed_high:02X}",
+        "    sta runtime_random_state_high",
+        "    rts",
+        "",
+        "runtime_random_byte:",
+        "    lda runtime_random_state_low",
+        "    ora runtime_random_state_high",
+        "    bne @random_step",
+        "    ; Zero is the cleared-RAM marker for one-time automatic timing seeding.",
+        "    lda runtime_frame_counter",
+        *controller_low_mix,
+        "    tax                     ; coherent timing/input snapshot for both bytes",
+        "    eor #$E1",
+        "    sta runtime_random_state_low",
+        "    txa",
+        "    eor #$AC               ; differing constants guarantee nonzero state",
+        "    sta runtime_random_state_high",
+        "@random_step:",
+        "    lsr runtime_random_state_high",
+        "    ror runtime_random_state_low",
+        "    bcc @random_output",
+        "    lda runtime_random_state_high",
+        f"    eor #${mask_high:02X}               ; high byte of Galois mask $B400",
+        "    sta runtime_random_state_high",
+        "@random_output:",
+        "    lda runtime_random_state_low",
+        "    rts",
+    ]
+    if bounded_range:
+        lines.extend(
+            [
+                "",
+                "; A = inclusive minimum, X = inclusive maximum; result returned in A.",
+                "; Invalid or singleton ranges return minimum without consuming the PRNG.",
+                "runtime_random_range:",
+                "    sta runtime_random_cutoff ; preserve minimum while deriving span",
+                "    tay",
+                "    txa",
+                "    sec",
+                "    sbc runtime_random_cutoff",
+                "    bcc @random_range_return_minimum",
+                "    beq @random_range_return_minimum",
+                "    clc",
+                "    adc #$01               ; inclusive span; zero denotes all 256 bytes",
+                "    beq @random_range_full_byte",
+                "    sta runtime_random_span",
+                "",
+                "    ; cutoff = 256 mod span, calculated without generic division/modulo.",
+                "    lda #$FF",
+                "@random_cutoff_loop:",
+                "    sec",
+                "    sbc runtime_random_span",
+                "    bcs @random_cutoff_loop",
+                "    clc",
+                "    adc runtime_random_span ; 255 mod span",
+                "    clc",
+                "    adc #$01               ; 256 mod span, except divisible spans",
+                "    cmp runtime_random_span",
+                "    bcc @random_cutoff_ready",
+                "    lda #$00",
+                "@random_cutoff_ready:",
+                "    sta runtime_random_cutoff",
+                "",
+                "@random_range_sample:",
+                "    jsr runtime_random_byte",
+                "    cmp runtime_random_cutoff",
+                "    bcc @random_range_sample ; reject the short low tail",
+                "    sec",
+                "    sbc runtime_random_cutoff",
+                "@random_reduce_loop:",
+                "    cmp runtime_random_span",
+                "    bcc @random_range_reduced",
+                "    sec",
+                "    sbc runtime_random_span",
+                "    jmp @random_reduce_loop",
+                "@random_range_reduced:",
+                "    sta runtime_random_cutoff ; reduction residue; cutoff no longer needed",
+                "    tya",
+                "    clc",
+                "    adc runtime_random_cutoff",
+                "    rts",
+                "@random_range_full_byte:",
+                "    jsr runtime_random_byte",
+                "    rts",
+                "@random_range_return_minimum:",
+                "    tya",
                 "    rts",
             ]
         )
@@ -3779,6 +3931,35 @@ def _load_background_collision(
     ]
 
 
+def _load_random_byte(
+    query: ResolvedBuiltinCall,
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+) -> list[str]:
+    del query, label_counter, temporary_pool
+    return [
+        "    ; nes.random_byte(): advance once and return the new state low byte",
+        "    jsr runtime_random_byte",
+    ]
+
+
+def _load_random_range(
+    query: ResolvedBuiltinCall,
+    label_counter: list[int],
+    temporary_pool: TemporaryPool,
+) -> list[str]:
+    minimum, maximum = query.arguments
+    return [
+        "    ; nes.random_range(minimum, maximum): inclusive unbiased range",
+        *_load_value(minimum, label_counter, temporary_pool),
+        "    pha                     ; preserve left-to-right minimum evaluation",
+        *_load_value(maximum, label_counter, temporary_pool),
+        "    tax",
+        "    pla",
+        "    jsr runtime_random_range",
+    ]
+
+
 _BUILTIN_VALUE_LOADERS = {
     BackendEmitter.SPRITE_CREATE: _load_sprite_create,
     BackendEmitter.METASPRITE_CREATE: _load_metasprite_create,
@@ -3793,6 +3974,8 @@ _BUILTIN_VALUE_LOADERS = {
     BackendEmitter.POINT_IN_RECT: _load_point_in_rect,
     BackendEmitter.COLLIDES: _load_collides,
     BackendEmitter.BACKGROUND_COLLISION: _load_background_collision,
+    BackendEmitter.RANDOM_BYTE: _load_random_byte,
+    BackendEmitter.RANDOM_RANGE: _load_random_range,
 }
 
 

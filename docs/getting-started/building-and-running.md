@@ -43,6 +43,7 @@ python -m nes_pascal.cli examples/scrolling_ppu_state.nsp -o build/scrolling_ppu
 python -m nes_pascal.cli examples/collision_rectangles.nsp -o build/collision_rectangles.nes --chr assets/game.chr --metasprite assets/player_idle.json
 python -m nes_pascal.cli examples/collision_background.nsp -o build/collision_background.nes --collision-map assets/collision_map.cmap
 python -m nes_pascal.cli examples/collision_helpers.nsp -o build/collision_helpers.nes --chr assets/game.chr --metasprite assets/player_idle.json --collision-map assets/collision_map.cmap
+python -m nes_pascal.cli examples/random_numbers.nsp -o build/random_numbers.nes
 python -m nes_pascal.cli examples/gameplay_full_stack.nsp -o build/gameplay_full_stack.nes --chr assets/game.chr --nametable assets/nametable_loading.nam --metasprite assets/player_consolidated.json
 ```
 
@@ -111,6 +112,8 @@ The examples demonstrate:
 - `collision_helpers.nsp`: every collision API together, including custom
   bounds, wrap-safe edge behavior, sprite/metasprite integration, and the
   configured background map.
+- `random_numbers.nsp`: deterministic byte generation, inclusive bounded
+  ranges, explicit seeding, and a small Function-based gameplay roll.
 - `gameplay_full_stack.nsp`: the full-stack example that combines background
   loading, controller input, palettes, a moving metasprite player with
   animation, and combined RAM pressure in one program.

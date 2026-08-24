@@ -915,3 +915,12 @@ Semantic-analysis diagnostics use the E3000-E3999 range.
 - **Explanation:** A function result is read before assignment or is not assigned on every path through the body.
 - **Trigger:** Compile `tests/fixtures/diagnostics/undefined_function_result.nsp`.
 - **Suggested fix:** Assign the function name on every path before the function ends or before reading it.
+
+## E3064 - Invalid random range
+
+- **Category:** Semantic Analysis
+- **Explanation:** Constant inclusive bounds passed to `nes.random_range` have
+  a minimum greater than the maximum.
+- **Trigger:** Compile `tests/fixtures/diagnostics/invalid_random_range.nsp`.
+- **Expected compiler output:** `E3064` identifies the reversed constant range.
+- **Suggested fix:** Use byte bounds where minimum is less than or equal to maximum.

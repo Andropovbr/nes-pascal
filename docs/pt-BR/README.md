@@ -83,6 +83,8 @@ Esta pasta contém a tradução completa da documentação do **NES Pascal** par
 - [x] `docs/compiler/expression-temporaries-0.5.11.md` -> `docs/pt-BR/compiler/expression-temporaries-0.5.11.md`
 - [x] `docs/compiler/functions-0.5.12.md` -> `docs/pt-BR/compiler/functions-0.5.12.md`
 - [x] `docs/compiler/collision-helpers-0.5.13.md` -> `docs/pt-BR/compiler/collision-helpers-0.5.13.md`
+- [x] `docs/compiler/random-number-generation-0.5.14.md` -> `docs/pt-BR/compiler/random-number-generation-0.5.14.md`
+- [x] `docs/runtime/random-numbers.md` -> `docs/pt-BR/runtime/random-numbers.md`
 - [x] `docs/compiler/milestone-0.5.10-audit.md` -> `docs/pt-BR/compiler/milestone-0.5.10-audit.md`
 - [x] `docs/compiler/milestone-0.5.11-audit.md` -> `docs/pt-BR/compiler/milestone-0.5.11-audit.md`
 - [x] `docs/compiler/milestone-0.5.12-audit.md` -> `docs/pt-BR/compiler/milestone-0.5.12-audit.md`
