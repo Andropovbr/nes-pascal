@@ -120,6 +120,20 @@ The examples demonstrate:
 - `gameplay_full_stack.nsp`: the full-stack example that combines background
   loading, controller input, palettes, a moving metasprite player with
   animation, and combined RAM pressure in one program.
+- `nes_survivor/nes_survivor_vertical_slice.nsp`: the maintained NES Survivor
+  gameplay workload with Title/Playing/GameOver, animated player and Bats,
+  automatic sword, collisions, damage flash, XP gems, RNG spawning, and a
+  compile-time 41-sprite OAM peak.
+
+Build the vertical slice with its frozen local assets:
+
+```text
+python -m nes_pascal.cli examples/nes_survivor/nes_survivor_vertical_slice.nsp -o build/nes_survivor_vertical_slice.nes --chr assets/game.chr --metasprite assets/player.json --metasprite assets/sword.json --metasprite assets/bat.json --metasprite assets/gem.json
+```
+
+The asset paths are relative to the nested `.nsp` file. Provenance, hashes,
+pattern-table assignments, metrics, and comparison with the frozen C/Assembly
+reference are in the [0.5.16 vertical-slice report](../compiler/nes-survivor-vertical-slice-0.5.16.md).
 
 The player example's `PlayerMinimumX`, `PlayerMaximumX`, `PlayerMinimumY`, and
 `PlayerMaximumY` constants are specific to the bundled asset rather than

@@ -1,0 +1,319 @@
+# NES Survivor Vertical Slice — 0.5.16
+
+English | [Português (Brasil)](../pt-BR/compiler/nes-survivor-vertical-slice-0.5.16.md)
+
+Milestone 0.5.16 validates the existing NES Pascal language and runtime as one
+gameplay system. It adds a long-lived NES Survivor vertical slice; it does not
+change compiler allocation, introduce an optimization, or add a language
+feature.
+
+## Frozen reference
+
+The comparison baseline is the `main` branch of
+[`Andropovbr/nes-survivor`](https://github.com/Andropovbr/nes-survivor), frozen
+on 2026-08-24 at:
+
+```text
+af433de5ad5705d756e9f4cb9ff800fc91b6261c
+```
+
+The SHA was resolved from the official remote before inspection. The reference
+checkout remained read-only; an isolated build copy was used to verify the
+reference map and ROM. NES Pascal builds and tests never fetch that repository.
+
+The maintained workload is
+[`examples/nes_survivor/nes_survivor_vertical_slice.nsp`](../../examples/nes_survivor/nes_survivor_vertical_slice.nsp).
+Its build inputs live beside it under `assets/`, so clean and offline builds are
+reproducible.
+
+## Asset Workflow Findings
+
+| Local input | Frozen reference source | SHA-256 | Role |
+| --- | --- | --- | --- |
+| `assets/game.chr` | `assets/game.chr` plus `src/chr.s` | `285c4879a83641e45debc34e6c5ea889a8552e423cf0e24df88efcad7c7185e2` | Exact 8 KiB CHR composition extracted from the frozen reference ROM |
+| `assets/player.json` | `assets/png2chr-studio/nes_survivor.p2c.json`, `src/soldier_animation_data.c` | `a356e0d070e13ecae915ec356ec041e087506b92ae215b8e73705b0aba3a25a9` | Soldier idle/walking adapter |
+| `assets/sword.json` | same project plus `src/weapon_sword.c` | `bc1c7b22533b8db9b9f18fdfe7e29c47afbcc385be816c18c13c4c102d7f5715` | two-tile sword adapter |
+| `assets/bat.json` | same project plus `src/bat_animation_data.c` | `dacc6edbc988dafa6e33ef29cebd157f2592b23fb959da872d1eeef954d273ca` | two-frame Bat adapter |
+| `assets/gem.json` | same project plus `src/xp_gem.c` | `698b781aa3df5305689cf1a35c95c6e79e209cc52e000efcde31b4b03ef14ab9` | one-tile XP adapter |
+
+The reference source `assets/game.chr` has SHA-256
+`86d7033d970b090a01ac46c3ef42c469abbe58a719df0e02eee27a4b518a2c99`.
+Its first 4 KiB provides the sprite table; its second half is not copied into
+the ROM. The frozen `src/chr.s` generates the background font instead. The
+local `game.chr` is therefore the exact 8 KiB CHR bank extracted from the
+verified reference ROM, not an unmodified copy of the source asset.
+
+The four JSON files are deterministic, minimal adapters to the already
+supported `png2chr-studio-animation` version 2 contract. They preserve the
+reference tile indexes, attributes, frame timing, and geometry while splitting
+the four entities into separate assets. That split matters: NES Pascal reserves
+each instance for the largest frame in its asset, so one combined
+seven-component asset would waste OAM for every Bat and gem.
+
+To audit or recreate the inputs:
+
+1. check out the frozen SHA in a separate directory;
+2. verify the source `assets/game.chr` hash above, build the frozen reference,
+   and extract its final 8 KiB CHR bank (or assemble the equivalent
+   `src/chr.s` composition); verify the local-output hash from the table;
+3. inspect the five animations in
+   `assets/png2chr-studio/nes_survivor.p2c.json` and the generated/adapted C
+   tables named above;
+4. emit one supported version-2 metadata root for each entity, retaining the
+   exact component tiles and OAM attributes;
+5. run `python -m unittest tests.test_nes_survivor_vertical_slice -v` to verify
+   the CHR hash, occupied tile set, geometry counts, OAM budget, and structural
+   snapshot.
+
+The native PNG2CHR Studio project JSON and NES Pascal's current compiler input
+are not the same interchange format. Removing this manual adapter boundary is
+explicitly deferred to milestone 0.5.17.
+
+## CHR and Pattern-Table Findings
+
+The original `assets/game.chr` does **not** contain the pattern-table-1
+alphabet: its second 4 KiB is blank. The reference build obtains the glyphs
+from inline `font_tile` data in `src/chr.s`. That source copies only the first
+4 KiB of `assets/game.chr`, then emits the uppercase glyphs and zero-fills the
+rest of pattern table 1. The resulting C/Assembly ROM therefore has 21
+populated sprite tiles plus 18 populated background glyphs.
+
+The frozen NES Pascal `assets/game.chr` reproduces that final reference-ROM CHR
+composition byte for byte. No tile was redrawn or relocated. The runtime
+selects sprite pattern table `$0000-$0FFF` and background pattern table
+`$1000-$1FFF`, matching the reference.
+
+| CHR indexes | Pattern-table use in this workload |
+| --- | --- |
+| `$00-$07` | Soldier/player frames |
+| `$08-$09` | vertical sword |
+| `$0A-$0D` | two Bat flying frames |
+| `$0E-$13` | reference skeleton tiles, retained but unused |
+| `$14` | XP gem |
+| `$15-$FF` in sprite table | blank |
+| background tiles `$41-$45`, `$47-$49`, `$4D-$50`, `$52-$56`, `$59` | uppercase glyphs generated by `src/chr.s` |
+| all other background-table tiles | blank |
+
+NES Pascal can preserve the pattern-table organization, but it does not yet
+have the reference's small direct screen-text loader. Pulling in the current
+general background-update queue would reserve 995 bytes of regular RAM, more
+than the 918 bytes left by this gameplay workload. The integration-safe
+fallback therefore keeps Title, Playing, damage, and GameOver distinct through
+universal-background colors, with a centered seven-sprite Soldier emblem on
+Title. The reference glyphs remain frozen in the CHR for exact provenance and
+future screen-workflow validation; this slice does not render them.
+
+## Implemented vertical slice
+
+The program composes these existing features:
+
+- `GameState`, `EnemyState`, and `GemState` enumerations for Title, Playing,
+  GameOver, enemies, and pickups;
+- fixed arrays of 12 four-byte `Enemy` records and eight three-byte
+  `ExperienceGem` records;
+- typed Functions for active-state and rectangle-collision queries;
+- controller-driven eight-direction player movement with opposite directions
+  cancelling per axis;
+- one-frame idle and two-frame walking animation with retained horizontal
+  facing;
+- an automatic 12-frame sword attack on a 60-frame period;
+- 12 simultaneous animated Bats, edge spawning through the deterministic RNG,
+  and one-pixel pursuit every three gameplay updates;
+- parity-scheduled sword/Bat collision, Bat death, and XP-gem creation;
+- one rotating pickup collision per update and an observable XP count;
+- one rotating Bat/player contact test, five HP, 30 updates of invulnerability,
+  and a ten-update red background flash replacing audio feedback;
+- visible Title, Playing, and GameOver states, with Start beginning and
+  restarting a session without resetting the ROM.
+
+The exact gameplay is representative rather than a source port. It retains the
+reference pool sizes, attack period, damage rules, spawn period, art, and OAM
+peak while keeping the example readable within the implemented Pascal subset.
+
+## OAM ownership
+
+All ownership is resolved at compile time:
+
+| Entity pool | Instances | Sprites each | Reserved/visible peak |
+| --- | ---: | ---: | ---: |
+| Player | 1 | 7 | 7 |
+| Sword | 1 | 2 | 2 |
+| Bats | 12 | 2 | 24 |
+| XP gems | 8 | 1 | 8 |
+| **Total** | **22 metasprites** | — | **41/64** |
+
+The final slot is `$28` (decimal 40), leaving 23 OAM entries available. The
+Mesen scenario makes all 41 entries visible together and verifies the exact
+count. Like the C reference, the workload does not implement scanline-priority
+rotation, so ordinary NES eight-sprites-per-scanline flicker remains possible.
+
+## Measured NES Pascal output
+
+The benchmark is `nes_survivor_vertical_slice` in
+`tools/measure_benchmarks.py`.
+
+| Code metric | Verified value |
+| --- | ---: |
+| PRG code | 5,908 B |
+| PRG occupied, including vectors | 5,914 B |
+| iNES header | 16 B |
+| CHR-ROM | 8,192 B |
+| Generated Assembly lines | 4,904 |
+| Generated instructions | 2,653 |
+| Static base-cycle sum across emitted instructions | 8,099 |
+| Maximum expression-tree depth | 2 |
+| Maximum live expression temporaries | 0 |
+| Maximum user call depth | 5 |
+| Maximum user return-stack use | 10 B |
+
+The 8,099-cycle value is the benchmark estimator's sum over the emitted static
+instruction stream, not a frame path or profiler result. Dynamic frame cost is
+covered separately by Mesen.
+
+### Generated-code inspection
+
+The generated ca65 was inspected around `UpdatePlayer`, `UpdateSword`,
+`UpdateEnemies`, both collision loops, `UpdateGems`, and state dispatch.
+Four-byte Enemy indexing lowers predictably to two `ASL` instructions, while
+three-byte gem indexing uses a small repeated-add loop. Each field access
+recomputes that scaled offset, and the source-level metasprite-handle dispatch
+becomes two explicit branch chains. Shared collision, RNG, animation, and
+metasprite helpers are called rather than duplicated.
+
+There is no expression-temporary pressure, but the corpus scanner records 31
+canonical Boolean materializations, 22 redundant `CMP #$00` candidates, and
+four store/load round trips. Together with repeated record-address scaling,
+these are measured codegen opportunities—not optimizations silently folded
+into this integration milestone.
+
+### CPU RAM accounting
+
+| Memory metric | Bytes |
+| --- | ---: |
+| Zero Page runtime symbols | 15 |
+| Zero Page compiler caches | 7 |
+| Zero Page promoted user variables | 32 |
+| Zero Page expression temporaries required | 0 |
+| **Zero Page allocated/reserved by workload** | **54** |
+| Zero Page policy-reserved/unavailable | 97 |
+| **Allocator-visible Zero Page free** | **105** |
+| Regular runtime allocation | 243 |
+| Regular compiler function-result allocation | 3 |
+| Regular user allocation | 116 |
+| **Non-ZP regular/runtime/user allocation** | **362** |
+| OAM shadow allocation | 256 |
+| Hardware stack page reservation | 256 |
+| **Allocator-visible regular RAM free** | **918** |
+| **Total allocator-visible free memory** | **1,023** |
+| **Compiler/runtime/user allocated or reserved** | **672** |
+| **Total committed/reserved CPU address space** | **1,025** |
+
+The accounting reconciles the NES's 2 KiB exactly:
+
+```text
+1,025 committed/reserved + 1,023 allocator-visible free = 2,048 bytes
+```
+
+The 97 policy bytes are unavailable Zero Page, not program consumption. The
+256-byte hardware stack is reserved by hardware policy, not dynamically proven
+stack occupancy.
+
+### Runtime stress result
+
+The deterministic headless scenario reaches 12 live Bats plus eight live gems,
+holds the full 41-sprite OAM load for 120 video frames, and observes 107
+completed gameplay updates. That is approximately 53.5 updates/second on an
+NTSC 60 Hz timeline. The ROM does not crash, freeze, execute invalid code, or
+corrupt OAM, and the frame-coalescing runtime continues to process the newest
+state.
+
+This result is intentionally reported as a performance gap. The test enforces
+a floor of 100 updates per 120 frames so a material regression cannot silently
+replace the measured baseline.
+
+## Comparison with the C/Assembly reference
+
+| Area | Frozen C/Assembly reference | NES Pascal vertical slice |
+| --- | --- | --- |
+| PRG occupied | 8,403 B | 5,914 B |
+| OAM peak | 41/64 | 41/64 |
+| Enemy pool | 12 Bats | 12 Bats |
+| Gem pool | 8 visible, excess drops condensed | 8 visible, excess drops omitted |
+| Player motion | 1 px/axis/update | 1 px/axis/update |
+| Bat motion | Q4 average 0.375 px/axis/update | 1 px every 3 updates, about 0.333 |
+| Attack | 12 active frames every 60 | same |
+| Damage | five HP, 30-frame cooldown, APU noise | five HP, 30-update cooldown, ten-update red flash |
+| Initial screens | PresentedBy + text Title | color/emblem Title |
+| Restart | GameOver -> Title -> Playing | GameOver -> Playing |
+| Full stress | 1,735/1,735 gameplay updates after baseline | 107/120 updates at 41 sprites |
+
+The PRG sizes are not a compiler shootout. The C ROM includes fixed font/text
+screens, cc65 startup/library support, separation, condensed drops, and other
+reference-only behavior. The Pascal number measures the explicitly scoped
+vertical slice. The reference did not separately profile gameplay cycle counts;
+its normal NMI path is documented at about 590 cycles.
+
+The largest implementation difference is rendering. The reference shares Bat
+animation state and uses a specialized two-sprite renderer. NES Pascal uses 22
+general static metasprite instances, each with generic animation/runtime state.
+That generality explains much of the observed worst-case update loss.
+
+## Gaps exposed
+
+| Classification | Required behavior / current limitation | Workaround and cost | Used? | Recommended action |
+| --- | --- | --- | :---: | --- |
+| **LANGUAGE GAP** | Collections and callable parameters cannot carry opaque metasprite handles. | Declare 20 handles and select them through two branch-dispatch procedures; adds source and generated branches. | Yes | Evaluate statically owned handle arrays/parameters in Additional Language Features. |
+| **ERGONOMICS/BOILERPLATE GAP** | No locals, whole-record initialization, or indexed-field `inc`/`dec`. | Use shared work variables and reset/update every field explicitly; contributes to the 663-line source. | Yes | Address only through separately scoped language work. |
+| **RUNTIME GAP** | No small direct state-screen text loader; the general background queue reserves 995 B and does not fit the 918 B remaining. | Preserve the reference font in CHR but render state colors and a sprite emblem; textual screens are omitted. | Yes | Measure a smaller static-screen path in future runtime-footprint work. |
+| **RUNTIME GAP** | No scanline-priority rotation or bulk entity renderer. | Keep static ownership and accept possible eight-sprites-per-scanline flicker. | Yes | Benchmark any bulk/rotation API before adopting it. |
+| **ASSET GAP** | Native PNG2CHR Studio project metadata is not the compiler's version-2 input schema. | Maintain four small frozen adapters; costs manual transformation and synchronization. | Yes | Resolve canonical interchange/versioning in 0.5.17. |
+| **CODEGEN/PERFORMANCE GAP** | Generic state per metasprite and repeated array-of-record scaling reduce peak update rate. | Retain generic APIs and enforce the measured 107/120-update baseline; no optimizer changes. | Yes | Preserve the workload for structured-backend and runtime-footprint measurement. |
+| **TEST/TOOLING GAP** | No exact dynamic cycle profiler is integrated into the benchmark tool. | Separate static instruction/base-cycle metrics from deterministic Mesen update throughput; exact frame-path cycles remain unknown. | Yes | Add profiling only in a dedicated benchmark/tooling milestone. |
+
+### Language and source ergonomics
+
+- Arrays cannot contain opaque `sprite` or `metasprite` handles, and callable
+  parameters cannot use those types. The example therefore declares 20 pool
+  handles and selects them through two explicit dispatch procedures.
+- The language has no local variables or whole-record initialization. Shared
+  work variables and explicit field resets make the 663-line example longer
+  than the equivalent systems would be in mature Pascal.
+- `inc`/`dec` do not target indexed record fields, so pursuit uses explicit
+  read/add/write expressions.
+
+These are ergonomic gaps, not correctness failures. Opaque-handle collection
+and parameter support is recorded under the planned Additional Language
+Features milestone.
+
+### Runtime and performance
+
+- General per-instance metasprite animation/rendering misses 13 of 120 updates
+  at the 41-sprite peak; the specialized reference renderer misses none in its
+  longer stress scenario.
+- Animation state is duplicated for 22 instances even though all Bats can share
+  one cosmetic frame/timer.
+- There is no scanline sprite rotation, entity-pool primitive, or bulk
+  metasprite renderer. Any such abstraction needs measurement before it earns a
+  runtime API.
+
+The existing structured-backend, optimization-benchmark, and runtime-footprint
+roadmap milestones now explicitly retain this workload and its 41-sprite
+stress baseline. No optimization is implemented in 0.5.16.
+
+### Assets and screens
+
+- The reference `.p2c.json` project is not directly consumable as NES Pascal
+  metadata. Versioned interchange/adapters are the next milestone's scope.
+- The frozen CHR includes the reference's generated font, but the current
+  general background-update queue does not fit this workload's remaining RAM;
+  the slice therefore uses state colors and a sprite emblem instead of text.
+- Bat separation and full-pool gem condensation remain reference-only policies;
+  they are not required to prove the compiler integration.
+
+## Validation
+
+The milestone adds focused asset, structural-golden, benchmark, toolchain, and
+Mesen regression coverage. The final local baseline is 590 automated tests,
+including all 34 dedicated headless Mesen tests, plus the complete benchmark
+corpus and ROM smoke build. The authoritative CI result is recorded with the
+milestone branch/commit rather than inferred from local execution.

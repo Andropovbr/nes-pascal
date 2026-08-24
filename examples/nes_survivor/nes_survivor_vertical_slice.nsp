@@ -1,0 +1,663 @@
+program NesSurvivorVerticalSlice;
+
+type
+    GameState = (Title, Playing, GameOver);
+    EnemyState = (EnemyInactive, EnemyAlive);
+    GemState = (GemInactive, GemActive);
+    Enemy = record
+        X: byte;
+        Y: byte;
+        State: EnemyState;
+        FacingLeft: boolean;
+    end;
+    ExperienceGem = record
+        X: byte;
+        Y: byte;
+        State: GemState;
+    end;
+
+const
+    LastEnemy: byte = $0B;
+    LastGem: byte = $07;
+    PlayerStartX: byte = $80;
+    PlayerStartY: byte = $78;
+    PlayerMinimumX: byte = $0C;
+    PlayerMaximumX: byte = $F3;
+    PlayerMinimumY: byte = $0C;
+    PlayerMaximumY: byte = $E3;
+    PlayerInitialHealth: byte = $05;
+    PlayerInvulnerabilityFrames: byte = $1E;
+    SwordActiveFrames: byte = $0C;
+    SwordPeriodFrames: byte = $3C;
+    EnemySpawnFrames: byte = $78;
+    EnemyMoveDelay: byte = $02;
+    DamageFlashFrames: byte = $0A;
+    ArenaColor: nes_color = $0F;
+    TitleColor: nes_color = $12;
+    DamageColor: nes_color = $06;
+    GameOverColor: nes_color = $16;
+
+var
+    State: GameState;
+    Enemies: array[$00..$0B] of Enemy;
+    Gems: array[$00..$07] of ExperienceGem;
+
+    PlayerVisual: metasprite;
+    SwordVisual: metasprite;
+    BatVisual0: metasprite;
+    BatVisual1: metasprite;
+    BatVisual2: metasprite;
+    BatVisual3: metasprite;
+    BatVisual4: metasprite;
+    BatVisual5: metasprite;
+    BatVisual6: metasprite;
+    BatVisual7: metasprite;
+    BatVisual8: metasprite;
+    BatVisual9: metasprite;
+    BatVisual10: metasprite;
+    BatVisual11: metasprite;
+    GemVisual0: metasprite;
+    GemVisual1: metasprite;
+    GemVisual2: metasprite;
+    GemVisual3: metasprite;
+    GemVisual4: metasprite;
+    GemVisual5: metasprite;
+    GemVisual6: metasprite;
+    GemVisual7: metasprite;
+    SelectedBatVisual: metasprite;
+    SelectedGemVisual: metasprite;
+
+    PlayerX: byte;
+    PlayerY: byte;
+    PlayerHealth: byte;
+    PlayerInvulnerability: byte;
+    PlayerFacingLeft: boolean;
+    PlayerMoving: boolean;
+    SwordX: byte;
+    SwordY: byte;
+    SwordActive: byte;
+    SwordCooldown: byte;
+    SpawnTimer: byte;
+    EnemyMoveTimer: byte;
+    DamageFlashTimer: byte;
+    ContactScanIndex: byte;
+    SwordScanParity: byte;
+    GemScanIndex: byte;
+    ExperienceCollected: byte;
+    SessionCount: byte;
+    ActiveEnemyCount: byte;
+    ActiveGemCount: byte;
+
+    Index: byte;
+    WorkIndex: byte;
+    RandomEdge: byte;
+    SpawnFound: boolean;
+    LeftHeld: boolean;
+    RightHeld: boolean;
+    UpHeld: boolean;
+    DownHeld: boolean;
+    PlayerBounds: nes_rect;
+    SwordBounds: nes_rect;
+    EnemyBounds: nes_rect;
+    GemBounds: nes_rect;
+
+procedure SelectBatVisual(Value: byte);
+begin
+    if Value = $00 then
+        SelectedBatVisual := BatVisual0
+    else if Value = $01 then
+        SelectedBatVisual := BatVisual1
+    else if Value = $02 then
+        SelectedBatVisual := BatVisual2
+    else if Value = $03 then
+        SelectedBatVisual := BatVisual3
+    else if Value = $04 then
+        SelectedBatVisual := BatVisual4
+    else if Value = $05 then
+        SelectedBatVisual := BatVisual5
+    else if Value = $06 then
+        SelectedBatVisual := BatVisual6
+    else if Value = $07 then
+        SelectedBatVisual := BatVisual7
+    else if Value = $08 then
+        SelectedBatVisual := BatVisual8
+    else if Value = $09 then
+        SelectedBatVisual := BatVisual9
+    else if Value = $0A then
+        SelectedBatVisual := BatVisual10
+    else
+        SelectedBatVisual := BatVisual11;
+end;
+
+procedure SelectGemVisual(Value: byte);
+begin
+    if Value = $00 then
+        SelectedGemVisual := GemVisual0
+    else if Value = $01 then
+        SelectedGemVisual := GemVisual1
+    else if Value = $02 then
+        SelectedGemVisual := GemVisual2
+    else if Value = $03 then
+        SelectedGemVisual := GemVisual3
+    else if Value = $04 then
+        SelectedGemVisual := GemVisual4
+    else if Value = $05 then
+        SelectedGemVisual := GemVisual5
+    else if Value = $06 then
+        SelectedGemVisual := GemVisual6
+    else
+        SelectedGemVisual := GemVisual7;
+end;
+
+function EnemyIsAlive(Value: byte): boolean;
+begin
+    EnemyIsAlive := Enemies[Value].State = EnemyAlive;
+end;
+
+function SwordHitsEnemy(Value: byte): boolean;
+begin
+    EnemyBounds.X := Enemies[Value].X - $08;
+    EnemyBounds.Y := Enemies[Value].Y - $04;
+    EnemyBounds.Width := $10;
+    EnemyBounds.Height := $08;
+    SwordHitsEnemy := nes.collides(SwordBounds, EnemyBounds);
+end;
+
+function GemTouchesPlayer(Value: byte): boolean;
+begin
+    GemBounds.X := Gems[Value].X - $04;
+    GemBounds.Y := Gems[Value].Y - $04;
+    GemBounds.Width := $08;
+    GemBounds.Height := $08;
+    GemTouchesPlayer := nes.collides(PlayerBounds, GemBounds);
+end;
+
+procedure HideAllEnemies;
+begin
+    for WorkIndex := $00 to LastEnemy do
+    begin
+        SelectBatVisual(WorkIndex);
+        nes.metasprite_hide(SelectedBatVisual);
+    end;
+end;
+
+procedure HideAllGems;
+begin
+    for WorkIndex := $00 to LastGem do
+    begin
+        SelectGemVisual(WorkIndex);
+        nes.metasprite_hide(SelectedGemVisual);
+    end;
+end;
+
+procedure ResetGameplay;
+begin
+    PlayerX := PlayerStartX;
+    PlayerY := PlayerStartY;
+    PlayerHealth := PlayerInitialHealth;
+    PlayerInvulnerability := $00;
+    PlayerFacingLeft := false;
+    PlayerMoving := false;
+    SwordX := PlayerX + $10;
+    SwordY := PlayerY;
+    SwordActive := $00;
+    SwordCooldown := $00;
+    SpawnTimer := EnemySpawnFrames;
+    EnemyMoveTimer := EnemyMoveDelay;
+    DamageFlashTimer := $00;
+    ContactScanIndex := $00;
+    SwordScanParity := $00;
+    GemScanIndex := $00;
+    ExperienceCollected := $00;
+    ActiveEnemyCount := $00;
+    ActiveGemCount := $00;
+
+    for WorkIndex := $00 to LastEnemy do
+    begin
+        Enemies[WorkIndex].X := $08;
+        Enemies[WorkIndex].Y := $08;
+        Enemies[WorkIndex].State := EnemyInactive;
+        Enemies[WorkIndex].FacingLeft := false;
+    end;
+    for WorkIndex := $00 to LastGem do
+    begin
+        Gems[WorkIndex].X := $04;
+        Gems[WorkIndex].Y := $04;
+        Gems[WorkIndex].State := GemInactive;
+    end;
+
+    HideAllEnemies;
+    HideAllGems;
+    nes.metasprite_hide(SwordVisual);
+end;
+
+procedure ShowTitle;
+begin
+    State := Title;
+    HideAllEnemies;
+    HideAllGems;
+    nes.metasprite_hide(SwordVisual);
+    nes.metasprite_set_position(PlayerVisual, PlayerStartX, PlayerStartY);
+    nes.metasprite_set_flip_horizontal(PlayerVisual, false);
+    nes.metasprite_set_animation(PlayerVisual, player.idle);
+    nes.metasprite_show(PlayerVisual);
+end;
+
+procedure StartGame;
+begin
+    ResetGameplay;
+    inc(SessionCount);
+    nes.seed_random(SessionCount);
+    nes.metasprite_set_position(PlayerVisual, PlayerX, PlayerY);
+    nes.metasprite_set_flip_horizontal(PlayerVisual, false);
+    nes.metasprite_set_animation(PlayerVisual, player.idle);
+    nes.metasprite_restart_animation(PlayerVisual);
+    nes.metasprite_show(PlayerVisual);
+    nes.set_background_color(ArenaColor);
+    State := Playing;
+end;
+
+procedure EnterGameOver;
+begin
+    State := GameOver;
+    nes.metasprite_hide(PlayerVisual);
+    nes.metasprite_hide(SwordVisual);
+    HideAllEnemies;
+    HideAllGems;
+    nes.set_background_color(GameOverColor);
+end;
+
+procedure UpdatePlayer;
+begin
+    LeftHeld := nes.controller_down($01, nes.button_left);
+    RightHeld := nes.controller_down($01, nes.button_right);
+    UpHeld := nes.controller_down($01, nes.button_up);
+    DownHeld := nes.controller_down($01, nes.button_down);
+    PlayerMoving := false;
+
+    if LeftHeld and not RightHeld then
+    begin
+        if PlayerX > PlayerMinimumX then
+            dec(PlayerX);
+        PlayerFacingLeft := true;
+        PlayerMoving := true;
+    end
+    else if RightHeld and not LeftHeld then
+    begin
+        if PlayerX < PlayerMaximumX then
+            inc(PlayerX);
+        PlayerFacingLeft := false;
+        PlayerMoving := true;
+    end;
+
+    if UpHeld and not DownHeld then
+    begin
+        if PlayerY > PlayerMinimumY then
+            dec(PlayerY);
+        PlayerMoving := true;
+    end
+    else if DownHeld and not UpHeld then
+    begin
+        if PlayerY < PlayerMaximumY then
+            inc(PlayerY);
+        PlayerMoving := true;
+    end;
+
+    if PlayerMoving then
+        nes.metasprite_set_animation(PlayerVisual, player.walking)
+    else
+        nes.metasprite_set_animation(PlayerVisual, player.idle);
+    nes.metasprite_set_flip_horizontal(PlayerVisual, PlayerFacingLeft);
+    nes.metasprite_set_position(PlayerVisual, PlayerX, PlayerY);
+
+    PlayerBounds.X := PlayerX - $04;
+    PlayerBounds.Y := PlayerY - $04;
+    PlayerBounds.Width := $10;
+    PlayerBounds.Height := $10;
+end;
+
+procedure UpdateSword;
+begin
+    if SwordActive > $00 then
+    begin
+        dec(SwordActive);
+        if SwordActive = $00 then
+            nes.metasprite_hide(SwordVisual);
+    end;
+    if SwordCooldown > $00 then
+        dec(SwordCooldown);
+
+    if (SwordActive = $00) and (SwordCooldown = $00) then
+    begin
+        SwordActive := SwordActiveFrames;
+        SwordCooldown := SwordPeriodFrames;
+        nes.metasprite_restart_animation(SwordVisual);
+        nes.metasprite_show(SwordVisual);
+    end;
+
+    if SwordActive > $00 then
+    begin
+        if PlayerFacingLeft then
+            SwordX := PlayerX - $10
+        else
+            SwordX := PlayerX + $10;
+        SwordY := PlayerY;
+        nes.metasprite_set_flip_horizontal(SwordVisual, PlayerFacingLeft);
+        nes.metasprite_set_position(SwordVisual, SwordX, SwordY);
+        SwordBounds.X := SwordX - $04;
+        SwordBounds.Y := SwordY - $08;
+        SwordBounds.Width := $08;
+        SwordBounds.Height := $10;
+    end;
+end;
+
+procedure SpawnEnemy;
+begin
+    WorkIndex := $00;
+    SpawnFound := false;
+    while (WorkIndex <= LastEnemy) and not SpawnFound do
+    begin
+        if Enemies[WorkIndex].State = EnemyInactive then
+            SpawnFound := true
+        else
+            inc(WorkIndex);
+    end;
+
+    if SpawnFound then
+    begin
+        RandomEdge := nes.random_range($00, $03);
+        if RandomEdge = $00 then
+        begin
+            Enemies[WorkIndex].X := $08;
+            Enemies[WorkIndex].Y := nes.random_range($08, $E8);
+        end
+        else if RandomEdge = $01 then
+        begin
+            Enemies[WorkIndex].X := $F7;
+            Enemies[WorkIndex].Y := nes.random_range($08, $E8);
+        end
+        else if RandomEdge = $02 then
+        begin
+            Enemies[WorkIndex].X := nes.random_range($08, $F7);
+            Enemies[WorkIndex].Y := $08;
+        end
+        else
+        begin
+            Enemies[WorkIndex].X := nes.random_range($08, $F7);
+            Enemies[WorkIndex].Y := $E8;
+        end;
+        Enemies[WorkIndex].State := EnemyAlive;
+        Enemies[WorkIndex].FacingLeft := Enemies[WorkIndex].X > PlayerX;
+        inc(ActiveEnemyCount);
+        SelectBatVisual(WorkIndex);
+        nes.metasprite_set_position(
+            SelectedBatVisual,
+            Enemies[WorkIndex].X,
+            Enemies[WorkIndex].Y
+        );
+        nes.metasprite_set_flip_horizontal(
+            SelectedBatVisual,
+            Enemies[WorkIndex].FacingLeft
+        );
+        nes.metasprite_set_animation(SelectedBatVisual, bat.flying);
+        nes.metasprite_restart_animation(SelectedBatVisual);
+        nes.metasprite_show(SelectedBatVisual);
+    end;
+end;
+
+procedure UpdateEnemies;
+begin
+    if SpawnTimer > $00 then
+        dec(SpawnTimer);
+    if SpawnTimer = $00 then
+    begin
+        SpawnEnemy;
+        SpawnTimer := EnemySpawnFrames;
+    end;
+
+    if EnemyMoveTimer > $00 then
+        dec(EnemyMoveTimer)
+    else
+        EnemyMoveTimer := EnemyMoveDelay;
+
+    for WorkIndex := $00 to LastEnemy do
+    begin
+        if EnemyIsAlive(WorkIndex) then
+        begin
+            if EnemyMoveTimer = EnemyMoveDelay then
+            begin
+                if Enemies[WorkIndex].X < PlayerX then
+                begin
+                    Enemies[WorkIndex].X := Enemies[WorkIndex].X + $01;
+                    Enemies[WorkIndex].FacingLeft := false;
+                end
+                else if Enemies[WorkIndex].X > PlayerX then
+                begin
+                    Enemies[WorkIndex].X := Enemies[WorkIndex].X - $01;
+                    Enemies[WorkIndex].FacingLeft := true;
+                end;
+                if Enemies[WorkIndex].Y < PlayerY then
+                    Enemies[WorkIndex].Y := Enemies[WorkIndex].Y + $01
+                else if Enemies[WorkIndex].Y > PlayerY then
+                    Enemies[WorkIndex].Y := Enemies[WorkIndex].Y - $01;
+            end;
+            SelectBatVisual(WorkIndex);
+            nes.metasprite_set_position(
+                SelectedBatVisual,
+                Enemies[WorkIndex].X,
+                Enemies[WorkIndex].Y
+            );
+            nes.metasprite_set_flip_horizontal(
+                SelectedBatVisual,
+                Enemies[WorkIndex].FacingLeft
+            );
+        end;
+    end;
+end;
+
+procedure SpawnGem(X: byte; Y: byte);
+begin
+    WorkIndex := $00;
+    SpawnFound := false;
+    while (WorkIndex <= LastGem) and not SpawnFound do
+    begin
+        if Gems[WorkIndex].State = GemInactive then
+            SpawnFound := true
+        else
+            inc(WorkIndex);
+    end;
+    if SpawnFound then
+    begin
+        Gems[WorkIndex].X := X;
+        Gems[WorkIndex].Y := Y;
+        Gems[WorkIndex].State := GemActive;
+        inc(ActiveGemCount);
+        SelectGemVisual(WorkIndex);
+        nes.metasprite_set_position(SelectedGemVisual, X, Y);
+        nes.metasprite_show(SelectedGemVisual);
+    end;
+end;
+
+procedure UpdateSwordCollisions;
+begin
+    if SwordActive > $00 then
+    begin
+        WorkIndex := SwordScanParity;
+        while WorkIndex <= LastEnemy do
+        begin
+            if EnemyIsAlive(WorkIndex) then
+            begin
+                if SwordHitsEnemy(WorkIndex) then
+                begin
+                    Enemies[WorkIndex].State := EnemyInactive;
+                    dec(ActiveEnemyCount);
+                    SelectBatVisual(WorkIndex);
+                    nes.metasprite_hide(SelectedBatVisual);
+                    SpawnGem(Enemies[WorkIndex].X, Enemies[WorkIndex].Y);
+                end;
+            end;
+            WorkIndex := WorkIndex + $02;
+        end;
+        if SwordScanParity = $00 then
+            SwordScanParity := $01
+        else
+            SwordScanParity := $00;
+    end;
+end;
+
+procedure UpdatePlayerDamage;
+begin
+    if PlayerInvulnerability > $00 then
+        dec(PlayerInvulnerability);
+
+    if Enemies[ContactScanIndex].State = EnemyAlive then
+    begin
+        EnemyBounds.X := Enemies[ContactScanIndex].X - $08;
+        EnemyBounds.Y := Enemies[ContactScanIndex].Y - $04;
+        EnemyBounds.Width := $10;
+        EnemyBounds.Height := $08;
+        if nes.collides(PlayerBounds, EnemyBounds) and
+            (PlayerInvulnerability = $00) then
+        begin
+            dec(PlayerHealth);
+            PlayerInvulnerability := PlayerInvulnerabilityFrames;
+            DamageFlashTimer := DamageFlashFrames;
+            nes.set_background_color(DamageColor);
+        end;
+    end;
+    if ContactScanIndex < LastEnemy then
+        inc(ContactScanIndex)
+    else
+        ContactScanIndex := $00;
+end;
+
+procedure UpdateGems;
+begin
+    if Gems[GemScanIndex].State = GemActive then
+    begin
+        if GemTouchesPlayer(GemScanIndex) then
+        begin
+            Gems[GemScanIndex].State := GemInactive;
+            inc(ExperienceCollected);
+            dec(ActiveGemCount);
+            SelectGemVisual(GemScanIndex);
+            nes.metasprite_hide(SelectedGemVisual);
+        end;
+    end;
+    if GemScanIndex < LastGem then
+        inc(GemScanIndex)
+    else
+        GemScanIndex := $00;
+end;
+
+procedure UpdateDamageFlash;
+begin
+    if DamageFlashTimer > $00 then
+    begin
+        dec(DamageFlashTimer);
+        if DamageFlashTimer = $00 then
+            nes.set_background_color(ArenaColor);
+    end;
+end;
+
+procedure UpdatePlaying;
+begin
+    UpdateDamageFlash;
+    UpdatePlayer;
+    UpdateSword;
+    UpdateEnemies;
+    UpdateSwordCollisions;
+    UpdatePlayerDamage;
+    UpdateGems;
+    if PlayerHealth = $00 then
+        EnterGameOver;
+end;
+
+procedure Update;
+begin
+    if State = Title then
+    begin
+        if nes.controller_pressed($01, nes.button_start) then
+            StartGame;
+    end
+    else if State = Playing then
+    begin
+        UpdatePlaying;
+    end
+    else if State = GameOver then
+    begin
+        if nes.controller_pressed($01, nes.button_start) then
+            StartGame;
+    end;
+end;
+
+begin
+    nes.import_metasprite(player);
+    nes.import_metasprite(sword);
+    nes.import_metasprite(bat);
+    nes.import_metasprite(gem);
+
+    PlayerVisual := nes.metasprite_create(player.idle_0);
+    SwordVisual := nes.metasprite_create(sword.attacking_0);
+    BatVisual0 := nes.metasprite_create(bat.flying_0);
+    BatVisual1 := nes.metasprite_create(bat.flying_0);
+    BatVisual2 := nes.metasprite_create(bat.flying_0);
+    BatVisual3 := nes.metasprite_create(bat.flying_0);
+    BatVisual4 := nes.metasprite_create(bat.flying_0);
+    BatVisual5 := nes.metasprite_create(bat.flying_0);
+    BatVisual6 := nes.metasprite_create(bat.flying_0);
+    BatVisual7 := nes.metasprite_create(bat.flying_0);
+    BatVisual8 := nes.metasprite_create(bat.flying_0);
+    BatVisual9 := nes.metasprite_create(bat.flying_0);
+    BatVisual10 := nes.metasprite_create(bat.flying_0);
+    BatVisual11 := nes.metasprite_create(bat.flying_0);
+    GemVisual0 := nes.metasprite_create(gem.idle_0);
+    GemVisual1 := nes.metasprite_create(gem.idle_0);
+    GemVisual2 := nes.metasprite_create(gem.idle_0);
+    GemVisual3 := nes.metasprite_create(gem.idle_0);
+    GemVisual4 := nes.metasprite_create(gem.idle_0);
+    GemVisual5 := nes.metasprite_create(gem.idle_0);
+    GemVisual6 := nes.metasprite_create(gem.idle_0);
+    GemVisual7 := nes.metasprite_create(gem.idle_0);
+
+    for Index := $00 to LastEnemy do
+    begin
+        Enemies[Index].X := $08;
+        Enemies[Index].Y := $08;
+        Enemies[Index].State := EnemyInactive;
+        Enemies[Index].FacingLeft := false;
+    end;
+    for Index := $00 to LastGem do
+    begin
+        Gems[Index].X := $04;
+        Gems[Index].Y := $04;
+        Gems[Index].State := GemInactive;
+    end;
+    Enemies[$00].State := EnemyInactive;
+    Gems[$00].State := GemInactive;
+    PlayerBounds.X := $00;
+    PlayerBounds.Y := $00;
+    PlayerBounds.Width := $00;
+    PlayerBounds.Height := $00;
+    SwordBounds.X := $00;
+    SwordBounds.Y := $00;
+    SwordBounds.Width := $00;
+    SwordBounds.Height := $00;
+    EnemyBounds.X := $00;
+    EnemyBounds.Y := $00;
+    EnemyBounds.Width := $00;
+    EnemyBounds.Height := $00;
+    GemBounds.X := $00;
+    GemBounds.Y := $00;
+    GemBounds.Width := $00;
+    GemBounds.Height := $00;
+    SessionCount := $00;
+    nes.set_sprite_palette($00, $0F, $00, $10, $37);
+    nes.set_sprite_palette($01, $0F, $08, $19, $06);
+    nes.set_sprite_palette($03, $0F, $03, $13, $23);
+    nes.set_background_color(TitleColor);
+    ResetGameplay;
+    ShowTitle;
+    nes.on_update(Update);
+    nes.run;
+end.

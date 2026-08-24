@@ -190,6 +190,18 @@ BENCHMARKS: tuple[BenchmarkSpec, ...] = (
         nametable_path="assets/nametable_loading.nam",
         metasprite_paths=("assets/player_consolidated.json",),
     ),
+    BenchmarkSpec(
+        "nes_survivor_vertical_slice",
+        "NES Survivor Vertical Slice",
+        "examples/nes_survivor/nes_survivor_vertical_slice.nsp",
+        chr_path="nes_survivor/assets/game.chr",
+        metasprite_paths=(
+            "nes_survivor/assets/player.json",
+            "nes_survivor/assets/sword.json",
+            "nes_survivor/assets/bat.json",
+            "nes_survivor/assets/gem.json",
+        ),
+    ),
 )
 
 
@@ -893,7 +905,7 @@ def run_all_benchmarks() -> list[BenchmarkMetrics]:
 
 def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
     lines: list[str] = [
-        "# NES Pascal Compiler Benchmark Results (through 0.5.15 Game-State Support)",
+        "# NES Pascal Compiler Benchmark Results (through 0.5.16 NES Survivor Vertical Slice)",
         "",
         "## 1. CPU RAM Accounting",
         "",

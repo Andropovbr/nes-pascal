@@ -1,0 +1,55 @@
+{
+  "format": "png2chr-studio-animation",
+  "version": 2,
+  "name": "sword",
+  "source": {
+    "image": "sword_attacking.png",
+    "image_width": 8,
+    "image_height": 16,
+    "frame_width": 8,
+    "frame_height": 16,
+    "tile_width": 8,
+    "tile_height": 8,
+    "frame_columns": 1,
+    "frame_rows": 1
+  },
+  "chr": {
+    "output": "game.chr",
+    "capacity_tiles": 256,
+    "base_tile_count": 8,
+    "reused_destination_tiles": 0,
+    "reused_imported_tiles": 0,
+    "new_tile_count": 2,
+    "appended_tile_start": 8,
+    "final_tile_count": 21,
+    "final_size_bytes": 8192,
+    "remaining_tiles": 235
+  },
+  "attribute_flags": { "flip_horizontal": 64, "flip_vertical": 128, "palette_mask": 3 },
+  "origin": { "x": 4, "y": 8 },
+  "animations": [
+    {
+      "name": "attacking",
+      "type": "attack",
+      "direction": "right",
+      "generated_by_horizontal_flip": false,
+      "default_frame_duration": 12,
+      "width": 8,
+      "height": 16,
+      "width_tiles": 1,
+      "height_tiles": 2,
+      "loop": true,
+      "frames": [
+        {
+          "duration": 12,
+          "width": 8,
+          "height": 16,
+          "sprites": [
+            { "x": -4, "y": -8, "tile": 8, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": -4, "y": 0, "tile": 9, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -5,10 +5,10 @@ progression. Do not infer the current or next milestone from numbering alone.
 
 ## Current roadmap state
 
-- **Current release:** Release 0.6 — Audio
-- **Last completed milestone:** [`0.5.15 — Game-State Support`](0.md#game-state-support)
-- **Next milestone:** [`0.6.1 — Basic APU Sound Effects`](0.md#basic-apu-sound-effects)
-- **Next milestone file:** [Version 0 roadmap](0.md#basic-apu-sound-effects)
+- **Current release:** Release 0.5 — Sprites and Gameplay
+- **Last completed milestone:** [`0.5.16 — Gameplay Integration / NES Survivor Vertical Slice`](0.md#gameplay-integration--nes-survivor-vertical-slice)
+- **Next milestone:** [`0.5.17 — Asset Interchange and Versioning`](0.md#asset-interchange-and-versioning)
+- **Next milestone file:** [Version 0 roadmap](0.md#asset-interchange-and-versioning)
 
 ## Philosophy
 

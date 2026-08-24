@@ -1,0 +1,9 @@
+program=NesSurvivorVerticalSlice
+reference_sha=af433de5ad5705d756e9f4cb9ff800fc91b6261c
+metasprite_instances=22
+reserved_oam_slots=41
+procedures=SelectBatVisual,SelectGemVisual,HideAllEnemies,HideAllGems,ResetGameplay,ShowTitle,StartGame,EnterGameOver,UpdatePlayer,UpdateSword,SpawnEnemy,UpdateEnemies,SpawnGem,UpdateSwordCollisions,UpdatePlayerDamage,UpdateGems,UpdateDamageFlash,UpdatePlaying,Update
+functions=EnemyIsAlive,SwordHitsEnemy,GemTouchesPlayer
+runtime_features=COLLISION_RECTS,CONTROLLER_QUERY,METASPRITE_ANIMATION,METASPRITE_API,PALETTE_QUEUE,RANDOM,RANDOM_RANGE
+prg_code_bytes=5908
+instructions=2653

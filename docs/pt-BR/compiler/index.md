@@ -74,6 +74,12 @@ relevante.
 - [Suporte a estados de jogo](../runtime/game-state-support.md) — padrão canônico
   de composição com enum, ciclo de vida, medições de recursos e validação.
 
+### 0.5.16 — Vertical slice de NES Survivor
+
+- [Vertical slice de NES Survivor](nes-survivor-vertical-slice-0.5.16.md) —
+  referência e assets congelados, workload integrado, medições, comparação com
+  C/Assembly, stress e gaps encontrados.
+
 Para material durável do compilador que não é específico de um marco, consulte
 o [Mapa de cobertura de testes semânticos](test-coverage-map.md) e a seção
 [Referência](../reference/index.md).

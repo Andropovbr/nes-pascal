@@ -1,0 +1,64 @@
+{
+  "format": "png2chr-studio-animation",
+  "version": 2,
+  "name": "bat",
+  "source": {
+    "image": "SwoopingBat.png",
+    "image_width": 32,
+    "image_height": 8,
+    "frame_width": 16,
+    "frame_height": 8,
+    "tile_width": 8,
+    "tile_height": 8,
+    "frame_columns": 2,
+    "frame_rows": 1
+  },
+  "chr": {
+    "output": "game.chr",
+    "capacity_tiles": 256,
+    "base_tile_count": 10,
+    "reused_destination_tiles": 0,
+    "reused_imported_tiles": 0,
+    "new_tile_count": 4,
+    "appended_tile_start": 10,
+    "final_tile_count": 21,
+    "final_size_bytes": 8192,
+    "remaining_tiles": 235
+  },
+  "attribute_flags": { "flip_horizontal": 64, "flip_vertical": 128, "palette_mask": 3 },
+  "origin": { "x": 8, "y": 4 },
+  "animations": [
+    {
+      "name": "flying",
+      "type": "movement",
+      "direction": "right",
+      "generated_by_horizontal_flip": false,
+      "default_frame_duration": 16,
+      "width": 16,
+      "height": 8,
+      "width_tiles": 2,
+      "height_tiles": 1,
+      "loop": true,
+      "frames": [
+        {
+          "duration": 16,
+          "width": 16,
+          "height": 8,
+          "sprites": [
+            { "x": -8, "y": -4, "tile": 10, "attributes": 1, "palette": 1, "horizontal_flip": false, "vertical_flip": false },
+            { "x": 0, "y": -4, "tile": 11, "attributes": 1, "palette": 1, "horizontal_flip": false, "vertical_flip": false }
+          ]
+        },
+        {
+          "duration": 16,
+          "width": 16,
+          "height": 8,
+          "sprites": [
+            { "x": -8, "y": -4, "tile": 12, "attributes": 1, "palette": 1, "horizontal_flip": false, "vertical_flip": false },
+            { "x": 0, "y": -4, "tile": 13, "attributes": 1, "palette": 1, "horizontal_flip": false, "vertical_flip": false }
+          ]
+        }
+      ]
+    }
+  ]
+}

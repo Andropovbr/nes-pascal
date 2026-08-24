@@ -46,6 +46,12 @@ manual frame selection, visibility, anchor-centered flip, and edge clipping.
 Imported animation symbols add automatic default/per-frame timing, looping and
 one-shot playback, explicit restart, completion queries, and main-thread frame
 advancement without duplicating component geometry.
+The maintained [NES Survivor vertical slice](docs/compiler/nes-survivor-vertical-slice-0.5.16.md)
+combines these language and runtime features into a 12-enemy gameplay workload
+with automatic melee attacks, damage, XP gems, state transitions, RNG spawning,
+and a verified 41-sprite OAM peak. It is a representative integration workload,
+not a finished port or the canonical
+[`Andropovbr/nes-survivor`](https://github.com/Andropovbr/nes-survivor) project.
 
 ## Documentation
 

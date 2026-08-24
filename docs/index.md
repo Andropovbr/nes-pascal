@@ -48,6 +48,7 @@ Planned work is tracked separately in the
 - [Collision helpers](runtime/collision-helpers.md)
 - [Random numbers](runtime/random-numbers.md)
 - [Game-state support](runtime/game-state-support.md)
+- [NES Survivor vertical slice](compiler/nes-survivor-vertical-slice-0.5.16.md)
 
 ## Reference
 

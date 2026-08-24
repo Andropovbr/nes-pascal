@@ -72,6 +72,12 @@ written, with explicit historical notes added where relevant.
 - [Game-state support](../runtime/game-state-support.md) — canonical enum-based
   composition pattern, lifecycle walkthrough, resource measurements, and validation.
 
+### 0.5.16 — NES Survivor vertical slice
+
+- [NES Survivor vertical slice](nes-survivor-vertical-slice-0.5.16.md) — frozen
+  reference/asset provenance, integrated workload, resource measurements,
+  C/Assembly comparison, stress result, and exposed gaps.
+
 ## Cross-cutting audits
 
 - [Diagnostic catalog and error-message consistency audit](diagnostic-consistency-audit.md) — cross-cutting QA audit of the diagnostic catalog, coverage, message quality, precedence, and EN/PT-BR parity.

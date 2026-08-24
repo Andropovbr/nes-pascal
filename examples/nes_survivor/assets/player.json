@@ -1,0 +1,109 @@
+{
+  "format": "png2chr-studio-animation",
+  "version": 2,
+  "name": "player",
+  "source": {
+    "image": "soldier_idle.png + soldier_walking.png",
+    "image_width": 48,
+    "image_height": 24,
+    "frame_width": 24,
+    "frame_height": 24,
+    "tile_width": 8,
+    "tile_height": 8,
+    "frame_columns": 2,
+    "frame_rows": 1
+  },
+  "chr": {
+    "output": "game.chr",
+    "capacity_tiles": 256,
+    "base_tile_count": 0,
+    "reused_destination_tiles": 0,
+    "reused_imported_tiles": 0,
+    "new_tile_count": 8,
+    "appended_tile_start": 0,
+    "final_tile_count": 21,
+    "final_size_bytes": 8192,
+    "remaining_tiles": 235
+  },
+  "attribute_flags": {
+    "flip_horizontal": 64,
+    "flip_vertical": 128,
+    "palette_mask": 3
+  },
+  "origin": { "x": 12, "y": 12 },
+  "animations": [
+    {
+      "name": "idle",
+      "type": "idle",
+      "direction": "none",
+      "generated_by_horizontal_flip": false,
+      "default_frame_duration": 12,
+      "width": 24,
+      "height": 24,
+      "width_tiles": 3,
+      "height_tiles": 3,
+      "loop": true,
+      "frames": [
+        {
+          "duration": 12,
+          "width": 24,
+          "height": 24,
+          "collision_box": { "x": -4, "y": -4, "width": 16, "height": 16 },
+          "sprites": [
+            { "x": -4, "y": -12, "tile": 0, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": 4, "y": -12, "tile": 0, "attributes": 64, "palette": 0, "horizontal_flip": true, "vertical_flip": false },
+            { "x": -4, "y": -4, "tile": 1, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": 4, "y": -4, "tile": 2, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": -12, "y": 4, "tile": 3, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": -4, "y": 4, "tile": 4, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": 4, "y": 4, "tile": 5, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "walking",
+      "type": "movement",
+      "direction": "right",
+      "generated_by_horizontal_flip": false,
+      "default_frame_duration": 12,
+      "width": 24,
+      "height": 24,
+      "width_tiles": 3,
+      "height_tiles": 3,
+      "loop": true,
+      "frames": [
+        {
+          "duration": 12,
+          "width": 24,
+          "height": 24,
+          "collision_box": { "x": -4, "y": -4, "width": 16, "height": 16 },
+          "sprites": [
+            { "x": -4, "y": -12, "tile": 0, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": 4, "y": -12, "tile": 0, "attributes": 64, "palette": 0, "horizontal_flip": true, "vertical_flip": false },
+            { "x": -4, "y": -4, "tile": 1, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": 4, "y": -4, "tile": 2, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": -12, "y": 4, "tile": 3, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": -4, "y": 4, "tile": 6, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": 4, "y": 4, "tile": 7, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false }
+          ]
+        },
+        {
+          "duration": 12,
+          "width": 24,
+          "height": 24,
+          "collision_box": { "x": -4, "y": -4, "width": 16, "height": 16 },
+          "sprites": [
+            { "x": -4, "y": -12, "tile": 0, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": 4, "y": -12, "tile": 0, "attributes": 64, "palette": 0, "horizontal_flip": true, "vertical_flip": false },
+            { "x": -4, "y": -4, "tile": 1, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": 4, "y": -4, "tile": 2, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": -12, "y": 4, "tile": 3, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": -4, "y": 4, "tile": 4, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false },
+            { "x": 4, "y": 4, "tile": 5, "attributes": 0, "palette": 0, "horizontal_flip": false, "vertical_flip": false }
+          ]
+        }
+      ]
+    }
+  ]
+}

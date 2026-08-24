@@ -455,6 +455,41 @@ end.
         self.assertIn("Non-ZP Allocated", benchmark_report)
         self.assertIn("Total Committed/Reserved", benchmark_report)
 
+    def test_nes_survivor_vertical_slice_builds_with_frozen_assets(self) -> None:
+        source_path = (
+            ROOT / "examples" / "nes_survivor" / "nes_survivor_vertical_slice.nsp"
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            rom_path = Path(temporary_directory) / "nes_survivor_vertical_slice.nes"
+            assembly_path, _ = compile_source(
+                source_path,
+                rom_path,
+                chr_path="assets/game.chr",
+                metasprite_paths=(
+                    "assets/player.json",
+                    "assets/sword.json",
+                    "assets/bat.json",
+                    "assets/gem.json",
+                ),
+            )
+            rom = rom_path.read_bytes()
+            assembly = assembly_path.read_text(encoding="utf-8")
+            memory_map = rom_path.with_suffix(".map").read_text(encoding="utf-8")
+
+        self.assertEqual(len(rom), 16 + 32 * 1024 + 8 * 1024)
+        self.assertEqual(
+            rom[-8 * 1024 :],
+            (source_path.parent / "assets" / "game.chr").read_bytes(),
+        )
+        self.assertIn("runtime_metasprite_x: .res 22", assembly)
+        self.assertIn("metasprite_instance_slots_21:", assembly)
+        self.assertIn("    .byte $01, $28", assembly)
+        self.assertIn("runtime_collision_rects:", assembly)
+        self.assertIn("runtime_random_range:", assembly)
+        self.assertIn("runtime_metasprite_animation", memory_map)
+        self.assertIn("variable_Enemies", memory_map)
+        self.assertIn("variable_Gems", memory_map)
+
     def test_split_nametable_assets_build_as_one_complete_asset(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             project = Path(temporary_directory)
@@ -820,6 +855,25 @@ class MesenIntegrationTests(unittest.TestCase):
             "game_state",
             "verify_game_state.lua",
             chr_path="assets/chr_asset.chr",
+        )
+
+    def test_nes_survivor_vertical_slice_composes_full_gameplay_runtime(self) -> None:
+        self._run_mesen_test(
+            "nes_survivor_vertical_slice",
+            "verify_nes_survivor_vertical_slice.lua",
+            source_path=(
+                ROOT
+                / "examples"
+                / "nes_survivor"
+                / "nes_survivor_vertical_slice.nsp"
+            ),
+            chr_path="assets/game.chr",
+            metasprite_paths=(
+                "assets/player.json",
+                "assets/sword.json",
+                "assets/bat.json",
+                "assets/gem.json",
+            ),
         )
 
     def test_arrays_preserve_indexed_storage_and_boolean_branching(self) -> None:

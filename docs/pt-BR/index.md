@@ -48,6 +48,7 @@ O trabalho planejado é acompanhado separadamente no
 - [Helpers de colisão](runtime/collision-helpers.md)
 - [Números aleatórios](runtime/random-numbers.md)
 - [Suporte a estados de jogo](runtime/game-state-support.md)
+- [Vertical slice de NES Survivor](compiler/nes-survivor-vertical-slice-0.5.16.md)
 
 ## Referência
 
