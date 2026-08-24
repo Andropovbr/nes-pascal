@@ -10,4 +10,7 @@ a partir de um único arquivo-fonte `.nsp`.
 3. [Compile outros exemplos e execute-os em um emulador](building-and-running.md).
 4. [Execute a suíte de testes do compilador](testing.md) ao contribuir com alterações.
 
+Para um fluxo completo de jogo pequeno com Title, Playing, Paused, GameOver e
+reinício, comece pelo [exemplo de referência de estados](../runtime/game-state-support.md).
+
 Para a sintaxe completa implementada, consulte o [Guia da Linguagem](../../language/index.md).

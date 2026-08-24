@@ -72,8 +72,10 @@ parte da linguagem suportada.
   e DMA de OAM na NMI. Metasprites suportam layouts arbitrários de componentes com posse estática,
   seleção manual de quadros, posição do objeto inteiro, visibilidade, flip, recorte de sprites de
   hardware e sequências automáticas de quadros em repetição ou disparo único. Criação/destruição
-  em runtime, velocidade variável de reprodução, interpolação (blending) de animações, colisão,
-  multiplexação/flicker de sprites, ordenação e mitigação de estouro de scanlines não são suportados.
+  em runtime, velocidade variável de reprodução, interpolação (blending) de animações,
+  associação automática de colisão, multiplexação/flicker de sprites, ordenação e
+  mitigação de estouro de scanlines não são suportados. Helpers explícitos de colisão
+  estão disponíveis separadamente.
   `nes.set_sprite_zero` permanece como um helper legado de compatibilidade.
 - O registro de callbacks é estático. Há apenas um callback de cada tipo, sem parâmetros, valores
   de retorno, prioridades, listas, remoção, chamadas indiretas, callbacks de IRQ ou tratadores de

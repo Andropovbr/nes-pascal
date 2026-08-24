@@ -69,6 +69,11 @@ relevante.
 
 - [Implementação e medições de geração de números aleatórios](random-number-generation-0.5.14.md) — relatório de implementação.
 
+### 0.5.15 — Suporte a estados de jogo
+
+- [Suporte a estados de jogo](../runtime/game-state-support.md) — padrão canônico
+  de composição com enum, ciclo de vida, medições de recursos e validação.
+
 Para material durável do compilador que não é específico de um marco, consulte
 o [Mapa de cobertura de testes semânticos](test-coverage-map.md) e a seção
 [Referência](../reference/index.md).

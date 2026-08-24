@@ -138,6 +138,16 @@ class PackagingMetadataTests(unittest.TestCase):
     def test_package_version_matches_pyproject(self) -> None:
         self.assertEqual(__version__, self._pyproject()["project"]["version"])
 
+    def test_packaging_smoke_discovers_exactly_one_version_independent_wheel(self) -> None:
+        repository_root = Path(__file__).resolve().parent.parent
+        workflow = (repository_root / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("wheels=(dist/nes_pascal-*.whl)", workflow)
+        self.assertIn('test "${#wheels[@]}" -eq 1', workflow)
+        self.assertIn('pip install "${wheels[0]}"', workflow)
+        self.assertNotRegex(workflow, r"dist/nes_pascal-\d+\.\d+\.\d+-\*\.whl")
+
 
 if __name__ == "__main__":
     unittest.main()

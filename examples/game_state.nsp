@@ -1,0 +1,154 @@
+program GameStateDemo;
+
+type
+    GameState = (Title, Playing, Paused, GameOver);
+
+const
+    PlayerSprite: sprite = $00;
+    PlayerStartX: byte = $78;
+    PlayerStartY: byte = $70;
+    InitialHealth: byte = $03;
+
+var
+    State: GameState;
+    PlayerX: byte;
+    PlayerY: byte;
+    Health: byte;
+    Score: byte;
+    GameplayTicks: byte;
+    InitialRandom: byte;
+    SessionStarts: byte;
+
+procedure ResetGameplay;
+begin
+    PlayerX := PlayerStartX;
+    PlayerY := PlayerStartY;
+    Health := InitialHealth;
+    Score := $00;
+    GameplayTicks := $00;
+
+    nes.seed_random($2A);
+    InitialRandom := nes.random_byte();
+end;
+
+procedure EnterTitle;
+begin
+    nes.sprite_hide(PlayerSprite);
+    State := Title;
+end;
+
+procedure StartGame;
+begin
+    ResetGameplay;
+    inc(SessionStarts);
+    nes.set_background_color($0F);
+    nes.sprite_set_position(PlayerSprite, PlayerX, PlayerY);
+    nes.sprite_set_tile(PlayerSprite, $01);
+    nes.sprite_set_palette(PlayerSprite, $00);
+    nes.sprite_show(PlayerSprite);
+    State := Playing;
+end;
+
+procedure PauseGame;
+begin
+    nes.set_background_color($11);
+    State := Paused;
+end;
+
+procedure ResumeGame;
+begin
+    nes.set_background_color($0F);
+    State := Playing;
+end;
+
+procedure EnterGameOver;
+begin
+    nes.set_background_color($16);
+    nes.sprite_hide(PlayerSprite);
+    State := GameOver;
+end;
+
+function ShouldEndGame: boolean;
+begin
+    ShouldEndGame := Health = $00;
+end;
+
+procedure UpdateTitle;
+begin
+    if nes.controller_pressed($01, nes.button_start) then
+        StartGame;
+end;
+
+procedure UpdatePlaying;
+begin
+    if nes.controller_pressed($01, nes.button_start) then
+    begin
+        PauseGame;
+    end
+    else
+    begin
+        if nes.controller_down($01, nes.button_left) then
+            dec(PlayerX)
+        else if nes.controller_down($01, nes.button_right) then
+            inc(PlayerX);
+
+        if nes.controller_down($01, nes.button_up) then
+            dec(PlayerY)
+        else if nes.controller_down($01, nes.button_down) then
+            inc(PlayerY);
+
+        inc(Score);
+        inc(GameplayTicks);
+
+        if nes.controller_pressed($01, nes.button_b) then
+            Health := $00;
+
+        if ShouldEndGame() then
+        begin
+            EnterGameOver;
+        end
+        else
+            nes.sprite_set_position(PlayerSprite, PlayerX, PlayerY);
+    end;
+end;
+
+procedure UpdatePaused;
+begin
+    if nes.controller_pressed($01, nes.button_start) then
+        ResumeGame;
+end;
+
+procedure UpdateGameOver;
+begin
+    if nes.controller_pressed($01, nes.button_start) then
+        StartGame;
+end;
+
+procedure Update;
+begin
+    if State = Title then
+    begin
+        UpdateTitle;
+    end
+    else if State = Playing then
+    begin
+        UpdatePlaying;
+    end
+    else if State = Paused then
+    begin
+        UpdatePaused;
+    end
+    else if State = GameOver then
+    begin
+        UpdateGameOver;
+    end;
+end;
+
+begin
+    SessionStarts := $00;
+    ResetGameplay;
+    EnterTitle;
+    nes.set_background_color($21);
+    nes.on_update(Update);
+    nes.run;
+end.

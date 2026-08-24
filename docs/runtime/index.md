@@ -38,6 +38,8 @@ APIs are:
   sprite and metasprite bounds, and immutable background-tile collision lookup.
 - [Random numbers](random-numbers.md) provide deterministic bytes and inclusive,
   bias-controlled ranges with optional explicit seeding.
+- [Game-state support](game-state-support.md) documents the official enum,
+  transition-helper, dispatcher, pause, game-over, and explicit-restart pattern.
 - `nes.set_sprite_zero` is the fixed, example-only OAM staging helper described
   in the controller documentation; it remains as a compatibility helper.
 

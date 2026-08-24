@@ -177,6 +177,12 @@ BENCHMARKS: tuple[BenchmarkSpec, ...] = (
         "examples/random_numbers.nsp",
     ),
     BenchmarkSpec(
+        "game_state",
+        "Four-State Game Flow",
+        "examples/game_state.nsp",
+        chr_path="assets/chr_asset.chr",
+    ),
+    BenchmarkSpec(
         "gameplay_full_stack",
         "Full-Stack Gameplay (Combined RAM Pressure)",
         "examples/gameplay_full_stack.nsp",
@@ -887,7 +893,7 @@ def run_all_benchmarks() -> list[BenchmarkMetrics]:
 
 def format_markdown_report(metrics_list: list[BenchmarkMetrics]) -> str:
     lines: list[str] = [
-        "# NES Pascal Compiler Benchmark Results (through 0.5.14 Random Number Generation)",
+        "# NES Pascal Compiler Benchmark Results (through 0.5.15 Game-State Support)",
         "",
         "## 1. CPU RAM Accounting",
         "",

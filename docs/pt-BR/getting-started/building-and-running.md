@@ -43,6 +43,7 @@ python -m nes_pascal.cli examples/collision_rectangles.nsp -o build/collision_re
 python -m nes_pascal.cli examples/collision_background.nsp -o build/collision_background.nes --collision-map assets/collision_map.cmap
 python -m nes_pascal.cli examples/collision_helpers.nsp -o build/collision_helpers.nes --chr assets/game.chr --metasprite assets/player_idle.json --collision-map assets/collision_map.cmap
 python -m nes_pascal.cli examples/random_numbers.nsp -o build/random_numbers.nes
+python -m nes_pascal.cli examples/game_state.nsp -o build/game_state.nes --chr assets/chr_asset.chr
 python -m nes_pascal.cli examples/gameplay_full_stack.nsp -o build/gameplay_full_stack.nes --chr assets/game.chr --nametable assets/nametable_loading.nam --metasprite assets/player_consolidated.json
 ```
 
@@ -123,6 +124,8 @@ Os exemplos demonstram:
   bounds customizados, bordas seguras contra wrap, sprites/metasprites e mapa.
 - `random_numbers.nsp`: geração determinística de bytes, ranges inclusivos,
   seed explícita e uma rolagem de gameplay baseada em Function.
+- `game_state.nsp`: o fluxo canônico com enum para Title, Playing, Paused e
+  GameOver, com transições explícitas e reset de gameplay sem reiniciar a ROM.
 - `gameplay_full_stack.nsp`: o exemplo full-stack que combina carregamento de
   background, entrada de controle, paletas, um jogador metasprite em movimento
   com animação e pressão combinada de RAM em um único programa.

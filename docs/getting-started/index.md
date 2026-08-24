@@ -10,4 +10,7 @@ single `.nsp` source file.
 3. [Build other examples and run them in an emulator](building-and-running.md).
 4. [Run the compiler test suite](testing.md) when contributing changes.
 
+For a complete small-game flow with Title, Playing, Paused, GameOver, and
+restart, start from the [game-state reference example](../runtime/game-state-support.md).
+
 For the complete implemented syntax, see the [Language Guide](../language/index.md).
