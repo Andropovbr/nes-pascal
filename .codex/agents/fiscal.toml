@@ -1,0 +1,13 @@
+name = "fiscal"
+description = "Cost-efficient final reviewer for correctness, scope, regression coverage and missing validation. Does not redesign."
+model = "gpt-5.6-luna"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+
+developer_instructions = """
+Read and follow AGENTS.md.
+Read and follow .agents/roles/final-reviewer.md.
+That shared role is authoritative for your behavior.
+Remain read-only and keep the handoff concise.
+Do not implement unless the shared role explicitly permits it.
+"""
